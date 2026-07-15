@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "kindred-scaffold",
-    "slug": "kindred-scaffold",
+    "name": "Kindred",
+    "slug": "kindred",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "kindredscaffold",
+    "scheme": "kindred",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
