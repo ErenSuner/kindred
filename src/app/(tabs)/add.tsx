@@ -126,9 +126,6 @@ export default function Connections() {
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Chip label={person.eventTag} tone="secondary" role={person.eventTag} />
-                    <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontFamily: 'Inter_400Regular' }}>
-                      {person.role}
-                    </Txt>
                   </View>
                 </View>
               </View>

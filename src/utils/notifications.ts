@@ -5,6 +5,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Nudge, PRESET_OFFSET_DAYS, parseNudges } from '@/utils/nudges';
 import { Recurrence, YEARLY } from '@/utils/recurrence';
 import { getUpcomingOccurrences } from '@/utils/dates';
+import { Holiday } from '@/data/holidays';
+import { formatHolidayDate, nextHolidayDates } from '@/utils/holidays';
 
 // How many notifications to schedule in advance. iOS has a limit of 64.
 const MAX_NOTIFICATIONS = 60;
@@ -12,6 +14,10 @@ const MAX_NOTIFICATIONS = 60;
 // A weekly event would burn the whole budget on one reminder, so cap how far
 // ahead any single nudge books itself. Everything reschedules on next launch.
 const MAX_OCCURRENCES_PER_NUDGE = 6;
+
+// Shared occasions aren't tuneable per-event; everyone gets the same two.
+const HOLIDAY_OFFSET_DAYS = [7, 1];
+const HOLIDAY_YEARS_AHEAD = 2;
 
 type PendingNotification = { title: string; body: string; date: Date; id: string };
 
@@ -112,10 +118,43 @@ function collectMyEventNotifications(myEvents: MyEvent[]): PendingNotification[]
   return pending;
 }
 
+function collectHolidayNotifications(holidays: Holiday[]): PendingNotification[] {
+  const pending: PendingNotification[] = [];
+  const now = new Date();
+
+  for (const holiday of holidays) {
+    for (const date of nextHolidayDates(holiday.rule, HOLIDAY_YEARS_AHEAD)) {
+      for (const offset of HOLIDAY_OFFSET_DAYS) {
+        const at = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 9, 0, 0, 0);
+        at.setDate(at.getDate() - offset);
+        if (at.getTime() <= now.getTime()) continue;
+
+        pending.push({
+          id: `hd_${holiday.id}_${date.getFullYear()}_${offset}`,
+          title: holiday.name,
+          body:
+            offset === 1
+              ? `${holiday.name} is tomorrow — a good moment to reach out.`
+              : `${holiday.name} is a week away, on ${formatHolidayDate(date)}.`,
+          date: at,
+        });
+      }
+    }
+  }
+
+  return pending;
+}
+
 // Cancels every scheduled notification and reschedules from scratch, so this has
-// to be given the complete picture — people AND the user's own events — in one
-// call. Two partial callers would wipe each other's reminders.
-export async function syncNotifications(people: Person[], myEvents: MyEvent[] = [], nudgesEnabled?: boolean) {
+// to be given the complete picture — people, the user's own events AND the
+// shared occasions — in one call. Two partial callers would wipe each other's
+// reminders.
+export async function syncNotifications(
+  people: Person[],
+  myEvents: MyEvent[] = [],
+  holidays: Holiday[] = [],
+  nudgesEnabled?: boolean,
+) {
   if (Platform.OS === 'web') return;
 
   let isEnabled = nudgesEnabled;
@@ -140,6 +179,7 @@ export async function syncNotifications(people: Person[], myEvents: MyEvent[] = 
   const upcomingNotifications = [
     ...collectPeopleNotifications(people),
     ...collectMyEventNotifications(myEvents),
+    ...collectHolidayNotifications(holidays),
   ];
 
   // 3. Sort by closest date

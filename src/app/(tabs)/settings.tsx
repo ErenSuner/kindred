@@ -15,6 +15,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { syncNotifications } from '@/utils/notifications';
 import { usePeople } from '@/context/PeopleContext';
 import { useEvents } from '@/context/EventsContext';
+import { useHolidays } from '@/context/HolidaysContext';
+import { HOLIDAYS } from '@/data/holidays';
 import { Toggle } from '@/components/Toggle';
 
 type RowProps = {
@@ -77,6 +79,7 @@ export default function Settings() {
   const { user, signOut } = useAuth();
   const { people } = usePeople();
   const { events } = useEvents();
+  const { enabledIds } = useHolidays();
 
   useEffect(() => {
     AsyncStorage.getItem('@settings_nudges').then(val => {
@@ -87,7 +90,8 @@ export default function Settings() {
   const handleToggleNudges = async (val: boolean) => {
     setNudges(val);
     await AsyncStorage.setItem('@settings_nudges', String(val));
-    syncNotifications(people, events, val); // Pass the setting directly to sync
+    // Pass the setting directly to sync — reading it back could race the write.
+    syncNotifications(people, events, HOLIDAYS.filter(h => enabledIds.includes(h.id)), val);
   };
 
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
@@ -174,6 +178,13 @@ export default function Settings() {
               sublabel="Soft reminders for important moments"
               right={<Toggle value={nudges} onChange={handleToggleNudges} />}
               onPress={() => handleToggleNudges(!nudges)}
+            />
+            <Row
+              icon="public"
+              label="Shared Occasions"
+              sublabel="Mother's Day, Valentine's Day and more"
+              value={`${enabledIds.length} on`}
+              onPress={() => router.push('/settings/holidays')}
             />
             <Row icon="schedule" label="Global Reminder Times" last />
           </View>

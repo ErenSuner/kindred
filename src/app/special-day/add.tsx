@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { View, ScrollView, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform, Modal } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,8 +10,10 @@ import { Button } from '@/components/Button';
 import { SelectableChip } from '@/components/Chip';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
 import { RecurrencePicker } from '@/components/RecurrencePicker';
+import { HighlightCard, HighlightHandle } from '@/components/HighlightCard';
 import { usePeople } from '@/context/PeopleContext';
 import { Recurrence, YEARLY } from '@/utils/recurrence';
+import { looksLikeBirthday } from '@/utils/birthdayHints';
 
 const PRESET_REMINDERS = [
   { label: 'Day Of', value: 'day_of' },
@@ -85,6 +87,16 @@ export default function AddSpecialDay() {
   const [customPickerVisible, setCustomPickerVisible] = useState(false);
   const [customPickerType, setCustomPickerType] = useState<'day' | 'month' | 'year'>('day');
 
+  // Nudging the user toward the Birthday card when they type a birthday into
+  // the free-text occasion field.
+  const scrollRef = useRef<ScrollView>(null);
+  const birthdayCardRef = useRef<HighlightHandle>(null);
+  const birthdayCardY = useRef(0);
+  const [birthdayPromptVisible, setBirthdayPromptVisible] = useState(false);
+  // Remembers the exact title the user already answered "no" for, so editing the
+  // title asks again but re-submitting the same one doesn't nag.
+  const [dismissedTitle, setDismissedTitle] = useState<string | null>(null);
+
   const addReminder = (reminder: Reminder) => {
     const targetReminders = pickerTarget === 'birthday' ? bdReminders : reminders;
     if (targetReminders.length >= MAX_REMINDERS) return;
@@ -150,6 +162,42 @@ export default function AddSpecialDay() {
       return;
     }
 
+    // Someone typing "Birthday" into the occasion field almost certainly wants
+    // the Birthday card instead — ask before saving it as a plain special day.
+    const title = occasion.trim().toLowerCase();
+    if (isAddingSpecial && looksLikeBirthday(title) && dismissedTitle !== title) {
+      setBirthdayPromptVisible(true);
+      return;
+    }
+
+    await saveEvents();
+  };
+
+  const dismissBirthdayPrompt = async () => {
+    setDismissedTitle(occasion.trim().toLowerCase());
+    setBirthdayPromptVisible(false);
+    await saveEvents();
+  };
+
+  const goToBirthdayCard = () => {
+    setBirthdayPromptVisible(false);
+
+    if (hasBirthday) {
+      // The Birthday card isn't on this screen once one exists, so send them to
+      // the editor and let it flag the card there.
+      router.push(`/birthday/edit/${personId}?highlight=1` as any);
+      return;
+    }
+
+    scrollRef.current?.scrollTo({ y: Math.max(birthdayCardY.current - 12, 0), animated: true });
+    // Let the scroll settle before the ring draws attention to itself.
+    setTimeout(() => birthdayCardRef.current?.pulse(), 380);
+  };
+
+  const saveEvents = async () => {
+    const isAddingBd = !hasBirthday && bdDay && bdMonth;
+    const isAddingSpecial = day && month && occasion.trim();
+
     try {
       if (isAddingBd) {
         const y = bdYear && bdYear !== 1000 ? bdYear : 1000;
@@ -197,10 +245,15 @@ export default function AddSpecialDay() {
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={{ padding: spacing.containerMobile, gap: spacing.stackLg, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
-          
+        <ScrollView ref={scrollRef} contentContainerStyle={{ padding: spacing.containerMobile, gap: spacing.stackLg, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
+
           {/* Birthday Card */}
           {!hasBirthday && (
+            <HighlightCard
+              ref={birthdayCardRef}
+              onLayout={(e) => { birthdayCardY.current = e.nativeEvent.layout.y; }}
+              style={{ marginHorizontal: -2 }}
+            >
             <Animated.View entering={FadeInDown.duration(500).delay(100)} style={[styles.card, { gap: spacing.stackMd }]}>
               <View style={styles.cardHeader}>
                 <Txt variant="headlineMd" color={colors.onSurface}>
@@ -267,6 +320,7 @@ export default function AddSpecialDay() {
                 </View>
               </View>
             </Animated.View>
+            </HighlightCard>
           )}
 
           {/* Important date */}
@@ -556,6 +610,43 @@ export default function AddSpecialDay() {
           </Animated.View>
         </Pressable>
       </Modal>
+
+      {/* "That looks like a birthday" prompt */}
+      <Modal visible={birthdayPromptVisible} transparent animationType="fade" onRequestClose={() => setBirthdayPromptVisible(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setBirthdayPromptVisible(false)}>
+          <Animated.View entering={SlideInDown.duration(280)} style={styles.modalContent}>
+            <Pressable onPress={(e) => e.stopPropagation()}>
+              <View style={styles.promptIconWrap}>
+                <Icon name="cake" size={28} color={colors.onPrimaryContainer} />
+              </View>
+
+              <Txt variant="headlineMd" color={colors.onSurface} style={{ marginTop: 16, marginBottom: 8 }}>
+                {hasBirthday ? 'Change the birthday?' : 'Is this a birthday?'}
+              </Txt>
+              <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginBottom: 24, lineHeight: 22 }}>
+                {hasBirthday
+                  ? `${person?.name ?? 'This person'} already has a birthday saved. Birthdays live in their own place so Kindred can count ages — do you want to edit it instead?`
+                  : `Birthdays have their own card up top, so Kindred can count ages and repeat every year. Want to add it there instead?`}
+              </Txt>
+
+              <View style={{ gap: 8 }}>
+                <Button
+                  label={hasBirthday ? 'Yes, edit the birthday' : 'Yes, take me there'}
+                  icon="cake"
+                  fullWidth
+                  onPress={goToBirthdayCard}
+                />
+                <Button
+                  label="No, save it as an important date"
+                  variant="tonal"
+                  fullWidth
+                  onPress={dismissBirthdayPrompt}
+                />
+              </View>
+            </Pressable>
+          </Animated.View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -669,5 +760,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     paddingVertical: 14,
     borderRadius: radius.full,
+  },
+  promptIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primaryFixed,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

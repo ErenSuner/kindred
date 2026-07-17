@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, ScrollView, StyleSheet, Pressable, KeyboardAvoidingView, Platform, Alert, Modal } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
+import { HighlightCard, HighlightHandle } from '@/components/HighlightCard';
 import { usePeople } from '@/context/PeopleContext';
 
 const PRESET_REMINDERS = [
@@ -47,11 +48,20 @@ function formatCustomDate(dateStr: string) {
 export default function EditBirthday() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { personId } = useLocalSearchParams<{ personId: string }>();
+  const { personId, highlight } = useLocalSearchParams<{ personId: string; highlight?: string }>();
   const { people, updateBirthday, deleteBirthday } = usePeople();
 
   const person = people.find((p) => p.id === personId);
   const birthday = person?.birthday;
+
+  // Set when the user arrives from the "that looks like a birthday" prompt on
+  // the special-day screen, so the card they were sent to announces itself.
+  const birthdayCardRef = useRef<HighlightHandle>(null);
+  useEffect(() => {
+    if (highlight !== '1' || !birthday) return;
+    const timer = setTimeout(() => birthdayCardRef.current?.pulse(), 420);
+    return () => clearTimeout(timer);
+  }, [highlight, birthday]);
 
   const [day, setDay] = useState<number | null>(null);
   const [month, setMonth] = useState<number | null>(null);
@@ -213,6 +223,7 @@ export default function EditBirthday() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ padding: spacing.containerMobile, gap: spacing.stackLg, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
           
+          <HighlightCard ref={birthdayCardRef} style={{ marginHorizontal: -2 }}>
           <Animated.View entering={FadeInDown.duration(500).delay(100)} style={[styles.card, { gap: spacing.stackMd }]}>
             <View style={styles.cardHeader}>
               <Txt variant="headlineMd" color={colors.onSurface}>
@@ -287,6 +298,7 @@ export default function EditBirthday() {
               </View>
             </View>
           </Animated.View>
+          </HighlightCard>
 
           <Animated.View entering={FadeInDown.duration(500).delay(200)} style={{ alignItems: 'center' }}>
             <Button label="Save Changes" icon="check" onPress={handleSubmit} />

@@ -12,6 +12,7 @@ import { currentUser } from '@/data/mock';
 import type { MyEvent, Person } from '@/data/mock';
 import { usePeople } from '@/context/PeopleContext';
 import { useEvents } from '@/context/EventsContext';
+import { useHolidays } from '@/context/HolidaysContext';
 import { useAuth } from '@/context/AuthContext';
 
 type FeedItem =
@@ -23,6 +24,7 @@ export default function Home() {
   const insets = useSafeAreaInsets();
   const { people } = usePeople();
   const { events } = useEvents();
+  const { imminent } = useHolidays();
   const { user } = useAuth();
 
   const userName = user?.email ? user.email.split('@')[0] : currentUser.name;
@@ -92,6 +94,45 @@ export default function Home() {
             <Txt variant="labelMd" color={colors.onPrimaryContainer}>Birthdays</Txt>
           </Pressable>
         </Animated.View>
+
+        {/* Shared occasions close enough to act on */}
+        {imminent.map((item, index) => (
+          <Animated.View
+            key={item.holiday.id}
+            entering={FadeInDown.duration(500).delay(80 + index * 60)}
+            style={{ marginBottom: spacing.gutter }}
+          >
+            <Card style={styles.holidayCard}>
+              <View style={[styles.holidayGlow, { pointerEvents: 'none' } as any]} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                <View style={styles.holidayIconWrap}>
+                  <Icon name={item.holiday.icon as any} size={26} color={colors.onTertiaryFixed} />
+                </View>
+                <View style={{ flex: 1, gap: 6 }}>
+                  <View style={styles.holidayChip}>
+                    <Icon name="public" size={12} color={colors.onTertiaryFixed} />
+                    <Txt variant="labelSm" color={colors.onTertiaryFixed}>Shared occasion</Txt>
+                  </View>
+                  <Txt variant="headlineMd" color={colors.onSurface}>{item.holiday.name}</Txt>
+                </View>
+              </View>
+
+              <View style={styles.holidayFooter}>
+                <View>
+                  <Txt variant="bodyMd" color={colors.onSurfaceVariant}>{item.formattedDate}</Txt>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Txt variant="headlineMd" color={colors.tertiary}>
+                    {item.daysAway === 0 ? 'Today!' : item.daysAway === 1 ? 'Tomorrow' : item.daysAway}
+                  </Txt>
+                  {item.daysAway > 1 && (
+                    <Txt variant="labelSm" color={colors.onSurfaceVariant}>days away</Txt>
+                  )}
+                </View>
+              </View>
+            </Card>
+          </Animated.View>
+        ))}
 
         {/* Empty state */}
         {people.length === 0 && events.length === 0 && (
@@ -315,6 +356,48 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryFixed,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Warm/tertiary so a shared occasion reads as a different kind of thing from
+  // the blush-toned people and personal event cards.
+  holidayCard: {
+    overflow: 'hidden',
+    paddingVertical: 20,
+  },
+  holidayGlow: {
+    position: 'absolute',
+    top: -70,
+    right: -50,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(207,151,83,0.14)',
+  },
+  holidayIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.tertiaryFixed,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  holidayChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    backgroundColor: colors.tertiaryFixed,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+  },
+  holidayFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.06)',
   },
   eventIconBadgeSm: {
     width: 48,

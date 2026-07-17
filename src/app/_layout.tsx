@@ -19,6 +19,7 @@ import { colors } from '@/theme/tokens';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { PeopleProvider } from '@/context/PeopleContext';
 import { EventsProvider } from '@/context/EventsContext';
+import { HolidaysProvider } from '@/context/HolidaysContext';
 import { NotificationSync } from '@/components/NotificationSync';
 
 import { Platform, LogBox } from 'react-native';
@@ -127,11 +128,13 @@ export default function RootLayout() {
     <AuthProvider>
       <PeopleProvider>
         <EventsProvider>
-          <GestureHandlerRootView style={{ flex: 1 }}>
-            <StatusBar style="dark" />
-            <NotificationSync />
-            <RootLayoutNav />
-          </GestureHandlerRootView>
+          <HolidaysProvider>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <StatusBar style="dark" />
+              <NotificationSync />
+              <RootLayoutNav />
+            </GestureHandlerRootView>
+          </HolidaysProvider>
         </EventsProvider>
       </PeopleProvider>
     </AuthProvider>
