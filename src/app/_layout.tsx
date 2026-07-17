@@ -4,6 +4,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import * as Notifications from 'expo-notifications';
 import {
   useFonts,
   Literata_500Medium,
@@ -18,7 +19,26 @@ import { colors } from '@/theme/tokens';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { PeopleProvider } from '@/context/PeopleContext';
 
+import { Platform, LogBox } from 'react-native';
+
+LogBox.ignoreLogs([
+  'expo-notifications: Android Push notifications',
+  'expo-notifications: Push notifications',
+]);
+
 SplashScreen.preventAutoHideAsync();
+
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    } as any),
+  });
+}
 
 function RootLayoutNav() {
   const { user, loading } = useAuth();
@@ -81,6 +101,21 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded) SplashScreen.hideAsync();
   }, [loaded]);
+
+  useEffect(() => {
+    async function reqPerm() {
+      if (Platform.OS === 'web') return;
+      try {
+        const { status } = await Notifications.getPermissionsAsync();
+        if (status !== 'granted') {
+          await Notifications.requestPermissionsAsync();
+        }
+      } catch (e) {
+        console.warn('Could not request notification permissions', e);
+      }
+    }
+    reqPerm();
+  }, []);
 
   if (!loaded) return null;
 

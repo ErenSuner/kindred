@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, ScrollView, StyleSheet, Pressable, Modal } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, ScrollView, StyleSheet, Pressable, Modal, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,10 @@ import { Button } from '@/components/Button';
 import { currentUser } from '@/data/mock';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { syncNotifications } from '@/utils/notifications';
+import { usePeople } from '@/context/PeopleContext';
+import { Toggle } from '@/components/Toggle';
 
 type RowProps = {
   icon: React.ComponentProps<typeof Icon>['name'];
@@ -57,25 +61,6 @@ function Row({ icon, label, sublabel, value, trailingIcon = 'chevron-right', rig
   );
 }
 
-function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <Pressable
-      onPress={() => onChange(!value)}
-      style={[styles.toggle, { backgroundColor: value ? colors.primaryContainer : colors.surfaceVariant }]}
-    >
-      <View
-        style={[
-          styles.knob,
-          {
-            backgroundColor: value ? colors.onPrimaryContainer : colors.outline,
-            alignSelf: value ? 'flex-end' : 'flex-start',
-          },
-        ]}
-      />
-    </Pressable>
-  );
-}
-
 function SectionTitle({ children }: { children: string }) {
   return (
     <Txt variant="labelSm" color={colors.primary} style={styles.sectionTitle}>
@@ -89,6 +74,19 @@ export default function Settings() {
   const insets = useSafeAreaInsets();
   const [nudges, setNudges] = useState(true);
   const { user, signOut } = useAuth();
+  const { people } = usePeople();
+
+  useEffect(() => {
+    AsyncStorage.getItem('@settings_nudges').then(val => {
+      if (val !== null) setNudges(val === 'true');
+    });
+  }, []);
+
+  const handleToggleNudges = async (val: boolean) => {
+    setNudges(val);
+    await AsyncStorage.setItem('@settings_nudges', String(val));
+    syncNotifications(people, val); // Pass the setting directly to sync
+  };
 
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [deleteStep, setDeleteStep] = useState(1);
@@ -172,7 +170,8 @@ export default function Settings() {
               icon="notifications-active"
               label="Gentle Nudges"
               sublabel="Soft reminders for important moments"
-              right={<Toggle value={nudges} onChange={setNudges} />}
+              right={<Toggle value={nudges} onChange={handleToggleNudges} />}
+              onPress={() => handleToggleNudges(!nudges)}
             />
             <Row icon="schedule" label="Global Reminder Times" last />
           </View>
@@ -311,14 +310,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceVariant,
     marginHorizontal: 16,
   },
-  toggle: {
-    width: 48,
-    height: 28,
-    borderRadius: radius.full,
-    padding: 4,
-    justifyContent: 'center',
-  },
-  knob: { width: 20, height: 20, borderRadius: 10 },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',

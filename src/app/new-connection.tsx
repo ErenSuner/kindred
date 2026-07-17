@@ -1,14 +1,15 @@
-import { useState, createElement } from 'react';
-import { View, ScrollView, StyleSheet, Pressable, TextInput, Modal, Platform, KeyboardAvoidingView } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeIn, FadeOut } from 'react-native-reanimated';
-import { colors, spacing, radius, softShadow, ambientShadow } from '@/theme/tokens';
-import { Txt } from '@/components/Txt';
-import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
+import { SelectableChip } from '@/components/Chip';
+import { Icon } from '@/components/Icon';
+import { Txt } from '@/components/Txt';
 import { usePeople } from '@/context/PeopleContext';
 import type { Relationship } from '@/data/mock';
+import { ambientShadow, colors, radius, softShadow, spacing } from '@/theme/tokens';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const RELATIONSHIPS: Relationship[] = ['Family', 'Friend', 'Partner', 'Colleague', 'Acquaintance'];
 
@@ -28,7 +29,7 @@ export default function NewConnection() {
   // Form state
   const [relationship, setRelationship] = useState<Relationship>('Friend');
   const [name, setName] = useState('');
-  
+
   // Validation
   const [nameError, setNameError] = useState('');
   const [duplicateAlertVisible, setDuplicateAlertVisible] = useState(false);
@@ -117,20 +118,15 @@ export default function NewConnection() {
             <View style={{ gap: 8 }}>
               <FieldLabel>Relationship</FieldLabel>
               <View style={styles.chipWrap}>
-                {RELATIONSHIPS.map((r) => {
-                  const active = relationship === r;
-                  return (
-                    <Pressable
-                      key={r}
-                      onPress={() => setRelationship(r)}
-                      style={[styles.selectChip, active && styles.selectChipActive]}
-                    >
-                      <Txt variant="labelMd" color={active ? colors.onSecondaryContainer : colors.onSurfaceVariant}>
-                        {r}
-                      </Txt>
-                    </Pressable>
-                  );
-                })}
+                {RELATIONSHIPS.map((r) => (
+                  <SelectableChip
+                    key={r}
+                    label={r}
+                    active={relationship === r}
+                    onPress={() => setRelationship(r)}
+                    isRole
+                  />
+                ))}
               </View>
             </View>
           </Animated.View>

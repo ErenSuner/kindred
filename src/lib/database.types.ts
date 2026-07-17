@@ -59,6 +59,29 @@ export type Database = {
           created_at?: string;
         };
       };
+      birthdays: {
+        Row: {
+          id: string;
+          person_id: string;
+          date: string;
+          nudges: string[];
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          person_id: string;
+          date: string;
+          nudges?: string[];
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          person_id?: string;
+          date?: string;
+          nudges?: string[];
+          created_at?: string;
+        };
+      };
       notes: {
         Row: {
           id: string;

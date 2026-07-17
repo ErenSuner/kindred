@@ -11,6 +11,10 @@ export type SpecialDay = {
   originalDate?: string; // e.g. YYYY-MM-DD
   daysAway?: number;
   turningAge?: number;
+  nudges?: any[];
+  isBirthday?: boolean;
+  isAnnual?: boolean;
+  isExpired?: boolean;
 };
 
 export type Note = {
@@ -39,6 +43,7 @@ export type Person = {
     progress: number; // 0..1
   };
   specialDays?: SpecialDay[];
+  birthday?: { id: string; date: string; nudges: any[] };
   notes?: Note[];
   isPinned?: boolean;
 };

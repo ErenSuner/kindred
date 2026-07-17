@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import type { Note, Person, Relationship } from '@/data/mock';
 import { supabase } from '@/lib/supabase';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
-import type { Person, Relationship, SpecialDay, Note } from '@/data/mock';
+import { syncNotifications } from '@/utils/notifications';
 
 type PeopleContextValue = {
   people: Person[];
@@ -17,13 +18,22 @@ type PeopleContextValue = {
   addSpecialDay: (personId: string, data: {
     title: string;
     date: string;
+    nudges?: string[];
+    isAnnual?: boolean;
   }) => Promise<void>;
   updateSpecialDay: (dayId: string, data: {
-    title: string;
-    date: string;
+    title?: string;
+    date?: string;
+    nudges?: string[];
+    isAnnual?: boolean;
   }) => Promise<void>;
   deleteSpecialDay: (dayId: string) => Promise<void>;
+  addBirthday: (personId: string, data: { date: string; nudges?: string[] }) => Promise<void>;
+  updateBirthday: (birthdayId: string, data: { date?: string; nudges?: string[] }) => Promise<void>;
+  deleteBirthday: (birthdayId: string) => Promise<void>;
   addNoteToPerson: (personId: string, kind: string, body: string) => Promise<void>;
+  updateNote: (noteId: string, data: { kind?: string; body?: string }) => Promise<void>;
+  deleteNote: (noteId: string) => Promise<void>;
   removePerson: (id: string) => Promise<void>;
   togglePin: (id: string, isPinned: boolean) => Promise<void>;
   refreshPeople: () => Promise<void>;
@@ -38,20 +48,20 @@ function getOrdinal(n: number) {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
-function getNextOccurrence(dateStr: string): { date: Date; daysAway: number; formattedDate: string; turningAge?: number } {
+function getNextOccurrence(dateStr: string, isAnnual: boolean = true): { date: Date; daysAway: number; formattedDate: string; turningAge?: number } {
   // dateStr is 'YYYY-MM-DD'
   const [yearStr, monthStr, dayStr] = dateStr.split('-');
   const birthYear = Number(yearStr);
   const month = Number(monthStr);
   const day = Number(dayStr);
-  
+
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
-  let targetYear = now.getFullYear();
+  let targetYear = isAnnual ? now.getFullYear() : birthYear;
   let target = new Date(targetYear, month - 1, day);
 
-  if (target.getTime() < now.getTime()) {
+  if (isAnnual && target.getTime() < now.getTime()) {
     targetYear += 1;
     target = new Date(targetYear, month - 1, day);
   }
@@ -65,7 +75,7 @@ function getNextOccurrence(dateStr: string): { date: Date; daysAway: number; for
   ];
 
   const formattedDate = `${months[month - 1]} ${getOrdinal(day)}, ${targetYear}`;
-  
+
   let turningAge: number | undefined = undefined;
   if (birthYear > 1000 && !isNaN(birthYear)) {
     turningAge = targetYear - birthYear;
@@ -76,7 +86,8 @@ function getNextOccurrence(dateStr: string): { date: Date; daysAway: number; for
 
 export function mapDbPersonToPerson(dbPerson: any): Person {
   const specialDays: any[] = (dbPerson.special_days || []).map((sd: any) => {
-    const { formattedDate, daysAway, turningAge } = getNextOccurrence(sd.date);
+    const isAnnual = sd.is_annual ?? true;
+    const { formattedDate, daysAway, turningAge } = getNextOccurrence(sd.date, isAnnual);
     return {
       id: sd.id,
       title: sd.title,
@@ -86,8 +97,34 @@ export function mapDbPersonToPerson(dbPerson: any): Person {
       originalDate: sd.date,
       daysAway,
       turningAge,
+      isAnnual,
+      isExpired: !isAnnual && daysAway < 0,
     };
   });
+
+  let birthday: any = undefined;
+  if (dbPerson.birthdays) {
+    const bd = Array.isArray(dbPerson.birthdays) ? dbPerson.birthdays[0] : dbPerson.birthdays;
+    if (bd) {
+    const { formattedDate, daysAway, turningAge } = getNextOccurrence(bd.date);
+    birthday = {
+      id: bd.id,
+      date: bd.date,
+      nudges: bd.nudges || [],
+    };
+    specialDays.push({
+      id: bd.id,
+      title: 'Birthday',
+      date: formattedDate,
+      icon: 'cake',
+      accent: 'tertiary',
+      originalDate: bd.date,
+      daysAway,
+      turningAge,
+      isBirthday: true,
+    });
+    }
+  }
 
   const notes: Note[] = (dbPerson.notes || [])
     .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -163,6 +200,7 @@ export function mapDbPersonToPerson(dbPerson: any): Person {
     eventDate,
     countdown,
     specialDays: returnedSpecialDays,
+    birthday,
     notes,
     isPinned: dbPerson.is_pinned || false,
   };
@@ -188,6 +226,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
           avatar_url,
           is_pinned,
           special_days (id, title, date, icon, accent),
+          birthdays (id, date, nudges),
           notes (id, kind, body, created_at)
         `);
 
@@ -195,13 +234,34 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
 
       if (data) {
         const mapped = data.map(mapDbPersonToPerson);
+        
+        const expiredDayIds: string[] = [];
+        mapped.forEach(p => {
+          if (p.specialDays) {
+            p.specialDays = p.specialDays.filter(sd => {
+              if (sd.isExpired) {
+                expiredDayIds.push(sd.id);
+                return false;
+              }
+              return true;
+            });
+          }
+        });
+
         // Sort people: pinned first, then closest event first
         mapped.sort((a, b) => {
           if (a.isPinned && !b.isPinned) return -1;
           if (!a.isPinned && b.isPinned) return 1;
           return (a.daysAway ?? 9999) - (b.daysAway ?? 9999);
         });
+        
         setPeople(mapped);
+        
+        if (expiredDayIds.length > 0) {
+          supabase.from('special_days').delete().in('id', expiredDayIds).then(({ error: delError }) => {
+            if (delError) console.warn('Failed to delete expired one-time events', delError);
+          });
+        }
       }
     } catch (err) {
       console.error('Error fetching people:', err);
@@ -216,6 +276,11 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
       setPeople([]);
     }
   }, [user]);
+
+  useEffect(() => {
+    // Re-calculate and schedule notifications whenever data changes
+    syncNotifications(people);
+  }, [people]);
 
   const addPerson = async (data: {
     name: string;
@@ -274,17 +339,21 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
   const addSpecialDay = async (personId: string, data: {
     title: string;
     date: string;
+    nudges?: string[];
+    isAnnual?: boolean;
   }) => {
-    if (!user) return;
     try {
+      if (!user) throw new Error('Not logged in');
       const { error } = await supabase
         .from('special_days')
         .insert({
           person_id: personId,
           title: data.title,
           date: data.date,
+          nudges: data.nudges || [],
           icon: data.title.toLowerCase().includes('birthday') ? 'cake' : 'event',
           accent: 'primary',
+          is_annual: data.isAnnual ?? true,
         });
       if (error) throw error;
       await refreshPeople();
@@ -295,18 +364,23 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateSpecialDay = async (dayId: string, data: {
-    title: string;
-    date: string;
+    title?: string;
+    date?: string;
+    nudges?: string[];
+    isAnnual?: boolean;
   }) => {
-    if (!user) return;
     try {
+      const updates: any = {};
+      if (data.title) {
+        updates.title = data.title;
+        updates.icon = data.title.toLowerCase().includes('birthday') ? 'cake' : 'event';
+      }
+      if (data.date) updates.date = data.date;
+      if (data.nudges) updates.nudges = data.nudges;
+      if (data.isAnnual !== undefined) updates.is_annual = data.isAnnual;
       const { error } = await supabase
         .from('special_days')
-        .update({
-          title: data.title,
-          date: data.date,
-          icon: data.title.toLowerCase().includes('birthday') ? 'cake' : 'event',
-        })
+        .update(updates)
         .eq('id', dayId);
       if (error) throw error;
       await refreshPeople();
@@ -331,6 +405,54 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const addBirthday = async (personId: string, data: { date: string; nudges?: string[] }) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from('birthdays')
+        .insert({
+          person_id: personId,
+          date: data.date,
+          nudges: data.nudges || [],
+        });
+      if (error) throw error;
+      await refreshPeople();
+    } catch (err) {
+      console.error('Error adding birthday:', err);
+      throw err;
+    }
+  };
+
+  const updateBirthday = async (birthdayId: string, data: { date?: string; nudges?: string[] }) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from('birthdays')
+        .update(data)
+        .eq('id', birthdayId);
+      if (error) throw error;
+      await refreshPeople();
+    } catch (err) {
+      console.error('Error updating birthday:', err);
+      throw err;
+    }
+  };
+
+  const deleteBirthday = async (birthdayId: string) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from('birthdays')
+        .delete()
+        .eq('id', birthdayId);
+      if (error) throw error;
+      await refreshPeople();
+    } catch (err) {
+      console.error('Error deleting birthday:', err);
+      throw err;
+    }
+  };
+
   const addNoteToPerson = async (personId: string, kind: string, body: string) => {
     if (!user) return;
     try {
@@ -345,6 +467,36 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
       await refreshPeople();
     } catch (err) {
       console.error('Error adding note:', err);
+      throw err;
+    }
+  };
+
+  const updateNote = async (noteId: string, data: { kind?: string; body?: string }) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from('notes')
+        .update(data)
+        .eq('id', noteId);
+      if (error) throw error;
+      await refreshPeople();
+    } catch (err) {
+      console.error('Error updating note:', err);
+      throw err;
+    }
+  };
+
+  const deleteNote = async (noteId: string) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from('notes')
+        .delete()
+        .eq('id', noteId);
+      if (error) throw error;
+      await refreshPeople();
+    } catch (err) {
+      console.error('Error deleting note:', err);
       throw err;
     }
   };
@@ -389,7 +541,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
         .from('people')
         .update({ is_pinned: isPinned })
         .eq('id', id);
-      
+
       if (error) throw error;
     } catch (err) {
       console.error('Error toggling pin:', err);
@@ -410,9 +562,14 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
         refreshPeople,
         getPerson,
         addNoteToPerson,
+        updateNote,
+        deleteNote,
         addSpecialDay,
         updateSpecialDay,
         deleteSpecialDay,
+        addBirthday,
+        updateBirthday,
+        deleteBirthday,
       }}
     >
       {children}

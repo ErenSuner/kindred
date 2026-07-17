@@ -3,13 +3,14 @@ import { View, ScrollView, StyleSheet, Pressable, TextInput, Modal } from 'react
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeOut, FadeIn, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { colors, spacing, radius, ambientShadow, softShadow } from '@/theme/tokens';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
-import { Chip } from '@/components/Chip';
+import { Chip, SelectableChip } from '@/components/Chip';
 import { Button } from '@/components/Button';
 import { usePeople } from '@/context/PeopleContext';
+import { InlineBirthdayCard } from '@/components/InlineBirthdayCard';
 import type { SpecialDay } from '@/data/mock';
 
 const accentMap = {
@@ -20,13 +21,20 @@ const accentMap = {
 
 const NOTE_KINDS = ['Gift Idea', 'Memory', 'Reminder', 'Other'];
 
-function SpecialDayRow({ day, personId }: { day: SpecialDay, personId: string }) {
+function SpecialDayRow({ day, personId, onLongPress }: { day: SpecialDay, personId: string, onLongPress?: () => void }) {
   const router = useRouter();
   const a = accentMap[day.accent as keyof typeof accentMap] || accentMap.primary;
   return (
     <Pressable 
       style={({ pressed }) => [styles.dayRow, pressed && { backgroundColor: colors.surfaceContainerLow }]}
-      onPress={() => router.push({ pathname: '/special-day/edit/[dayId]', params: { dayId: day.id, personId } } as any)}
+      onLongPress={onLongPress}
+      onPress={() => {
+        if ((day as any).isBirthday) {
+          router.push({ pathname: '/birthday/edit/[personId]', params: { personId } } as any);
+        } else {
+          router.push({ pathname: '/special-day/edit/[dayId]', params: { dayId: day.id, personId } } as any);
+        }
+      }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flex: 1 }}>
         <View style={[styles.dayIcon, { backgroundColor: a.bg }]}>
@@ -50,7 +58,7 @@ export default function PersonDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { getPerson, removePerson, addNoteToPerson } = usePeople();
+  const { getPerson, removePerson, addNoteToPerson, updateNote, deleteNote, deleteSpecialDay } = usePeople();
   
   const person = getPerson(id ?? '');
 
@@ -59,8 +67,22 @@ export default function PersonDetail() {
   const [noteKind, setNoteKind] = useState('Gift Idea');
   const [loadingNote, setLoadingNote] = useState(false);
 
+  // Edit Note state
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editNoteBody, setEditNoteBody] = useState('');
+  const [editNoteKind, setEditNoteKind] = useState('Gift Idea');
+  const [loadingEdit, setLoadingEdit] = useState(false);
+
   // Delete state
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [dayActionVisible, setDayActionVisible] = useState(false);
+  const [dayConfirmVisible, setDayConfirmVisible] = useState(false);
+  const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
+  const [isDeletingDay, setIsDeletingDay] = useState(false);
+
+  const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
+  const [deleteNoteConfirmVisible, setDeleteNoteConfirmVisible] = useState(false);
+  const [isDeletingNote, setIsDeletingNote] = useState(false);
 
   if (!person) {
     return (
@@ -108,6 +130,38 @@ export default function PersonDetail() {
       console.error('Failed to add note:', e);
     } finally {
       setLoadingNote(false);
+    }
+  };
+
+  const confirmDeleteNote = (noteId: string) => {
+    setNoteToDelete(noteId);
+    setDeleteNoteConfirmVisible(true);
+  };
+
+  const executeDeleteNote = async () => {
+    if (!noteToDelete) return;
+    setIsDeletingNote(true);
+    try {
+      await deleteNote(noteToDelete);
+      setDeleteNoteConfirmVisible(false);
+      setNoteToDelete(null);
+    } catch (e) {
+      console.error('Failed to delete note:', e);
+    } finally {
+      setIsDeletingNote(false);
+    }
+  };
+
+  const handleUpdateNote = async () => {
+    if (!editingNoteId || !editNoteBody.trim()) return;
+    setLoadingEdit(true);
+    try {
+      await updateNote(editingNoteId, { kind: editNoteKind, body: editNoteBody.trim() });
+      setEditingNoteId(null);
+    } catch (e) {
+      console.error('Failed to update note:', e);
+    } finally {
+      setLoadingEdit(false);
     }
   };
 
@@ -162,56 +216,57 @@ export default function PersonDetail() {
           </View>
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
             {person.tags.map((t) => (
-              <Chip key={t} label={t} tone={t === 'Local' ? 'tertiary' : 'primary'} />
+              <Chip key={t} label={t} tone={t === 'Local' ? 'tertiary' : 'primary'} role={t} />
             ))}
           </View>
         </Animated.View>
 
         {/* Countdown */}
-        <Animated.View entering={FadeInDown.duration(500).delay(100)} style={styles.countdownCard}>
-          <View style={[styles.blur, { pointerEvents: 'none' } as any]} />
-          <View style={styles.cardHeaderRow}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Icon name="celebration" size={24} color={colors.primary} />
-              <Txt variant="headlineMd" color={colors.onSurface}>
-                Next Big Day
-              </Txt>
-            </View>
-            {person.countdown && <Chip label={person.countdown.tag} tone="primarySolid" />}
-          </View>
-          
-          {person.countdown ? (
-            <>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 12, marginTop: 16 }}>
-                <Txt style={styles.bigNumber} color={colors.primary}>
-                  {person.countdown.days}
+        {person.countdown && (
+          <Animated.View entering={FadeInDown.duration(500).delay(100)} style={styles.countdownCard}>
+            <View style={[styles.blur, { pointerEvents: 'none' } as any]} />
+            <View style={styles.cardHeaderRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Icon name="celebration" size={24} color={colors.primary} />
+                <Txt variant="headlineMd" color={colors.onSurface}>
+                  Next Big Day
                 </Txt>
+              </View>
+              <Chip label={person.countdown.tag} tone="primarySolid" />
+            </View>
+            
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 12, marginTop: 16 }}>
+              <Txt style={styles.bigNumber} color={colors.primary}>
+                {person.countdown.days === 0 ? 'Today!' : person.countdown.days}
+              </Txt>
+              {person.countdown.days !== 0 && (
                 <Txt variant="bodyLg" color={colors.onSurfaceVariant} style={{ marginBottom: 8 }}>
                   days away
                 </Txt>
-              </View>
-              <View style={{ marginTop: 8 }}>
-                <Txt variant="bodyMd" color={colors.onSurface}>
-                  {person.countdown.title}
-                </Txt>
-                <Txt variant="labelMd" color={colors.onSurfaceVariant} style={{ marginTop: 4 }}>
-                  {person.countdown.date}
-                </Txt>
-              </View>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${person.countdown.progress * 100}%` }]} />
-              </View>
-            </>
-          ) : (
-            <View style={{ marginTop: 24, paddingVertical: 12, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: radius.md }}>
-              <Txt variant="bodyLg" color={colors.onSurfaceVariant}>
-                No upcoming events
+              )}
+            </View>
+            <View style={{ marginTop: 8 }}>
+              <Txt variant="bodyMd" color={colors.onSurface}>
+                {person.countdown.title}
               </Txt>
-              <Txt variant="labelMd" color={colors.outline} style={{ marginTop: 4 }}>
-                Add a special day to see the countdown
+              <Txt variant="labelMd" color={colors.onSurfaceVariant} style={{ marginTop: 4 }}>
+                {person.countdown.date}
               </Txt>
             </View>
-          )}
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${person.countdown.progress * 100}%` }]} />
+            </View>
+          </Animated.View>
+        )}
+
+        {/* Birthday Section */}
+        <Animated.View entering={FadeInDown.duration(500).delay(140)} style={{ gap: spacing.stackMd }}>
+          <View style={[styles.cardHeaderRow, styles.sectionHeading]}>
+            <Txt variant="headlineMd" color={colors.onSurface}>
+              Birthday
+            </Txt>
+          </View>
+          <InlineBirthdayCard person={person as any} />
         </Animated.View>
 
         {/* Special Days */}
@@ -222,10 +277,18 @@ export default function PersonDetail() {
             </Txt>
           </View>
           
-          {person.specialDays && person.specialDays.length > 0 ? (
-            <View style={{ gap: spacing.stackSm }}>
-              {person.specialDays.map((d) => (
-                <SpecialDayRow key={d.id} day={d} personId={person.id} />
+          {person.specialDays && person.specialDays.filter((d: any) => !d.isBirthday).length > 0 ? (
+            <View style={{ gap: 8 }}>
+              {person.specialDays.filter((d: any) => !d.isBirthday).map((d) => (
+                <SpecialDayRow 
+                  key={d.id} 
+                  day={d} 
+                  personId={person.id} 
+                  onLongPress={() => {
+                    setSelectedDayId(d.id);
+                    setDayActionVisible(true);
+                  }}
+                />
               ))}
             </View>
           ) : (
@@ -261,12 +324,58 @@ export default function PersonDetail() {
             <View style={{ gap: spacing.stackMd, marginBottom: 20 }}>
               {person.notes.map((n) => (
                 <View key={n.id} style={styles.note}>
-                  <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontFamily: 'Inter_400Regular', marginBottom: 8 }}>
-                    {n.kind} • {n.when}
-                  </Txt>
-                  <Txt variant="bodyMd" color={colors.onSurface}>
-                    {n.body}
-                  </Txt>
+                  {editingNoteId === n.id ? (
+                    <View style={{ gap: spacing.stackSm }}>
+                      <View style={styles.chipWrap}>
+                        {NOTE_KINDS.map((k) => (
+                          <SelectableChip
+                            key={k}
+                            label={k}
+                            active={editNoteKind === k}
+                            onPress={() => setEditNoteKind(k)}
+                          />
+                        ))}
+                      </View>
+                      <TextInput
+                        multiline
+                        value={editNoteBody}
+                        onChangeText={setEditNoteBody}
+                        style={styles.noteInput}
+                        editable={!loadingEdit}
+                      />
+                      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+                        <Pressable onPress={() => setEditingNoteId(null)} disabled={loadingEdit} style={{ padding: 8 }}>
+                          <Txt variant="labelMd" color={colors.onSurfaceVariant}>Cancel</Txt>
+                        </Pressable>
+                        <Pressable onPress={handleUpdateNote} disabled={loadingEdit || !editNoteBody.trim()} style={[styles.saveEditBtn, { paddingHorizontal: 16, paddingVertical: 8 }]}>
+                          <Txt variant="labelMd" color={colors.onPrimary}>{loadingEdit ? 'Saving...' : 'Save'}</Txt>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : (
+                    <>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontFamily: 'Inter_400Regular' }}>
+                          {n.kind} • {n.when}
+                        </Txt>
+                        <View style={{ flexDirection: 'row', gap: 12 }}>
+                          <Pressable onPress={() => {
+                            setEditingNoteId(n.id);
+                            setEditNoteBody(n.body);
+                            setEditNoteKind(n.kind);
+                          }} hitSlop={8}>
+                            <Icon name="edit" size={18} color={colors.outline} />
+                          </Pressable>
+                          <Pressable onPress={() => confirmDeleteNote(n.id)} hitSlop={8}>
+                            <Icon name="delete-outline" size={18} color={colors.error} />
+                          </Pressable>
+                        </View>
+                      </View>
+                      <Txt variant="bodyMd" color={colors.onSurface}>
+                        {n.body}
+                      </Txt>
+                    </>
+                  )}
                 </View>
               ))}
             </View>
@@ -283,20 +392,14 @@ export default function PersonDetail() {
             </Txt>
             
             <View style={styles.chipWrap}>
-              {NOTE_KINDS.map((k) => {
-                const active = noteKind === k;
-                return (
-                  <Pressable
-                    key={k}
-                    onPress={() => setNoteKind(k)}
-                    style={[styles.selectChip, active && styles.selectChipActive]}
-                  >
-                    <Txt variant="labelSm" color={active ? colors.onSecondaryContainer : colors.onSurfaceVariant}>
-                      {k}
-                    </Txt>
-                  </Pressable>
-                );
-              })}
+              {NOTE_KINDS.map((k) => (
+                <SelectableChip
+                  key={k}
+                  label={k}
+                  active={noteKind === k}
+                  onPress={() => setNoteKind(k)}
+                />
+              ))}
             </View>
 
             <TextInput
@@ -323,6 +426,73 @@ export default function PersonDetail() {
         </Animated.View>
       </ScrollView>
 
+      {/* Special Day Action Sheet */}
+      <Modal visible={dayActionVisible} transparent animationType="none" onRequestClose={() => setDayActionVisible(false)}>
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setDayActionVisible(false)} />
+          <Animated.View entering={SlideInDown.duration(300).springify()} exiting={SlideOutDown.duration(200)} style={[styles.modalContent, { marginTop: 'auto', marginBottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }]}>
+            <Txt variant="headlineMd" color={colors.onSurface} style={{ marginBottom: 24 }}>
+              Options
+            </Txt>
+            <Button 
+              label="Delete Special Day" 
+              variant="error" 
+              icon="delete" 
+              fullWidth 
+              style={{ marginBottom: 12, backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.error }}
+              onPress={() => {
+                setDayActionVisible(false);
+                setDayConfirmVisible(true);
+              }}
+            />
+            <Button 
+              label="Cancel" 
+              variant="tonal" 
+              fullWidth 
+              onPress={() => setDayActionVisible(false)}
+            />
+          </Animated.View>
+        </Animated.View>
+      </Modal>
+
+      {/* Special Day Delete Confirm Modal */}
+      <Modal visible={dayConfirmVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <Animated.View entering={FadeInDown.duration(300)} exiting={FadeOut.duration(200)} style={styles.modalContent}>
+            <View style={styles.modalIconWrap}>
+              <Icon name="delete" size={32} color={colors.error} />
+            </View>
+            <Txt variant="headlineMd" color={colors.onSurface} style={{ marginTop: 16 }}>
+              Delete Special Day
+            </Txt>
+            <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 8, textAlign: 'center' }}>
+              Are you sure you want to delete this special day? This action cannot be undone.
+            </Txt>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, width: '100%' }}>
+              <Button label="Cancel" onPress={() => setDayConfirmVisible(false)} variant="tonal" style={{ flex: 1 }} disabled={isDeletingDay} />
+              <Button 
+                label="Delete" 
+                disabled={isDeletingDay}
+                onPress={async () => {
+                  if (!selectedDayId) return;
+                  setIsDeletingDay(true);
+                  try {
+                    await deleteSpecialDay(selectedDayId);
+                  } catch(e) {
+                    console.error(e);
+                  } finally {
+                    setIsDeletingDay(false);
+                    setDayConfirmVisible(false);
+                    setSelectedDayId(null);
+                  }
+                }} 
+                style={{ flex: 1, backgroundColor: colors.error }} 
+              />
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
+
       {/* Delete Confirmation Modal */}
       <Modal visible={deleteConfirmVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
@@ -339,6 +509,32 @@ export default function PersonDetail() {
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, width: '100%' }}>
               <Button label="Cancel" onPress={() => setDeleteConfirmVisible(false)} variant="tonal" style={{ flex: 1 }} />
               <Button label="Delete" onPress={executeDelete} style={{ flex: 1, backgroundColor: colors.error }} />
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
+
+      {/* Note Delete Confirm Modal */}
+      <Modal visible={deleteNoteConfirmVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <Animated.View entering={FadeInDown.duration(300)} exiting={FadeOut.duration(200)} style={styles.modalContent}>
+            <View style={styles.modalIconWrap}>
+              <Icon name="delete" size={32} color={colors.error} />
+            </View>
+            <Txt variant="headlineMd" color={colors.onSurface} style={{ marginTop: 16 }}>
+              Delete Note
+            </Txt>
+            <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 8, textAlign: 'center' }}>
+              Are you sure you want to delete this note? This action cannot be undone.
+            </Txt>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, width: '100%' }}>
+              <Button label="Cancel" onPress={() => setDeleteNoteConfirmVisible(false)} variant="tonal" style={{ flex: 1 }} disabled={isDeletingNote} />
+              <Button 
+                label="Delete" 
+                onPress={executeDeleteNote} 
+                style={{ flex: 1, backgroundColor: colors.error }} 
+                disabled={isDeletingNote}
+              />
             </View>
           </Animated.View>
         </View>
@@ -471,6 +667,12 @@ const styles = StyleSheet.create({
     borderColor: colors.outlineVariant,
     backgroundColor: colors.surfaceContainerLow,
     marginTop: 12,
+  },
+  saveEditBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalOverlay: {
     flex: 1,

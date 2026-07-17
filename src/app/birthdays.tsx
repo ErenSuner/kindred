@@ -105,11 +105,13 @@ export default function Birthdays() {
           </View>
           <View style={{ alignItems: 'flex-end', opacity: isVerySoon ? 1 : 0.7 }}>
             <Txt variant="labelMd" color={isVerySoon ? colors.primary : colors.onSurfaceVariant} style={isVerySoon && { fontWeight: 'bold' }}>
-              {item.day.daysAway} Days
+              {item.day.daysAway === 0 ? 'Today!' : `${item.day.daysAway} Days`}
             </Txt>
-            <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ textTransform: 'uppercase', letterSpacing: 1 }}>
-              Away
-            </Txt>
+            {item.day.daysAway !== 0 && (
+              <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ textTransform: 'uppercase', letterSpacing: 1 }}>
+                Away
+              </Txt>
+            )}
           </View>
         </Pressable>
       </Animated.View>

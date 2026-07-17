@@ -125,7 +125,7 @@ export default function Connections() {
                     {person.isPinned && <Icon name="push-pin" size={16} color={colors.primary} />}
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Chip label={person.eventTag} tone="secondary" />
+                    <Chip label={person.eventTag} tone="secondary" role={person.eventTag} />
                     <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontFamily: 'Inter_400Regular' }}>
                       {person.role}
                     </Txt>
@@ -135,14 +135,16 @@ export default function Connections() {
 
               {/* Event preview */}
               <View style={styles.personRight}>
-                {person.daysAway > 0 ? (
+                {person.specialDays && person.specialDays.length > 0 ? (
                   <>
                     <Txt variant="headlineMd" color={colors.primary}>
-                      {person.daysAway}
+                      {person.daysAway === 0 ? 'Today!' : person.daysAway}
                     </Txt>
-                    <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-                      days
-                    </Txt>
+                    {person.daysAway !== 0 && (
+                      <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                        days
+                      </Txt>
+                    )}
                   </>
                 ) : (
                   <Icon name="chevron-right" size={22} color={colors.onSurfaceVariant} style={{ opacity: 0.5 }} />

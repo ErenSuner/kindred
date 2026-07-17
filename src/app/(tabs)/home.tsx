@@ -85,6 +85,42 @@ export default function Home() {
           </Animated.View>
         )}
 
+        {/* Empty special days state */}
+        {people.length > 0 && activePeople.length === 0 && (
+          <Animated.View entering={FadeInDown.duration(600).delay(150)}>
+            <Card style={styles.emptyDaysCard}>
+              <View style={styles.emptyDaysAccent} />
+              <View style={styles.emptyDaysContent}>
+                <View style={styles.emptyDaysIconWrap}>
+                  <Icon name="event" size={32} color={colors.primary} />
+                </View>
+                <Txt variant="headlineMd" color={colors.onSurface} style={{ textAlign: 'center', marginTop: 20 }}>
+                  No special days yet
+                </Txt>
+                <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ textAlign: 'center', marginTop: 8, maxWidth: 260, lineHeight: 22 }}>
+                  Birthdays, anniversaries, milestones — add a special day to someone you care about and never miss a moment.
+                </Txt>
+                <Pressable
+                  onPress={() => {
+                    if (people.length > 0) {
+                      router.push(`/person/${people[0].id}` as any);
+                    }
+                  }}
+                  style={({ pressed }) => [
+                    styles.emptyDaysBtn,
+                    pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
+                  ]}
+                >
+                  <Icon name="add" size={18} color={colors.onPrimary} />
+                  <Txt variant="labelMd" color={colors.onPrimary}>
+                    Add a special day
+                  </Txt>
+                </Pressable>
+              </View>
+            </Card>
+          </Animated.View>
+        )}
+
         {/* Featured events */}
         {featuredPeople.map((featured, index) => {
           const nextDay = featured.specialDays && featured.specialDays.length > 1 ? featured.specialDays[1] : null;
@@ -95,7 +131,7 @@ export default function Home() {
                 <View style={styles.featuredTop}>
                   <Avatar uri={featured.avatar} initials={featured.initials} size={64} />
                   <View style={{ flex: 1, gap: 8 }}>
-                    <Chip label={featured.eventTag} tone="secondary" />
+                    <Chip label={featured.eventTag} tone="secondary" role={featured.eventTag} />
                     <Txt variant="headlineMd" color={colors.onSurface}>
                       {featured.eventTitle}
                     </Txt>
@@ -104,11 +140,13 @@ export default function Home() {
                 <View style={{ marginTop: spacing.stackLg, marginBottom: nextDay ? 0 : spacing.stackSm }}>
                   <View style={styles.daysRow}>
                     <Txt variant="headlineXl" color={colors.primary}>
-                      {featured.daysAway}
+                      {featured.daysAway === 0 ? 'Today!' : featured.daysAway}
                     </Txt>
-                    <Txt variant="bodyLg" color={colors.onSurfaceVariant} style={{ marginBottom: 6 }}>
-                      days away
-                    </Txt>
+                    {featured.daysAway !== 0 && (
+                      <Txt variant="bodyLg" color={colors.onSurfaceVariant} style={{ marginBottom: 6 }}>
+                        days away
+                      </Txt>
+                    )}
                   </View>
                   <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 4 }}>
                     {featured.eventDate}
@@ -121,7 +159,7 @@ export default function Home() {
                         Next: {nextDay.title}
                       </Txt>
                       <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ opacity: 0.8 }}>
-                        {nextDay.date} ({nextDay.daysAway}d)
+                        {nextDay.date} ({nextDay.daysAway === 0 ? 'Today!' : `${nextDay.daysAway}d`})
                       </Txt>
                     </View>
                   </View>
@@ -149,11 +187,13 @@ export default function Home() {
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Txt variant="headlineMd" color={colors.onSurface}>
-                    {person.daysAway}
+                    {person.daysAway === 0 ? 'Today!' : person.daysAway}
                   </Txt>
-                  <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-                    days
-                  </Txt>
+                  {person.daysAway !== 0 && (
+                    <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                      days
+                    </Txt>
+                  )}
                 </View>
               </Card>
             ))}
@@ -228,5 +268,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  emptyDaysCard: {
+    overflow: 'hidden',
+    paddingVertical: 40,
+    paddingHorizontal: 24,
+    marginBottom: spacing.gutter,
+  },
+  emptyDaysAccent: {
+    position: 'absolute',
+    top: -40,
+    left: -40,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(217,142,142,0.12)',
+  },
+  emptyDaysContent: {
+    alignItems: 'center',
+  },
+  emptyDaysIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.primaryFixed,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyDaysBtn: {
+    marginTop: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: radius.full,
   },
 });
