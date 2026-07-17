@@ -1,19 +1,17 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { View, ScrollView, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform, Modal } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, SlideInDown } from 'react-native-reanimated';
 import { colors, spacing, radius, softShadow } from '@/theme/tokens';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
-import { SelectableChip } from '@/components/Chip';
+
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
 import { RecurrencePicker } from '@/components/RecurrencePicker';
-import { HighlightCard, HighlightHandle } from '@/components/HighlightCard';
 import { usePeople } from '@/context/PeopleContext';
 import { Recurrence, YEARLY } from '@/utils/recurrence';
-import { looksLikeBirthday } from '@/utils/birthdayHints';
 
 const PRESET_REMINDERS = [
   { label: 'Day Of', value: 'day_of' },
@@ -53,15 +51,7 @@ export default function AddSpecialDay() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { personId } = useLocalSearchParams<{ personId: string }>();
-  const { addSpecialDay, addBirthday, getPerson } = usePeople();
-  const person = getPerson(personId ?? '');
-  const hasBirthday = !!person?.birthday;
-
-  // Birthday state
-  const [bdDay, setBdDay] = useState<number | null>(null);
-  const [bdMonth, setBdMonth] = useState<number | null>(null);
-  const [bdYear, setBdYear] = useState<number | null>(null);
-  const [bdReminders, setBdReminders] = useState<Reminder[]>([]);
+  const { addSpecialDay } = usePeople();
 
   // Occasion state
   const [occasion, setOccasion] = useState('');
@@ -72,7 +62,6 @@ export default function AddSpecialDay() {
   const [year, setYear] = useState<number | null>(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerType, setPickerType] = useState<'day' | 'month' | 'year'>('day');
-  const [pickerTarget, setPickerTarget] = useState<'specialDay' | 'birthday'>('specialDay');
 
   // Reminder state
   const [reminders, setReminders] = useState<Reminder[]>([
@@ -87,48 +76,24 @@ export default function AddSpecialDay() {
   const [customPickerVisible, setCustomPickerVisible] = useState(false);
   const [customPickerType, setCustomPickerType] = useState<'day' | 'month' | 'year'>('day');
 
-  // Nudging the user toward the Birthday card when they type a birthday into
-  // the free-text occasion field.
-  const scrollRef = useRef<ScrollView>(null);
-  const birthdayCardRef = useRef<HighlightHandle>(null);
-  const birthdayCardY = useRef(0);
-  const [birthdayPromptVisible, setBirthdayPromptVisible] = useState(false);
-  // Remembers the exact title the user already answered "no" for, so editing the
-  // title asks again but re-submitting the same one doesn't nag.
-  const [dismissedTitle, setDismissedTitle] = useState<string | null>(null);
+
 
   const addReminder = (reminder: Reminder) => {
-    const targetReminders = pickerTarget === 'birthday' ? bdReminders : reminders;
-    if (targetReminders.length >= MAX_REMINDERS) return;
-    if (targetReminders.some(r => r.type === reminder.type && r.value === reminder.value)) return;
-    
-    if (pickerTarget === 'birthday') {
-      setBdReminders(prev => [...prev, reminder]);
-    } else {
-      setReminders(prev => [...prev, reminder]);
-    }
+    if (reminders.length >= MAX_REMINDERS) return;
+    if (reminders.some(r => r.type === reminder.type && r.value === reminder.value)) return;
+    setReminders(prev => [...prev, reminder]);
     setReminderModalVisible(false);
     setCustomDateMode(false);
   };
 
-  const removeReminder = (index: number, isBd: boolean = false) => {
-    if (isBd) {
-      setBdReminders(prev => prev.filter((_, i) => i !== index));
-    } else {
-      setReminders(prev => prev.filter((_, i) => i !== index));
-    }
+  const removeReminder = (index: number) => {
+    setReminders(prev => prev.filter((_, i) => i !== index));
   };
 
   const getSpecialDayDate = (): Date | null => {
-    if (pickerTarget === 'birthday') {
-      if (!bdDay || !bdMonth) return null;
-      const y = bdYear && bdYear !== 1000 ? bdYear : new Date().getFullYear();
-      return new Date(y, bdMonth - 1, bdDay);
-    } else {
-      if (!day || !month) return null;
-      const y = year && year !== 1000 ? year : new Date().getFullYear();
-      return new Date(y, month - 1, day);
-    }
+    if (!day || !month) return null;
+    const y = year && year !== 1000 ? year : new Date().getFullYear();
+    return new Date(y, month - 1, day);
   };
 
   const isCustomDateValid = (): boolean => {
@@ -154,71 +119,20 @@ export default function AddSpecialDay() {
   };
 
   const handleSubmit = async () => {
-    const isAddingBd = !hasBirthday && bdDay && bdMonth;
-    const isAddingSpecial = day && month && occasion.trim();
-
-    if (!isAddingBd && !isAddingSpecial) {
-      alert('Please fill out at least one event.');
+    if (!day || !month || !occasion.trim()) {
+      alert('Please fill out the event details.');
       return;
     }
-
-    // Someone typing "Birthday" into the occasion field almost certainly wants
-    // the Birthday card instead — ask before saving it as a plain special day.
-    const title = occasion.trim().toLowerCase();
-    if (isAddingSpecial && looksLikeBirthday(title) && dismissedTitle !== title) {
-      setBirthdayPromptVisible(true);
-      return;
-    }
-
-    await saveEvents();
-  };
-
-  const dismissBirthdayPrompt = async () => {
-    setDismissedTitle(occasion.trim().toLowerCase());
-    setBirthdayPromptVisible(false);
-    await saveEvents();
-  };
-
-  const goToBirthdayCard = () => {
-    setBirthdayPromptVisible(false);
-
-    if (hasBirthday) {
-      // The Birthday card isn't on this screen once one exists, so send them to
-      // the editor and let it flag the card there.
-      router.push(`/birthday/edit/${personId}?highlight=1` as any);
-      return;
-    }
-
-    scrollRef.current?.scrollTo({ y: Math.max(birthdayCardY.current - 12, 0), animated: true });
-    // Let the scroll settle before the ring draws attention to itself.
-    setTimeout(() => birthdayCardRef.current?.pulse(), 380);
-  };
-
-  const saveEvents = async () => {
-    const isAddingBd = !hasBirthday && bdDay && bdMonth;
-    const isAddingSpecial = day && month && occasion.trim();
 
     try {
-      if (isAddingBd) {
-        const y = bdYear && bdYear !== 1000 ? bdYear : 1000;
-        const formattedDate = `${y}-${String(bdMonth).padStart(2, '0')}-${String(bdDay).padStart(2, '0')}`;
-        await addBirthday(personId ?? '', {
-          date: formattedDate,
-          nudges: bdReminders.map(r => r.value)
-        });
-      }
-
-      if (isAddingSpecial) {
-        const y = year && year !== 1000 ? year : 1000;
-        const formattedDate = `${y}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        await addSpecialDay(personId ?? '', {
-          title: occasion.trim(),
-          date: formattedDate,
-          nudges: reminders.map(r => r.value),
-          recurrence,
-        });
-      }
-
+      const y = year && year !== 1000 ? year : 1000;
+      const formattedDate = `${y}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      await addSpecialDay(personId ?? '', {
+        title: occasion.trim(),
+        date: formattedDate,
+        nudges: reminders.map(r => r.value),
+        recurrence,
+      });
       router.back();
     } catch (e) {
       console.error(e);
@@ -245,83 +159,9 @@ export default function AddSpecialDay() {
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView ref={scrollRef} contentContainerStyle={{ padding: spacing.containerMobile, gap: spacing.stackLg, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ padding: spacing.containerMobile, gap: spacing.stackLg, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
 
-          {/* Birthday Card */}
-          {!hasBirthday && (
-            <HighlightCard
-              ref={birthdayCardRef}
-              onLayout={(e) => { birthdayCardY.current = e.nativeEvent.layout.y; }}
-              style={{ marginHorizontal: -2 }}
-            >
-            <Animated.View entering={FadeInDown.duration(500).delay(100)} style={[styles.card, { gap: spacing.stackMd }]}>
-              <View style={styles.cardHeader}>
-                <Txt variant="headlineMd" color={colors.onSurface}>
-                  Birthday
-                </Txt>
-                <Icon name="cake" size={24} color={colors.primary} />
-              </View>
-              <View style={{ gap: spacing.stackMd }}>
-                <View style={{ gap: 4 }}>
-                  <FieldLabel>Date <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{fontWeight: 'normal'}}>(Year optional)</Txt></FieldLabel>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <Pressable onPress={() => { setPickerTarget('birthday'); setPickerType('day'); setPickerVisible(true); }} style={[styles.input, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
-                      <Txt variant="bodyMd" color={bdDay ? colors.onSurface : colors.outline}>{bdDay || 'Day'}</Txt>
-                    </Pressable>
-                    <Pressable onPress={() => { setPickerTarget('birthday'); setPickerType('month'); setPickerVisible(true); }} style={[styles.input, { flex: 1.5, alignItems: 'center', justifyContent: 'center' }]}>
-                      <Txt variant="bodyMd" color={bdMonth ? colors.onSurface : colors.outline}>
-                        {bdMonth ? MONTHS_SHORT[bdMonth - 1] : 'Month'}
-                      </Txt>
-                    </Pressable>
-                    <Pressable onPress={() => { setPickerTarget('birthday'); setPickerType('year'); setPickerVisible(true); }} style={[styles.input, { flex: 1.2, alignItems: 'center', justifyContent: 'center' }]}>
-                      <Txt variant="bodyMd" color={bdYear && bdYear !== 1000 ? colors.onSurface : colors.outline}>{bdYear && bdYear !== 1000 ? bdYear : 'Year'}</Txt>
-                    </Pressable>
-                  </View>
-                </View>
 
-                {/* Gentle nudges — Birthday */}
-                <View style={styles.nudgeBox}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Icon name="notifications-active" size={16} color={colors.primary} />
-                    <Txt variant="labelMd" color={colors.onSurface}>
-                      Gentle Nudges
-                    </Txt>
-                  </View>
-
-                  {bdReminders.length > 0 && (
-                    <View style={{ gap: 8, marginTop: 12, marginBottom: 12 }}>
-                      {bdReminders.map((r, i) => (
-                        <View key={`${r.value}-${i}`} style={styles.reminderRow}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-                            <Icon name={r.type === 'custom' ? 'calendar-today' : 'schedule'} size={16} color={colors.primary} />
-                            <Txt variant="labelMd" color={colors.onSurface}>{r.label}</Txt>
-                          </View>
-                          <Pressable onPress={() => removeReminder(i, true)} hitSlop={8}>
-                            <Icon name="close" size={16} color={colors.onSurfaceVariant} />
-                          </Pressable>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-
-                  {bdReminders.length < MAX_REMINDERS && (
-                    <Pressable
-                      onPress={() => { setPickerTarget('birthday'); setReminderModalVisible(true); setCustomDateMode(false); }}
-                      style={({ pressed }) => [
-                        styles.addReminderBtn,
-                        pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
-                        bdReminders.length === 0 && { marginTop: 12 }
-                      ]}
-                    >
-                      <Icon name="add" size={18} color={colors.primary} />
-                      <Txt variant="labelMd" color={colors.primary}>Add Reminder</Txt>
-                    </Pressable>
-                  )}
-                </View>
-              </View>
-            </Animated.View>
-            </HighlightCard>
-          )}
 
           {/* Important date */}
           <Animated.View entering={FadeInDown.duration(500).delay(200)} style={[styles.card, { gap: spacing.stackMd }]}>
@@ -344,15 +184,15 @@ export default function AddSpecialDay() {
               <View style={{ gap: 4 }}>
                 <FieldLabel>Date <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{fontWeight: 'normal'}}>(Year optional)</Txt></FieldLabel>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <Pressable onPress={() => { setPickerTarget('specialDay'); setPickerType('day'); setPickerVisible(true); }} style={[styles.input, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Pressable onPress={() => { setPickerType('day'); setPickerVisible(true); }} style={[styles.input, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
                     <Txt variant="bodyMd" color={day ? colors.onSurface : colors.outline}>{day || 'Day'}</Txt>
                   </Pressable>
-                  <Pressable onPress={() => { setPickerTarget('specialDay'); setPickerType('month'); setPickerVisible(true); }} style={[styles.input, { flex: 1.5, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Pressable onPress={() => { setPickerType('month'); setPickerVisible(true); }} style={[styles.input, { flex: 1.5, alignItems: 'center', justifyContent: 'center' }]}>
                     <Txt variant="bodyMd" color={month ? colors.onSurface : colors.outline}>
                       {month ? MONTHS_SHORT[month - 1] : 'Month'}
                     </Txt>
                   </Pressable>
-                  <Pressable onPress={() => { setPickerTarget('specialDay'); setPickerType('year'); setPickerVisible(true); }} style={[styles.input, { flex: 1.2, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Pressable onPress={() => { setPickerType('year'); setPickerVisible(true); }} style={[styles.input, { flex: 1.2, alignItems: 'center', justifyContent: 'center' }]}>
                     <Txt variant="bodyMd" color={year && year !== 1000 ? colors.onSurface : colors.outline}>{year && year !== 1000 ? year : 'Year'}</Txt>
                   </Pressable>
                 </View>
@@ -394,7 +234,7 @@ export default function AddSpecialDay() {
               {/* Add reminder button */}
               {reminders.length < MAX_REMINDERS && (
                 <Pressable
-                  onPress={() => { setPickerTarget('specialDay'); setReminderModalVisible(true); setCustomDateMode(false); }}
+                  onPress={() => { setReminderModalVisible(true); setCustomDateMode(false); }}
                   style={({ pressed }) => [
                     styles.addReminderBtn,
                     pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
@@ -433,17 +273,11 @@ export default function AddSpecialDay() {
             ? MONTHS_FULL.map((m, i) => ({ label: m, value: i + 1 }))
             : [{ label: 'Skip Year', value: 1000 }, ...Array.from({length: 101}, (_, i) => ({ label: String(new Date().getFullYear() - i), value: new Date().getFullYear() - i }))]
         }
-        selectedValue={pickerType === 'day' ? (pickerTarget === 'birthday' ? (bdDay || undefined) : (day || undefined)) : pickerType === 'month' ? (pickerTarget === 'birthday' ? (bdMonth || undefined) : (month || undefined)) : (pickerTarget === 'birthday' ? (bdYear || undefined) : (year || undefined))}
+        selectedValue={pickerType === 'day' ? (day || undefined) : pickerType === 'month' ? (month || undefined) : (year || undefined)}
         onSelect={(val) => {
-          if (pickerTarget === 'birthday') {
-            if (pickerType === 'day') setBdDay(val as number);
-            else if (pickerType === 'month') setBdMonth(val as number);
-            else setBdYear(val as number);
-          } else {
-            if (pickerType === 'day') setDay(val as number);
-            else if (pickerType === 'month') setMonth(val as number);
-            else setYear(val as number);
-          }
+          if (pickerType === 'day') setDay(val as number);
+          else if (pickerType === 'month') setMonth(val as number);
+          else setYear(val as number);
           setPickerVisible(false);
         }}
       />
@@ -611,42 +445,7 @@ export default function AddSpecialDay() {
         </Pressable>
       </Modal>
 
-      {/* "That looks like a birthday" prompt */}
-      <Modal visible={birthdayPromptVisible} transparent animationType="fade" onRequestClose={() => setBirthdayPromptVisible(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setBirthdayPromptVisible(false)}>
-          <Animated.View entering={SlideInDown.duration(280)} style={styles.modalContent}>
-            <Pressable onPress={(e) => e.stopPropagation()}>
-              <View style={styles.promptIconWrap}>
-                <Icon name="cake" size={28} color={colors.onPrimaryContainer} />
-              </View>
 
-              <Txt variant="headlineMd" color={colors.onSurface} style={{ marginTop: 16, marginBottom: 8 }}>
-                {hasBirthday ? 'Change the birthday?' : 'Is this a birthday?'}
-              </Txt>
-              <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginBottom: 24, lineHeight: 22 }}>
-                {hasBirthday
-                  ? `${person?.name ?? 'This person'} already has a birthday saved. Birthdays live in their own place so Kindred can count ages — do you want to edit it instead?`
-                  : `Birthdays have their own card up top, so Kindred can count ages and repeat every year. Want to add it there instead?`}
-              </Txt>
-
-              <View style={{ gap: 8 }}>
-                <Button
-                  label={hasBirthday ? 'Yes, edit the birthday' : 'Yes, take me there'}
-                  icon="cake"
-                  fullWidth
-                  onPress={goToBirthdayCard}
-                />
-                <Button
-                  label="No, save it as an important date"
-                  variant="tonal"
-                  fullWidth
-                  onPress={dismissBirthdayPrompt}
-                />
-              </View>
-            </Pressable>
-          </Animated.View>
-        </Pressable>
-      </Modal>
     </View>
   );
 }
@@ -761,12 +560,5 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: radius.full,
   },
-  promptIconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primaryFixed,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+
 });
