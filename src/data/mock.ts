@@ -1,5 +1,7 @@
 // Mock data standing in for a backend. Shapes match the Kindred screens.
 
+import type { Recurrence } from '@/utils/recurrence';
+
 export type Relationship = 'Family' | 'Friend' | 'Partner' | 'Colleague' | 'Acquaintance';
 
 export type SpecialDay = {
@@ -13,7 +15,7 @@ export type SpecialDay = {
   turningAge?: number;
   nudges?: any[];
   isBirthday?: boolean;
-  isAnnual?: boolean;
+  recurrence?: Recurrence;
   isExpired?: boolean;
 };
 
@@ -22,6 +24,21 @@ export type Note = {
   kind: string; // e.g. "Gift Idea", "Memory"
   when: string;
   body: string;
+};
+
+// An event the user keeps for themselves — no person attached.
+export type MyEvent = {
+  id: string;
+  title: string;
+  date: string; // display string
+  originalDate: string; // YYYY-MM-DD
+  icon: string; // MaterialIcons name
+  accent: 'primary' | 'tertiary' | 'secondary';
+  daysAway: number;
+  turningAge?: number;
+  nudges: string[];
+  recurrence: Recurrence;
+  isExpired?: boolean;
 };
 
 export type Person = {

@@ -9,8 +9,9 @@ import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
 import { SelectableChip } from '@/components/Chip';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
-import { Toggle } from '@/components/Toggle';
+import { RecurrencePicker } from '@/components/RecurrencePicker';
 import { usePeople } from '@/context/PeopleContext';
+import { Recurrence, YEARLY } from '@/utils/recurrence';
 
 const PRESET_REMINDERS = [
   { label: 'Day Of', value: 'day_of' },
@@ -62,8 +63,8 @@ export default function AddSpecialDay() {
 
   // Occasion state
   const [occasion, setOccasion] = useState('');
-  const [isAnnual, setIsAnnual] = useState(true);
-  
+  const [recurrence, setRecurrence] = useState<Recurrence>(YEARLY);
+
   const [day, setDay] = useState<number | null>(null);
   const [month, setMonth] = useState<number | null>(null);
   const [year, setYear] = useState<number | null>(null);
@@ -166,7 +167,7 @@ export default function AddSpecialDay() {
           title: occasion.trim(),
           date: formattedDate,
           nudges: reminders.map(r => r.value),
-          isAnnual
+          recurrence,
         });
       }
 
@@ -304,19 +305,8 @@ export default function AddSpecialDay() {
               </View>
             </View>
 
-            {/* Annual Event */}
-            <View style={[styles.nudgeBox, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16 }]}>
-              <View style={{ flex: 1, paddingRight: 16 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Icon name={!isAnnual ? "event" : "event-repeat"} size={16} color={colors.primary} />
-                  <Txt variant="labelMd" color={colors.onSurface}>{!isAnnual ? "One-Time Event" : "Annual Event"}</Txt>
-                </View>
-                <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 4 }}>
-                  {!isAnnual ? "This event will happen only once." : "This event repeats every year."}
-                </Txt>
-              </View>
-              <Toggle value={!isAnnual} onChange={(v) => setIsAnnual(!v)} />
-            </View>
+            {/* How often it comes back around */}
+            <RecurrencePicker value={recurrence} onChange={setRecurrence} />
 
             {/* Gentle nudges — advanced */}
             <View style={styles.nudgeBox}>

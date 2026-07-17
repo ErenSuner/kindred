@@ -36,6 +36,8 @@ export type Database = {
           icon: string;
           accent: string;
           nudges: string[];
+          repeat_unit: string;
+          repeat_interval: number;
           created_at: string;
         };
         Insert: {
@@ -46,6 +48,8 @@ export type Database = {
           icon?: string;
           accent?: string;
           nudges?: string[];
+          repeat_unit?: string;
+          repeat_interval?: number;
           created_at?: string;
         };
         Update: {
@@ -56,6 +60,8 @@ export type Database = {
           icon?: string;
           accent?: string;
           nudges?: string[];
+          repeat_unit?: string;
+          repeat_interval?: number;
           created_at?: string;
         };
       };
@@ -79,6 +85,44 @@ export type Database = {
           person_id?: string;
           date?: string;
           nudges?: string[];
+          created_at?: string;
+        };
+      };
+      my_events: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          date: string;
+          icon: string;
+          accent: string;
+          nudges: string[];
+          repeat_unit: string;
+          repeat_interval: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title: string;
+          date: string;
+          icon?: string;
+          accent?: string;
+          nudges?: string[];
+          repeat_unit?: string;
+          repeat_interval?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          date?: string;
+          icon?: string;
+          accent?: string;
+          nudges?: string[];
+          repeat_unit?: string;
+          repeat_interval?: number;
           created_at?: string;
         };
       };

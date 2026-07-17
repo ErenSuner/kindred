@@ -10,6 +10,7 @@ type TabDef = { name: string; label: string; icon: React.ComponentProps<typeof I
 const TABS: TabDef[] = [
   { name: 'home', label: 'Home', icon: 'home' },
   { name: 'add', label: 'Connections', icon: 'people' },
+  { name: 'events', label: 'My Events', icon: 'event' },
   { name: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
@@ -62,6 +63,7 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="home" />
       <Tabs.Screen name="add" />
+      <Tabs.Screen name="events" />
       <Tabs.Screen name="settings" />
     </Tabs>
   );
@@ -82,7 +84,7 @@ const styles = StyleSheet.create({
   item: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: radius.full,
   },

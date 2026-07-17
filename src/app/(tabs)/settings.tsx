@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { syncNotifications } from '@/utils/notifications';
 import { usePeople } from '@/context/PeopleContext';
+import { useEvents } from '@/context/EventsContext';
 import { Toggle } from '@/components/Toggle';
 
 type RowProps = {
@@ -75,6 +76,7 @@ export default function Settings() {
   const [nudges, setNudges] = useState(true);
   const { user, signOut } = useAuth();
   const { people } = usePeople();
+  const { events } = useEvents();
 
   useEffect(() => {
     AsyncStorage.getItem('@settings_nudges').then(val => {
@@ -85,7 +87,7 @@ export default function Settings() {
   const handleToggleNudges = async (val: boolean) => {
     setNudges(val);
     await AsyncStorage.setItem('@settings_nudges', String(val));
-    syncNotifications(people, val); // Pass the setting directly to sync
+    syncNotifications(people, events, val); // Pass the setting directly to sync
   };
 
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);

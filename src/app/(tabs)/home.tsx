@@ -9,20 +9,41 @@ import { Avatar } from '@/components/Avatar';
 import { Chip } from '@/components/Chip';
 import { Card } from '@/components/Card';
 import { currentUser } from '@/data/mock';
+import type { MyEvent, Person } from '@/data/mock';
 import { usePeople } from '@/context/PeopleContext';
+import { useEvents } from '@/context/EventsContext';
 import { useAuth } from '@/context/AuthContext';
+
+type FeedItem =
+  | { kind: 'person'; id: string; daysAway: number; person: Person }
+  | { kind: 'event'; id: string; daysAway: number; event: MyEvent };
 
 export default function Home() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { people } = usePeople();
+  const { events } = useEvents();
   const { user } = useAuth();
 
   const userName = user?.email ? user.email.split('@')[0] : currentUser.name;
 
   const activePeople = people.filter(p => p.specialDays && p.specialDays.length > 0);
-  const featuredPeople = activePeople.filter((p, i) => i === 0 || p.daysAway <= 7);
-  const rest = activePeople.filter((p, i) => i !== 0 && p.daysAway > 7);
+
+  // People arrive already sorted with pinned ones first, and pinning should keep
+  // winning over a merely-sooner event, so only the unpinned tail gets mixed in
+  // with the user's own events.
+  const pinnedItems: FeedItem[] = activePeople
+    .filter(p => p.isPinned)
+    .map(p => ({ kind: 'person', id: p.id, daysAway: p.daysAway, person: p }));
+
+  const mixedItems: FeedItem[] = [
+    ...activePeople.filter(p => !p.isPinned).map((p): FeedItem => ({ kind: 'person', id: p.id, daysAway: p.daysAway, person: p })),
+    ...events.map((e): FeedItem => ({ kind: 'event', id: e.id, daysAway: e.daysAway, event: e })),
+  ].sort((a, b) => a.daysAway - b.daysAway);
+
+  const feed = [...pinnedItems, ...mixedItems];
+  const featuredItems = feed.filter((item, i) => i === 0 || item.daysAway <= 7);
+  const rest = feed.filter((item, i) => i !== 0 && item.daysAway > 7);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -73,7 +94,7 @@ export default function Home() {
         </Animated.View>
 
         {/* Empty state */}
-        {people.length === 0 && (
+        {people.length === 0 && events.length === 0 && (
           <Animated.View entering={FadeInDown.duration(500).delay(120)} style={styles.emptyState}>
             <Icon name="people" size={48} color={colors.outlineVariant} />
             <Txt variant="headlineMd" color={colors.onSurface} style={{ marginTop: 16, textAlign: 'center' }}>
@@ -86,7 +107,7 @@ export default function Home() {
         )}
 
         {/* Empty special days state */}
-        {people.length > 0 && activePeople.length === 0 && (
+        {people.length > 0 && activePeople.length === 0 && events.length === 0 && (
           <Animated.View entering={FadeInDown.duration(600).delay(150)}>
             <Card style={styles.emptyDaysCard}>
               <View style={styles.emptyDaysAccent} />
@@ -122,10 +143,48 @@ export default function Home() {
         )}
 
         {/* Featured events */}
-        {featuredPeople.map((featured, index) => {
+        {featuredItems.map((item, index) => {
+          if (item.kind === 'event') {
+            const event = item.event;
+            return (
+              <Animated.View key={`event-${event.id}`} entering={FadeInDown.duration(500).delay(120 + index * 50)} style={{ marginBottom: spacing.gutter }}>
+                <Card pressable onPress={() => router.push(`/my-event/edit/${event.id}` as any)} style={styles.featured}>
+                  <View style={[styles.blur, { pointerEvents: 'none' } as any]} />
+                  <View style={styles.featuredTop}>
+                    <View style={styles.eventIconBadge}>
+                      <Icon name={event.icon as any} size={28} color={colors.onPrimaryContainer} />
+                    </View>
+                    <View style={{ flex: 1, gap: 8 }}>
+                      <Chip label="For you" tone="secondary" />
+                      <Txt variant="headlineMd" color={colors.onSurface}>
+                        {event.title}
+                      </Txt>
+                    </View>
+                  </View>
+                  <View style={{ marginTop: spacing.stackLg, marginBottom: spacing.stackSm }}>
+                    <View style={styles.daysRow}>
+                      <Txt variant="headlineXl" color={colors.primary}>
+                        {event.daysAway === 0 ? 'Today!' : event.daysAway}
+                      </Txt>
+                      {event.daysAway !== 0 && (
+                        <Txt variant="bodyLg" color={colors.onSurfaceVariant} style={{ marginBottom: 6 }}>
+                          days away
+                        </Txt>
+                      )}
+                    </View>
+                    <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 4 }}>
+                      {event.date}
+                    </Txt>
+                  </View>
+                </Card>
+              </Animated.View>
+            );
+          }
+
+          const featured = item.person;
           const nextDay = featured.specialDays && featured.specialDays.length > 1 ? featured.specialDays[1] : null;
           return (
-            <Animated.View key={featured.id} entering={FadeInDown.duration(500).delay(120 + index * 50)} style={{ marginBottom: spacing.gutter }}>
+            <Animated.View key={`person-${featured.id}`} entering={FadeInDown.duration(500).delay(120 + index * 50)} style={{ marginBottom: spacing.gutter }}>
               <Card pressable onPress={() => router.push(`/person/${featured.id}` as any)} style={styles.featured}>
                 <View style={[styles.blur, { pointerEvents: 'none' } as any]} />
                 <View style={styles.featuredTop}>
@@ -169,34 +228,49 @@ export default function Home() {
           );
         })}
 
-        {/* Remaining people */}
+        {/* Everything further out */}
         {rest.length > 0 && (
           <Animated.View entering={FadeInDown.duration(500).delay(200)} style={{ marginTop: spacing.gutter, gap: spacing.gutter }}>
-            {rest.map((person) => (
-              <Card key={person.id} pressable onPress={() => router.push(`/person/${person.id}`)} style={styles.rowCard}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flex: 1 }}>
-                  <Avatar uri={person.avatar} initials={person.initials} size={48} />
-                  <View style={{ flex: 1 }}>
-                    <Txt variant="bodyLg" color={colors.onSurface} style={{ fontFamily: 'Inter_500Medium' }}>
-                      {person.name}
-                    </Txt>
-                    <Txt variant="bodyMd" color={colors.onSurfaceVariant}>
-                      {person.eventTitle}
-                    </Txt>
+            {rest.map((item) => {
+              const isEvent = item.kind === 'event';
+              const onPress = isEvent
+                ? () => router.push(`/my-event/edit/${item.id}` as any)
+                : () => router.push(`/person/${item.id}` as any);
+              const primaryText = isEvent ? item.event.title : item.person.name;
+              const secondaryText = isEvent ? item.event.date : item.person.eventTitle;
+
+              return (
+                <Card key={`${item.kind}-${item.id}`} pressable onPress={onPress} style={styles.rowCard}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flex: 1 }}>
+                    {isEvent ? (
+                      <View style={styles.eventIconBadgeSm}>
+                        <Icon name={item.event.icon as any} size={20} color={colors.onPrimaryContainer} />
+                      </View>
+                    ) : (
+                      <Avatar uri={item.person.avatar} initials={item.person.initials} size={48} />
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Txt variant="bodyLg" color={colors.onSurface} style={{ fontFamily: 'Inter_500Medium' }}>
+                        {primaryText}
+                      </Txt>
+                      <Txt variant="bodyMd" color={colors.onSurfaceVariant}>
+                        {secondaryText}
+                      </Txt>
+                    </View>
                   </View>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Txt variant="headlineMd" color={colors.onSurface}>
-                    {person.daysAway === 0 ? 'Today!' : person.daysAway}
-                  </Txt>
-                  {person.daysAway !== 0 && (
-                    <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-                      days
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Txt variant="headlineMd" color={colors.onSurface}>
+                      {item.daysAway === 0 ? 'Today!' : item.daysAway}
                     </Txt>
-                  )}
-                </View>
-              </Card>
-            ))}
+                    {item.daysAway !== 0 && (
+                      <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                        days
+                      </Txt>
+                    )}
+                  </View>
+                </Card>
+              );
+            })}
           </Animated.View>
         )}
 
@@ -234,6 +308,22 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   featuredTop: { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
+  eventIconBadge: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.primaryFixed,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eventIconBadgeSm: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.primaryFixed,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   daysRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   rowCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   blur: {

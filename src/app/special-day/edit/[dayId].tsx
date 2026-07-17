@@ -9,8 +9,10 @@ import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
 import { SelectableChip } from '@/components/Chip';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
-import { Toggle } from '@/components/Toggle';
+import { RecurrencePicker } from '@/components/RecurrencePicker';
 import { usePeople } from '@/context/PeopleContext';
+import { Recurrence, YEARLY } from '@/utils/recurrence';
+import { parseNudges, serializeNudges } from '@/utils/nudges';
 
 const PRESET_REMINDERS = [
   { label: 'Day Of', value: 'day_of' },
@@ -57,8 +59,8 @@ export default function EditSpecialDay() {
 
   // Occasion state
   const [occasion, setOccasion] = useState('');
-  const [isAnnual, setIsAnnual] = useState(true);
-  
+  const [recurrence, setRecurrence] = useState<Recurrence>(YEARLY);
+
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
@@ -95,7 +97,8 @@ export default function EditSpecialDay() {
         if (!isNaN(d)) setDay(d);
       }
       
-      setIsAnnual(specialDay.isAnnual ?? true);
+      setRecurrence(specialDay.recurrence ?? YEARLY);
+      setReminders(parseNudges(specialDay.nudges));
     }
   }, [specialDay]);
 
@@ -152,7 +155,8 @@ export default function EditSpecialDay() {
       await updateSpecialDay(dayId ?? '', {
         title: occasion.trim(),
         date: formattedDate,
-        isAnnual
+        recurrence,
+        nudges: serializeNudges(reminders),
       });
 
       router.back();
@@ -239,19 +243,8 @@ export default function EditSpecialDay() {
               </View>
             </View>
 
-            {/* Annual Event */}
-            <View style={[styles.nudgeBox, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16 }]}>
-              <View style={{ flex: 1, paddingRight: 16 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Icon name={!isAnnual ? "event" : "event-repeat"} size={16} color={colors.primary} />
-                  <Txt variant="labelMd" color={colors.onSurface}>{!isAnnual ? "One-Time Event" : "Annual Event"}</Txt>
-                </View>
-                <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 4 }}>
-                  {!isAnnual ? "This event will happen only once." : "This event repeats every year."}
-                </Txt>
-              </View>
-              <Toggle value={!isAnnual} onChange={(v) => setIsAnnual(!v)} />
-            </View>
+            {/* How often it comes back around */}
+            <RecurrencePicker value={recurrence} onChange={setRecurrence} />
 
             {/* Gentle nudges — advanced */}
             <View style={styles.nudgeBox}>

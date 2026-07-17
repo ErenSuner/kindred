@@ -2,7 +2,8 @@ import type { Note, Person, Relationship } from '@/data/mock';
 import { supabase } from '@/lib/supabase';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
-import { syncNotifications } from '@/utils/notifications';
+import { getNextOccurrence } from '@/utils/dates';
+import { Recurrence, YEARLY, parseRecurrence, serializeRecurrence } from '@/utils/recurrence';
 
 type PeopleContextValue = {
   people: Person[];
@@ -19,13 +20,13 @@ type PeopleContextValue = {
     title: string;
     date: string;
     nudges?: string[];
-    isAnnual?: boolean;
+    recurrence?: Recurrence;
   }) => Promise<void>;
   updateSpecialDay: (dayId: string, data: {
     title?: string;
     date?: string;
     nudges?: string[];
-    isAnnual?: boolean;
+    recurrence?: Recurrence;
   }) => Promise<void>;
   deleteSpecialDay: (dayId: string) => Promise<void>;
   addBirthday: (personId: string, data: { date: string; nudges?: string[] }) => Promise<void>;
@@ -42,52 +43,10 @@ type PeopleContextValue = {
 
 const PeopleContext = createContext<PeopleContextValue | null>(null);
 
-function getOrdinal(n: number) {
-  const s = ['th', 'st', 'nd', 'rd'];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
-}
-
-function getNextOccurrence(dateStr: string, isAnnual: boolean = true): { date: Date; daysAway: number; formattedDate: string; turningAge?: number } {
-  // dateStr is 'YYYY-MM-DD'
-  const [yearStr, monthStr, dayStr] = dateStr.split('-');
-  const birthYear = Number(yearStr);
-  const month = Number(monthStr);
-  const day = Number(dayStr);
-
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-
-  let targetYear = isAnnual ? now.getFullYear() : birthYear;
-  let target = new Date(targetYear, month - 1, day);
-
-  if (isAnnual && target.getTime() < now.getTime()) {
-    targetYear += 1;
-    target = new Date(targetYear, month - 1, day);
-  }
-
-  const diffTime = target.getTime() - now.getTime();
-  const daysAway = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-
-  const formattedDate = `${months[month - 1]} ${getOrdinal(day)}, ${targetYear}`;
-
-  let turningAge: number | undefined = undefined;
-  if (birthYear > 1000 && !isNaN(birthYear)) {
-    turningAge = targetYear - birthYear;
-  }
-
-  return { date: target, daysAway, formattedDate, turningAge };
-}
-
 export function mapDbPersonToPerson(dbPerson: any): Person {
   const specialDays: any[] = (dbPerson.special_days || []).map((sd: any) => {
-    const isAnnual = sd.is_annual ?? true;
-    const { formattedDate, daysAway, turningAge } = getNextOccurrence(sd.date, isAnnual);
+    const recurrence = parseRecurrence(sd);
+    const { formattedDate, daysAway, turningAge } = getNextOccurrence(sd.date, recurrence);
     return {
       id: sd.id,
       title: sd.title,
@@ -97,8 +56,9 @@ export function mapDbPersonToPerson(dbPerson: any): Person {
       originalDate: sd.date,
       daysAway,
       turningAge,
-      isAnnual,
-      isExpired: !isAnnual && daysAway < 0,
+      nudges: sd.nudges || [],
+      recurrence,
+      isExpired: recurrence.unit === 'none' && daysAway < 0,
     };
   });
 
@@ -106,7 +66,8 @@ export function mapDbPersonToPerson(dbPerson: any): Person {
   if (dbPerson.birthdays) {
     const bd = Array.isArray(dbPerson.birthdays) ? dbPerson.birthdays[0] : dbPerson.birthdays;
     if (bd) {
-    const { formattedDate, daysAway, turningAge } = getNextOccurrence(bd.date);
+    // A birthday is yearly by definition — it has no recurrence picker.
+    const { formattedDate, daysAway, turningAge } = getNextOccurrence(bd.date, YEARLY);
     birthday = {
       id: bd.id,
       date: bd.date,
@@ -121,6 +82,7 @@ export function mapDbPersonToPerson(dbPerson: any): Person {
       originalDate: bd.date,
       daysAway,
       turningAge,
+      recurrence: YEARLY,
       isBirthday: true,
     });
     }
@@ -225,7 +187,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
           role,
           avatar_url,
           is_pinned,
-          special_days (id, title, date, icon, accent),
+          special_days (id, title, date, icon, accent, nudges, repeat_unit, repeat_interval),
           birthdays (id, date, nudges),
           notes (id, kind, body, created_at)
         `);
@@ -276,11 +238,6 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
       setPeople([]);
     }
   }, [user]);
-
-  useEffect(() => {
-    // Re-calculate and schedule notifications whenever data changes
-    syncNotifications(people);
-  }, [people]);
 
   const addPerson = async (data: {
     name: string;
@@ -340,7 +297,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
     title: string;
     date: string;
     nudges?: string[];
-    isAnnual?: boolean;
+    recurrence?: Recurrence;
   }) => {
     try {
       if (!user) throw new Error('Not logged in');
@@ -353,7 +310,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
           nudges: data.nudges || [],
           icon: data.title.toLowerCase().includes('birthday') ? 'cake' : 'event',
           accent: 'primary',
-          is_annual: data.isAnnual ?? true,
+          ...serializeRecurrence(data.recurrence ?? YEARLY),
         });
       if (error) throw error;
       await refreshPeople();
@@ -367,7 +324,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
     title?: string;
     date?: string;
     nudges?: string[];
-    isAnnual?: boolean;
+    recurrence?: Recurrence;
   }) => {
     try {
       const updates: any = {};
@@ -377,7 +334,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
       }
       if (data.date) updates.date = data.date;
       if (data.nudges) updates.nudges = data.nudges;
-      if (data.isAnnual !== undefined) updates.is_annual = data.isAnnual;
+      if (data.recurrence !== undefined) Object.assign(updates, serializeRecurrence(data.recurrence));
       const { error } = await supabase
         .from('special_days')
         .update(updates)

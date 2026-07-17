@@ -1,58 +1,121 @@
 import * as Notifications from 'expo-notifications';
-import { Person } from '@/data/mock';
+import { MyEvent, Person } from '@/data/mock';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Nudge, PRESET_OFFSET_DAYS, parseNudges } from '@/utils/nudges';
+import { Recurrence, YEARLY } from '@/utils/recurrence';
+import { getUpcomingOccurrences } from '@/utils/dates';
 
 // How many notifications to schedule in advance. iOS has a limit of 64.
 const MAX_NOTIFICATIONS = 60;
 
-function calculateNotificationDate(targetDateStr: string, reminderType: string, customValue?: string, isAnnual: boolean = true): Date | null {
-  // targetDateStr is YYYY-MM-DD
-  const [yearStr, monthStr, dayStr] = targetDateStr.split('-');
-  const month = Number(monthStr);
-  const day = Number(dayStr);
+// A weekly event would burn the whole budget on one reminder, so cap how far
+// ahead any single nudge books itself. Everything reschedules on next launch.
+const MAX_OCCURRENCES_PER_NUDGE = 6;
 
+type PendingNotification = { title: string; body: string; date: Date; id: string };
+
+// Nudges fire relative to an occurrence: a preset is N days before it, a custom
+// nudge is an absolute date and ignores the cycle entirely.
+function notificationDatesFor(anchorDate: string, recurrence: Recurrence, nudge: Nudge): Date[] {
   const now = new Date();
-  
-  // If it's a custom date (like '2025-05-10'), we don't repeat it yearly, we just parse it.
-  if (reminderType === 'custom' && customValue) {
-    const [cYear, cMonth, cDay] = customValue.split('-');
-    const customDate = new Date(Number(cYear), Number(cMonth) - 1, Number(cDay), 9, 0, 0, 0); // 9:00 AM
-    return customDate.getTime() > now.getTime() ? customDate : null;
+
+  if (nudge.type === 'custom') {
+    const [y, m, d] = nudge.value.split('-').map(Number);
+    const at = new Date(y, m - 1, d, 9, 0, 0, 0); // 9:00 AM
+    return at.getTime() > now.getTime() ? [at] : [];
   }
 
-  // Calculate the next occurrence of the special day/birthday
-  let targetYear = isAnnual ? now.getFullYear() : Number(yearStr);
-  let target = new Date(targetYear, month - 1, day, 9, 0, 0, 0); // Default to 9:00 AM
+  const offsetDays = PRESET_OFFSET_DAYS[nudge.value] ?? 0;
 
-  // Calculate the offset for the reminder
-  let offsetDays = 0;
-  switch (reminderType) {
-    case 'day_of': offsetDays = 0; break;
-    case '1_day': offsetDays = 1; break;
-    case '3_days': offsetDays = 3; break;
-    case '1_week': offsetDays = 7; break;
-    case '2_weeks': offsetDays = 14; break;
-    case '1_month': offsetDays = 30; break; // approximate 1 month as 30 days
-  }
+  return getUpcomingOccurrences(anchorDate, recurrence, MAX_OCCURRENCES_PER_NUDGE)
+    .map((occurrence) => {
+      const at = new Date(occurrence.getFullYear(), occurrence.getMonth(), occurrence.getDate(), 9, 0, 0, 0);
+      at.setDate(at.getDate() - offsetDays);
+      return at;
+    })
+    .filter((at) => at.getTime() > now.getTime());
+}
 
-  target.setDate(target.getDate() - offsetDays);
+function collectPeopleNotifications(people: Person[]): PendingNotification[] {
+  const pending: PendingNotification[] = [];
 
-  // If the reminder time has already passed this year, schedule it for next year
-  if (target.getTime() < now.getTime()) {
-    if (isAnnual) {
-      targetYear += 1;
-      target = new Date(targetYear, month - 1, day, 9, 0, 0, 0);
-      target.setDate(target.getDate() - offsetDays);
-    } else {
-      return null;
+  for (const person of people) {
+    // Birthday — always yearly.
+    if (person.birthday) {
+      const bdSpecialDay = person.specialDays?.find((d) => d.isBirthday);
+      const turningStr = bdSpecialDay?.turningAge ? ` (turning ${bdSpecialDay.turningAge})` : '';
+      const displayDate = bdSpecialDay?.date ?? person.birthday.date;
+
+      for (const nudge of parseNudges(person.birthday.nudges)) {
+        const dates = notificationDatesFor(person.birthday.date, YEARLY, nudge);
+        dates.forEach((date, i) => {
+          let body = `${person.name}'s birthday${turningStr} is on ${displayDate}.`;
+          if (nudge.value === 'day_of') body = `It's ${person.name}'s birthday today!${turningStr}`;
+
+          pending.push({
+            id: `bd_${person.id}_${nudge.value}_${i}`,
+            title: `Birthday Reminder: ${person.name}`,
+            body,
+            date,
+          });
+        });
+      }
+    }
+
+    // Special days
+    for (const sd of person.specialDays ?? []) {
+      if (sd.isBirthday) continue; // handled above
+      const dateStr = sd.originalDate;
+      if (!dateStr) continue;
+
+      for (const nudge of parseNudges(sd.nudges)) {
+        const dates = notificationDatesFor(dateStr, sd.recurrence ?? YEARLY, nudge);
+        dates.forEach((date, i) => {
+          let body = `${person.name}'s ${sd.title} is on ${sd.date}.`;
+          if (nudge.value === 'day_of') body = `It's ${person.name}'s ${sd.title} today!`;
+
+          pending.push({
+            id: `sd_${sd.id}_${nudge.value}_${i}`,
+            title: `Special Day: ${person.name}`,
+            body,
+            date,
+          });
+        });
+      }
     }
   }
 
-  return target;
+  return pending;
 }
 
-export async function syncNotifications(people: Person[], nudgesEnabled?: boolean) {
+function collectMyEventNotifications(myEvents: MyEvent[]): PendingNotification[] {
+  const pending: PendingNotification[] = [];
+
+  for (const event of myEvents) {
+    for (const nudge of parseNudges(event.nudges)) {
+      const dates = notificationDatesFor(event.originalDate, event.recurrence, nudge);
+      dates.forEach((date, i) => {
+        let body = `${event.title} is on ${event.date}.`;
+        if (nudge.value === 'day_of') body = `${event.title} is today!`;
+
+        pending.push({
+          id: `me_${event.id}_${nudge.value}_${i}`,
+          title: 'Your Reminder',
+          body,
+          date,
+        });
+      });
+    }
+  }
+
+  return pending;
+}
+
+// Cancels every scheduled notification and reschedules from scratch, so this has
+// to be given the complete picture — people AND the user's own events — in one
+// call. Two partial callers would wipe each other's reminders.
+export async function syncNotifications(people: Person[], myEvents: MyEvent[] = [], nudgesEnabled?: boolean) {
   if (Platform.OS === 'web') return;
 
   let isEnabled = nudgesEnabled;
@@ -73,52 +136,11 @@ export async function syncNotifications(people: Person[], nudgesEnabled?: boolea
     return;
   }
 
-  const upcomingNotifications: { title: string; body: string; date: Date; id: string }[] = [];
-
   // 2. Gather all reminders
-  for (const person of people) {
-    // Process Birthday
-    if (person.birthday && person.birthday.nudges) {
-      for (const nudge of person.birthday.nudges) {
-        const notifyDate = calculateNotificationDate(person.birthday.date, nudge.type, nudge.value, true);
-        if (notifyDate) {
-          const bdSpecialDay = person.specialDays?.find(d => d.isBirthday);
-          const turningStr = bdSpecialDay?.turningAge ? ` (turning ${bdSpecialDay.turningAge})` : '';
-          let body = `${person.name}'s birthday${turningStr} is on ${person.birthday.date}.`;
-          if (nudge.type === 'day_of') body = `It's ${person.name}'s birthday today!${turningStr}`;
-          
-          upcomingNotifications.push({
-            id: `bd_${person.id}_${nudge.type}`,
-            title: `Birthday Reminder: ${person.name}`,
-            body,
-            date: notifyDate,
-          });
-        }
-      }
-    }
-
-    // Process Special Days
-    if (person.specialDays) {
-      for (const sd of person.specialDays) {
-        if (!sd.nudges || sd.isBirthday) continue; // skip birthdays here since handled above
-
-        for (const nudge of sd.nudges) {
-          const notifyDate = calculateNotificationDate(sd.date, nudge.type, nudge.value, sd.isAnnual ?? true);
-          if (notifyDate) {
-            let body = `${person.name}'s ${sd.title} is on ${sd.date}.`;
-            if (nudge.type === 'day_of') body = `It's ${person.name}'s ${sd.title} today!`;
-            
-            upcomingNotifications.push({
-              id: `sd_${sd.id}_${nudge.type}`,
-              title: `Special Day: ${person.name}`,
-              body,
-              date: notifyDate,
-            });
-          }
-        }
-      }
-    }
-  }
+  const upcomingNotifications = [
+    ...collectPeopleNotifications(people),
+    ...collectMyEventNotifications(myEvents),
+  ];
 
   // 3. Sort by closest date
   upcomingNotifications.sort((a, b) => a.date.getTime() - b.date.getTime());
