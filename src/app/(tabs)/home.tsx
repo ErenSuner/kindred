@@ -196,9 +196,7 @@ export default function Home() {
                 <Card pressable onPress={() => router.push(`/my-event/edit/${event.id}` as any)} style={styles.featured}>
                   <View style={[styles.blur, { pointerEvents: 'none' } as any]} />
                   <View style={styles.featuredTop}>
-                    <View style={styles.eventIconBadge}>
-                      <Icon name={event.icon as any} size={28} color={colors.onPrimaryContainer} />
-                    </View>
+                    <Avatar uri={user?.user_metadata?.avatar_url ?? undefined} initials={userName?.charAt(0)?.toUpperCase()} size={64} />
                     <View style={{ flex: 1, gap: 8 }}>
                       <Chip label="For you" tone="secondary" />
                       <Txt variant="headlineMd" color={colors.onSurface}>
@@ -297,9 +295,7 @@ export default function Home() {
                 <Card key={`${item.kind}-${item.id}`} pressable onPress={onPress} style={styles.rowCard}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flex: 1 }}>
                     {isEvent ? (
-                      <View style={styles.eventIconBadgeSm}>
-                        <Icon name={item.event.icon as any} size={20} color={colors.onPrimaryContainer} />
-                      </View>
+                      <Avatar uri={user?.user_metadata?.avatar_url ?? undefined} initials={userName?.charAt(0)?.toUpperCase()} size={48} />
                     ) : (
                       <Avatar uri={item.person.avatar} initials={item.person.initials} size={48} />
                     )}

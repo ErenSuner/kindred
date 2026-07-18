@@ -7,7 +7,6 @@ import { colors, spacing, radius, softShadow, ambientShadow } from '@/theme/toke
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Avatar } from '@/components/Avatar';
-import { AvatarPicker } from '@/components/AvatarPicker';
 import { Chip } from '@/components/Chip';
 import { Button } from '@/components/Button';
 import { SearchBar } from '@/components/SearchBar';
@@ -20,29 +19,11 @@ import type { Person } from '@/data/mock';
 export default function Connections() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { people, togglePin, removePersonWithUndo, updatePerson, loadError, refreshPeople } = usePeople();
+  const { people, togglePin, removePersonWithUndo, loadError, refreshPeople } = usePeople();
 
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
-
-  const [avatarError, setAvatarError] = useState<string | null>(null);
-
-  // Saving straight from the list — the picture is the only thing changing, so
-  // there's no form to submit.
-  const savePersonAvatar = async (person: Person, url: string) => {
-    setAvatarError(null);
-    try {
-      await updatePerson(person.id, {
-        name: person.name,
-        role: person.eventTag,
-        avatarUrl: url,
-      });
-    } catch (e) {
-      console.error(e);
-      setAvatarError('Photo uploaded, but saving it failed. Try again.');
-    }
-  };
 
   const [query, setQuery] = useState('');
   const searching = query.trim().length > 0;
@@ -118,7 +99,6 @@ export default function Connections() {
         </Animated.View>
 
         <FormError message={loadError} onRetry={refreshPeople} retryLabel="Retry" />
-        <FormError message={avatarError} />
 
         {/* Search — hidden until there's something to search through */}
         {people.length > 0 && (
@@ -155,15 +135,7 @@ export default function Connections() {
                       style={({ pressed }) => [styles.personCard, pressed && { transform: [{ scale: 0.98 }], shadowOpacity: 0.04 }]}
                     >
                       <View style={styles.personLeft}>
-                        <AvatarPicker
-                          uri={hit.person.avatar}
-                          initials={hit.person.initials}
-                          size={52}
-                          subjectId={hit.person.id}
-                          hideBadgeWhenSet
-                          onUploaded={(url) => savePersonAvatar(hit.person, url)}
-                          onError={setAvatarError}
-                        />
+                        <Avatar uri={hit.person.avatar} initials={hit.person.initials} size={52} />
                         <View style={{ flex: 1, gap: 4 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                             <Txt variant="bodyLg" color={colors.onSurface} style={{ fontFamily: 'Inter_500Medium' }}>
@@ -255,15 +227,7 @@ export default function Connections() {
               ]}
             >
               <View style={styles.personLeft}>
-                <AvatarPicker
-                  uri={person.avatar}
-                  initials={person.initials}
-                  size={52}
-                  subjectId={person.id}
-                  hideBadgeWhenSet
-                  onUploaded={(url) => savePersonAvatar(person, url)}
-                  onError={setAvatarError}
-                />
+                <Avatar uri={person.avatar} initials={person.initials} size={52} />
                 <View style={{ flex: 1, gap: 4 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Txt variant="bodyLg" color={colors.onSurface} style={{ fontFamily: 'Inter_500Medium' }}>

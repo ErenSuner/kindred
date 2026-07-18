@@ -5,6 +5,8 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { colors, spacing, radius } from '@/theme/tokens';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
+import { Avatar } from '@/components/Avatar';
+import { useAuth } from '@/context/AuthContext';
 import { Card } from '@/components/Card';
 import { FormError } from '@/components/FormError';
 import { useEvents } from '@/context/EventsContext';
@@ -38,6 +40,9 @@ export default function MyEvents() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { events, pastEvents, loadError, refreshEvents } = useEvents();
+  const { user } = useAuth();
+  const userName = user?.user_metadata?.name || (user?.email ? user.email.split('@')[0] : 'You');
+  const ownAvatarUrl: string | undefined = user?.user_metadata?.avatar_url ?? undefined;
 
   const featured = events[0];
   const rest = events.slice(1);
@@ -104,9 +109,7 @@ export default function MyEvents() {
               <Card pressable onPress={() => router.push(`/my-event/edit/${featured.id}` as any)} style={styles.featured}>
                 <View style={[styles.blur, { pointerEvents: 'none' } as any]} />
                 <View style={styles.featuredTop}>
-                  <View style={styles.iconBadge}>
-                    <Icon name={featured.icon as any} size={28} color={colors.onPrimaryContainer} />
-                  </View>
+                  <Avatar uri={ownAvatarUrl} initials={userName?.charAt(0)?.toUpperCase()} size={64} />
                   <View style={{ flex: 1, gap: 8 }}>
                     <View style={styles.repeatChip}>
                       <Icon name={recurrenceIcon(featured.recurrence)} size={12} color={colors.onSecondaryContainer} />
@@ -151,9 +154,7 @@ export default function MyEvents() {
                     style={styles.rowCard}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flex: 1 }}>
-                      <View style={styles.iconBadgeSm}>
-                        <Icon name={event.icon as any} size={20} color={colors.onPrimaryContainer} />
-                      </View>
+                      <Avatar uri={ownAvatarUrl} initials={userName?.charAt(0)?.toUpperCase()} size={48} />
                       <View style={{ flex: 1 }}>
                         <Txt variant="bodyLg" color={colors.onSurface} style={{ fontFamily: 'Inter_500Medium' }}>
                           {event.title}
@@ -200,9 +201,7 @@ export default function MyEvents() {
                 style={[styles.rowCard, styles.pastCard]}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flex: 1 }}>
-                  <View style={[styles.iconBadgeSm, { backgroundColor: colors.surfaceContainerHigh }]}>
-                    <Icon name={event.icon as any} size={20} color={colors.onSurfaceVariant} />
-                  </View>
+                  <Avatar uri={ownAvatarUrl} initials={userName?.charAt(0)?.toUpperCase()} size={48} />
                   <View style={{ flex: 1 }}>
                     <Txt variant="bodyLg" color={colors.onSurfaceVariant} style={{ fontFamily: 'Inter_500Medium' }}>
                       {event.title}

@@ -13,6 +13,7 @@ import { usePeople } from '@/context/PeopleContext';
 import { InlineBirthdayCard } from '@/components/InlineBirthdayCard';
 import { NotePreview } from '@/components/NotePreview';
 import { LookingBack } from '@/components/LookingBack';
+import { PhotoViewer } from '@/components/PhotoViewer';
 import type { SpecialDay } from '@/data/mock';
 
 const accentMap = {
@@ -85,6 +86,8 @@ export default function PersonDetail() {
   const [dayActionVisible, setDayActionVisible] = useState(false);
   const [dayConfirmVisible, setDayConfirmVisible] = useState(false);
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
+
+  const [photoVisible, setPhotoVisible] = useState(false);
 
   const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
   const [deleteNoteConfirmVisible, setDeleteNoteConfirmVisible] = useState(false);
@@ -192,7 +195,14 @@ export default function PersonDetail() {
         {/* Profile header */}
         <Animated.View entering={FadeInDown.duration(500)} style={{ alignItems: 'center' }}>
           {person.avatar ? (
-            <Image source={{ uri: person.avatar }} style={styles.bigAvatar} contentFit="cover" />
+            // Tapping opens the original, uncropped — the circle here hides how
+            // the photo was actually framed.
+            <Pressable
+              onPress={() => setPhotoVisible(true)}
+              style={({ pressed }) => pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }}
+            >
+              <Image source={{ uri: person.avatar }} style={styles.bigAvatar} contentFit="cover" />
+            </Pressable>
           ) : (
             <View style={[styles.bigAvatar, styles.bigInitials]}>
               <Txt variant="headlineXl" color={colors.onPrimaryContainer}>
@@ -536,6 +546,13 @@ export default function PersonDetail() {
           </Animated.View>
         </View>
       </Modal>
+
+      <PhotoViewer
+        visible={photoVisible}
+        onClose={() => setPhotoVisible(false)}
+        uri={person.avatar}
+        title={person.name}
+      />
     </View>
   );
 }
