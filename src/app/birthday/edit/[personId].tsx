@@ -28,7 +28,7 @@ export default function EditBirthday() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { personId, highlight } = useLocalSearchParams<{ personId: string; highlight?: string }>();
-  const { people, updateBirthday, deleteBirthday, syncNotes } = usePeople();
+  const { people, updateBirthday, deleteSpecialDayWithUndo, syncNotes } = usePeople();
 
   const person = people.find((p) => p.id === personId);
   const birthday = person?.birthday;
@@ -42,7 +42,6 @@ export default function EditBirthday() {
   const [notes, setNotes] = useState<DraftNote[]>([]);
 
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -118,20 +117,12 @@ export default function EditBirthday() {
     }
   };
 
-  const executeDelete = async () => {
+  const executeDelete = () => {
     if (!birthday) return;
-    setIsDeleting(true);
-    setError(null);
-    try {
-      await deleteBirthday(birthday.id);
-      router.back();
-    } catch (e) {
-      console.error(e);
-      setError('Could not delete. Check your connection and try again.');
-    } finally {
-      setIsDeleting(false);
-      setDeleteConfirmVisible(false);
-    }
+    setDeleteConfirmVisible(false);
+    // A birthday is a special day now, so it shares the same staged deletion.
+    deleteSpecialDayWithUndo(birthday.id, 'Birthday');
+    router.back();
   };
 
   if (!birthday) {
@@ -214,11 +205,11 @@ export default function EditBirthday() {
               Delete Birthday
             </Txt>
             <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 8, textAlign: 'center' }}>
-              This removes {person?.name ?? 'their'}&apos;s birthday and any notes kept with it. This action cannot be undone.
+              This removes {person?.name ?? 'their'}&apos;s birthday and any notes kept with it. You&apos;ll have a moment to undo it.
             </Txt>
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, width: '100%' }}>
-              <Button label="Cancel" onPress={() => setDeleteConfirmVisible(false)} variant="tonal" style={{ flex: 1 }} disabled={isDeleting} />
-              <Button label="Delete" onPress={executeDelete} style={{ flex: 1, backgroundColor: colors.error }} disabled={isDeleting} />
+              <Button label="Cancel" onPress={() => setDeleteConfirmVisible(false)} variant="tonal" style={{ flex: 1 }} />
+              <Button label="Delete" onPress={executeDelete} style={{ flex: 1, backgroundColor: colors.error }} />
             </View>
           </Animated.View>
         </View>

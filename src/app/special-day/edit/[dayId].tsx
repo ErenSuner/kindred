@@ -29,7 +29,7 @@ export default function EditSpecialDay() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { dayId, personId } = useLocalSearchParams<{ dayId: string; personId: string }>();
-  const { people, updateSpecialDay, deleteSpecialDay, syncNotes } = usePeople();
+  const { people, updateSpecialDay, deleteSpecialDayWithUndo, syncNotes } = usePeople();
 
   const person = people.find((p) => p.id === personId);
   const specialDay = person?.specialDays?.find((sd) => sd.id === dayId);
@@ -122,19 +122,12 @@ export default function EditSpecialDay() {
     }
   };
 
-  const executeDelete = async () => {
-    setIsDeleting(true);
-    setError(null);
-    try {
-      await deleteSpecialDay(dayId ?? '');
-      router.back();
-    } catch (e) {
-      console.error(e);
-      setError('Could not delete. Check your connection and try again.');
-    } finally {
-      setIsDeleting(false);
-      setDeleteConfirmVisible(false);
-    }
+  const executeDelete = () => {
+    setDeleteConfirmVisible(false);
+    // Leaves immediately; the snackbar carries the undo offer back to the person
+    // screen, where the day is already hidden from the list.
+    deleteSpecialDayWithUndo(dayId ?? '', specialDay?.title ?? 'Special day');
+    router.back();
   };
 
   return (
@@ -217,7 +210,7 @@ export default function EditSpecialDay() {
               Delete Special Day
             </Txt>
             <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 8, textAlign: 'center' }}>
-              Are you sure you want to delete this special day? This action cannot be undone.
+              This removes the day and any notes kept with it. You&apos;ll have a moment to undo it.
             </Txt>
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, width: '100%' }}>
               <Button label="Cancel" onPress={() => setDeleteConfirmVisible(false)} variant="tonal" style={{ flex: 1 }} disabled={isDeleting} />

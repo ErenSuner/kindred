@@ -27,7 +27,7 @@ export default function EditMyEvent() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getEvent, updateEvent, deleteEvent } = useEvents();
+  const { getEvent, updateEvent, deleteEventWithUndo } = useEvents();
   const event = getEvent(id ?? '');
 
   const [title, setTitle] = useState('');
@@ -96,15 +96,11 @@ export default function EditMyEvent() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
+    if (!event) return;
     setDeleteConfirmVisible(false);
-    try {
-      await deleteEvent(id ?? '');
-      router.back();
-    } catch (e) {
-      console.error(e);
-      setError('Could not delete. Try again.');
-    }
+    deleteEventWithUndo(event);
+    router.back();
   };
 
   if (!event) {

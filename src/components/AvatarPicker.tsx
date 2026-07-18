@@ -17,17 +17,33 @@ type Props = {
   subjectId: string;
   onUploaded: (publicUrl: string) => void | Promise<void>;
   onError?: (message: string) => void;
+  // In a list, the badge is an invitation to add a missing photo — once one is
+  // set it just adds noise, so it can be hidden.
+  hideBadgeWhenSet?: boolean;
 };
 
 // Tap-to-replace avatar. Uploads immediately rather than deferring to a form
 // save, so the picture is on screen (and in storage) before anything else is
 // filled in — and so a failed upload can't silently lose a photo the user
 // thought was attached.
-export function AvatarPicker({ uri, initials, size = 96, subjectId, onUploaded, onError }: Props) {
+export function AvatarPicker({
+  uri,
+  initials,
+  size = 96,
+  subjectId,
+  onUploaded,
+  onError,
+  hideBadgeWhenSet = false,
+}: Props) {
   const { user } = useAuth();
   const [busy, setBusy] = useState(false);
 
   const dim = { width: size, height: size, borderRadius: size / 2 };
+  // The badge and initials track the avatar's size so this works equally well at
+  // 96px on a profile and 52px in a list row.
+  const badgeSize = Math.max(20, Math.round(size * 0.33));
+  const badgeDim = { width: badgeSize, height: badgeSize, borderRadius: badgeSize / 2 };
+  const showBadge = !busy && !(hideBadgeWhenSet && uri);
 
   const handlePress = async () => {
     if (busy) return;
@@ -67,23 +83,27 @@ export function AvatarPicker({ uri, initials, size = 96, subjectId, onUploaded, 
       ) : (
         <View style={[dim, styles.placeholder]}>
           {initials ? (
-            <Txt variant="headlineLgMobile" color={colors.onPrimaryContainer}>{initials}</Txt>
+            <Txt color={colors.onPrimaryContainer} style={{ fontSize: size * 0.36, fontFamily: 'Inter_500Medium' }}>
+              {initials}
+            </Txt>
           ) : (
             <Icon name="add-a-photo" size={size * 0.3} color={colors.onSurfaceVariant} />
           )}
         </View>
       )}
 
-      {/* Camera badge doubles as the affordance when a picture is already set. */}
-      <View style={styles.badge}>
-        {busy ? (
-          <ActivityIndicator size="small" color={colors.onPrimary} />
-        ) : (
-          <Icon name={uri ? 'edit' : 'add-a-photo'} size={16} color={colors.onPrimary} />
-        )}
-      </View>
+      {/* Doubles as the affordance: an invitation when empty, an edit hint when set. */}
+      {showBadge && (
+        <View style={[styles.badge, badgeDim]}>
+          <Icon name={uri ? 'edit' : 'add-a-photo'} size={badgeSize * 0.55} color={colors.onPrimary} />
+        </View>
+      )}
 
-      {busy && <View style={[styles.busyVeil, dim]} />}
+      {busy && (
+        <View style={[styles.busyVeil, dim]}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -104,9 +124,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -115,7 +132,9 @@ const styles = StyleSheet.create({
   },
   busyVeil: {
     position: 'absolute',
-    backgroundColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: 'rgba(255,255,255,0.7)',
     borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

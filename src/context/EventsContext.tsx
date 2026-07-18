@@ -1,10 +1,12 @@
 import type { MyEvent } from '@/data/mock';
 import { supabase } from '@/lib/supabase';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { getNextOccurrence } from '@/utils/dates';
 import { Recurrence, YEARLY, parseRecurrence, serializeRecurrence } from '@/utils/recurrence';
 import { describeLoadError } from '@/utils/loadError';
+import { useUndo } from './UndoContext';
+import { cacheKey, readCache, writeCache } from '@/utils/cache';
 
 type EventInput = {
   title: string;
@@ -22,6 +24,8 @@ type EventsContextValue = {
   addEvent: (data: EventInput) => Promise<void>;
   updateEvent: (id: string, data: Partial<EventInput>) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
+  // Hides the event immediately and offers an undo before it reaches the database.
+  deleteEventWithUndo: (event: MyEvent) => void;
   refreshEvents: () => Promise<void>;
   getEvent: (id: string) => MyEvent | undefined;
 };
@@ -63,6 +67,31 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   const [events, setEvents] = useState<MyEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
+  const { stage } = useUndo();
+  const eventsRef = useRef<MyEvent[]>([]);
+
+  // Rows in, sorted events out — used by both the network and the cache so
+  // countdowns are always recomputed from today.
+  const applyRows = (rows: any[]): string[] => {
+    const mapped = rows.map(mapDbEvent);
+
+    // One-time events that have passed are dropped, matching how special days
+    // are cleaned up in PeopleContext.
+    const expiredIds = mapped.filter((e) => e.isExpired).map((e) => e.id);
+    const live = mapped.filter((e) => !e.isExpired);
+    live.sort((a, b) => a.daysAway - b.daysAway);
+
+    setEvents(live);
+    eventsRef.current = live;
+    return expiredIds;
+  };
+
+  const hydrateFromCache = async (userId: string) => {
+    const cached = await readCache<any[]>(cacheKey('events', userId));
+    if (!cached?.rows?.length) return;
+    if (eventsRef.current.length === 0) applyRows(cached.rows);
+  };
 
   const refreshEvents = async () => {
     if (!user) {
@@ -78,15 +107,9 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
       if (!data) return;
 
-      const mapped = data.map(mapDbEvent);
-
-      // One-time events that have passed are dropped, matching how special days
-      // are cleaned up in PeopleContext.
-      const expiredIds = mapped.filter((e) => e.isExpired).map((e) => e.id);
-      const live = mapped.filter((e) => !e.isExpired);
-      live.sort((a, b) => a.daysAway - b.daysAway);
-      setEvents(live);
+      const expiredIds = applyRows(data);
       setLoadError(null);
+      writeCache(cacheKey('events', user.id), data);
 
       if (expiredIds.length > 0) {
         const { error: delError } = await supabase.from('my_events').delete().in('id', expiredIds);
@@ -95,16 +118,19 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.error('Error fetching events:', err);
       // Previously loaded events are left in place rather than blanked out.
-      setLoadError(describeLoadError(err, "Couldn't load your reminders."));
+      setLoadError(describeLoadError(err, "Couldn't reach the server. Showing your saved copy."));
     }
   };
 
   useEffect(() => {
     if (user) {
       setLoading(true);
-      refreshEvents().finally(() => setLoading(false));
+      hydrateFromCache(user.id).finally(() => {
+        refreshEvents().finally(() => setLoading(false));
+      });
     } else {
       setEvents([]);
+      setLoadError(null);
     }
   }, [user]);
 
@@ -166,11 +192,29 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const getEvent = (id: string) => events.find((e) => e.id === id);
+  // Staged deletions read as gone everywhere while the undo window is open.
+  const visibleEvents = events.filter((e) => !hiddenIds.includes(e.id));
+
+  const deleteEventWithUndo = (event: MyEvent) => {
+    setHiddenIds((prev) => [...prev, event.id]);
+    stage({
+      message: `${event.title} deleted`,
+      commit: async () => {
+        try {
+          await deleteEvent(event.id);
+        } finally {
+          setHiddenIds((prev) => prev.filter((id) => id !== event.id));
+        }
+      },
+      undo: () => setHiddenIds((prev) => prev.filter((id) => id !== event.id)),
+    });
+  };
+
+  const getEvent = (id: string) => visibleEvents.find((e) => e.id === id);
 
   return (
     <EventsContext.Provider
-      value={{ events, loading, loadError, addEvent, updateEvent, deleteEvent, refreshEvents, getEvent }}
+      value={{ events: visibleEvents, loading, loadError, addEvent, updateEvent, deleteEvent, deleteEventWithUndo, refreshEvents, getEvent }}
     >
       {children}
     </EventsContext.Provider>

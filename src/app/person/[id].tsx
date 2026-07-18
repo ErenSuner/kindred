@@ -64,7 +64,7 @@ export default function PersonDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { getPerson, removePerson, addNoteToPerson, updateNote, deleteNote, deleteSpecialDay } = usePeople();
+  const { getPerson, removePersonWithUndo, addNoteToPerson, updateNote, deleteNoteWithUndo, deleteSpecialDayWithUndo } = usePeople();
   
   const person = getPerson(id ?? '');
 
@@ -84,11 +84,9 @@ export default function PersonDetail() {
   const [dayActionVisible, setDayActionVisible] = useState(false);
   const [dayConfirmVisible, setDayConfirmVisible] = useState(false);
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
-  const [isDeletingDay, setIsDeletingDay] = useState(false);
 
   const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
   const [deleteNoteConfirmVisible, setDeleteNoteConfirmVisible] = useState(false);
-  const [isDeletingNote, setIsDeletingNote] = useState(false);
 
   if (!person) {
     return (
@@ -117,13 +115,10 @@ export default function PersonDetail() {
     setDeleteConfirmVisible(true);
   };
 
-  const executeDelete = async () => {
-    try {
-      await removePerson(person.id);
-      router.back();
-    } catch (e) {
-      console.error('Failed to delete person:', e);
-    }
+  const executeDelete = () => {
+    setDeleteConfirmVisible(false);
+    removePersonWithUndo(person);
+    router.back();
   };
 
   const handleAddNote = async () => {
@@ -144,18 +139,11 @@ export default function PersonDetail() {
     setDeleteNoteConfirmVisible(true);
   };
 
-  const executeDeleteNote = async () => {
+  const executeDeleteNote = () => {
     if (!noteToDelete) return;
-    setIsDeletingNote(true);
-    try {
-      await deleteNote(noteToDelete);
-      setDeleteNoteConfirmVisible(false);
-      setNoteToDelete(null);
-    } catch (e) {
-      console.error('Failed to delete note:', e);
-    } finally {
-      setIsDeletingNote(false);
-    }
+    deleteNoteWithUndo(noteToDelete);
+    setDeleteNoteConfirmVisible(false);
+    setNoteToDelete(null);
   };
 
   const handleUpdateNote = async () => {
@@ -478,19 +466,15 @@ export default function PersonDetail() {
               Are you sure you want to delete this special day? This action cannot be undone.
             </Txt>
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, width: '100%' }}>
-              <Button label="Cancel" onPress={() => setDayConfirmVisible(false)} variant="tonal" style={{ flex: 1 }} disabled={isDeletingDay} />
+              <Button label="Cancel" onPress={() => setDayConfirmVisible(false)} variant="tonal" style={{ flex: 1 }} />
               <Button 
                 label="Delete" 
-                disabled={isDeletingDay}
-                onPress={async () => {
+               
+                onPress={() => {
                   if (!selectedDayId) return;
-                  setIsDeletingDay(true);
-                  try {
-                    await deleteSpecialDay(selectedDayId);
-                  } catch(e) {
-                    console.error(e);
-                  } finally {
-                    setIsDeletingDay(false);
+                  {
+                    const day = person.specialDays?.find((d) => d.id === selectedDayId);
+                    deleteSpecialDayWithUndo(selectedDayId, day?.title ?? 'Special day');
                     setDayConfirmVisible(false);
                     setSelectedDayId(null);
                   }
@@ -537,12 +521,12 @@ export default function PersonDetail() {
               Are you sure you want to delete this note? This action cannot be undone.
             </Txt>
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, width: '100%' }}>
-              <Button label="Cancel" onPress={() => setDeleteNoteConfirmVisible(false)} variant="tonal" style={{ flex: 1 }} disabled={isDeletingNote} />
+              <Button label="Cancel" onPress={() => setDeleteNoteConfirmVisible(false)} variant="tonal" style={{ flex: 1 }} />
               <Button 
                 label="Delete" 
                 onPress={executeDeleteNote} 
                 style={{ flex: 1, backgroundColor: colors.error }} 
-                disabled={isDeletingNote}
+               
               />
             </View>
           </Animated.View>

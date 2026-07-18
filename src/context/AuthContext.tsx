@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { clearCachesForUser } from '@/utils/cache';
 import { Session, User } from '@supabase/supabase-js';
 
 type AuthContextType = {
@@ -38,8 +39,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     setLoading(true);
+    // Captured before the sign-out clears it — the offline copy belongs to this
+    // account and must not be readable by whoever signs in next.
+    const signingOutUserId = user?.id;
     try {
       await supabase.auth.signOut();
+      if (signingOutUserId) await clearCachesForUser(signingOutUserId);
     } catch (e) {
       console.error('Signout error:', e);
     } finally {

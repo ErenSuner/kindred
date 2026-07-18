@@ -1,11 +1,13 @@
 import type { Note, Person, Relationship } from '@/data/mock';
 import { supabase } from '@/lib/supabase';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { getNextOccurrence } from '@/utils/dates';
 import { Recurrence, YEARLY, parseRecurrence, serializeRecurrence } from '@/utils/recurrence';
 import { distributeNotes, mapDbNote } from '@/utils/notes';
 import { describeLoadError } from '@/utils/loadError';
+import { useUndo } from './UndoContext';
+import { cacheKey, readCache, writeCache } from '@/utils/cache';
 
 type PeopleContextValue = {
   people: Person[];
@@ -36,6 +38,8 @@ type PeopleContextValue = {
     recurrence?: Recurrence;
   }) => Promise<void>;
   deleteSpecialDay: (dayId: string) => Promise<void>;
+  // Hides the day immediately and offers an undo before it reaches the database.
+  deleteSpecialDayWithUndo: (dayId: string, title: string) => void;
   addBirthday: (personId: string, data: { date: string; nudges?: string[]; notes?: NoteDraft[] }) => Promise<void>;
   updateBirthday: (birthdayId: string, data: { date?: string; nudges?: string[] }) => Promise<void>;
   deleteBirthday: (birthdayId: string) => Promise<void>;
@@ -48,7 +52,12 @@ type PeopleContextValue = {
   ) => Promise<void>;
   updateNote: (noteId: string, data: { kind?: string; body?: string }) => Promise<void>;
   deleteNote: (noteId: string) => Promise<void>;
+  // Hides the note immediately and offers an undo before it reaches the database.
+  deleteNoteWithUndo: (noteId: string) => void;
   removePerson: (id: string) => Promise<void>;
+  // Hides the person immediately and offers an undo; the delete only reaches the
+  // database once the window closes.
+  removePersonWithUndo: (person: Person) => void;
   togglePin: (id: string, isPinned: boolean) => Promise<void>;
   refreshPeople: () => Promise<void>;
   getPerson: (id: string) => Person | undefined;
@@ -171,6 +180,46 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
   // A failed load used to leave an empty list behind with nothing to explain it,
   // which reads exactly like "all your data is gone". Screens show this instead.
   const [loadError, setLoadError] = useState<string | null>(null);
+  // People staged for deletion. They're kept out of `people` so the UI reads as
+  // deleted, but the rows are untouched until the undo window closes.
+  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
+  const [hiddenDayIds, setHiddenDayIds] = useState<string[]>([]);
+  const [hiddenNoteIds, setHiddenNoteIds] = useState<string[]>([]);
+  const { stage } = useUndo();
+  // Lets the cache hydration check what is already loaded without re-running on
+  // every state change.
+  const peopleRef = useRef<Person[]>([]);
+
+  // Rows in, sorted people out. Shared by the network and the offline cache so
+  // both paths produce identical state — and so countdowns are always computed
+  // from today, never from whenever the cache was written.
+  const applyRows = (rows: any[]): string[] => {
+    const mapped = rows.map(mapDbPersonToPerson);
+
+    const expiredDayIds: string[] = [];
+    mapped.forEach((p) => {
+      if (p.specialDays) {
+        p.specialDays = p.specialDays.filter((sd) => {
+          if (sd.isExpired) {
+            expiredDayIds.push(sd.id);
+            return false;
+          }
+          return true;
+        });
+      }
+    });
+
+    // Pinned first, then closest event first.
+    mapped.sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return (a.daysAway ?? 9999) - (b.daysAway ?? 9999);
+    });
+
+    setPeople(mapped);
+    peopleRef.current = mapped;
+    return expiredDayIds;
+  };
 
   const refreshPeople = async () => {
     if (!user) {
@@ -194,30 +243,9 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
 
       if (data) {
-        const mapped = data.map(mapDbPersonToPerson);
-        
-        const expiredDayIds: string[] = [];
-        mapped.forEach(p => {
-          if (p.specialDays) {
-            p.specialDays = p.specialDays.filter(sd => {
-              if (sd.isExpired) {
-                expiredDayIds.push(sd.id);
-                return false;
-              }
-              return true;
-            });
-          }
-        });
-
-        // Sort people: pinned first, then closest event first
-        mapped.sort((a, b) => {
-          if (a.isPinned && !b.isPinned) return -1;
-          if (!a.isPinned && b.isPinned) return 1;
-          return (a.daysAway ?? 9999) - (b.daysAway ?? 9999);
-        });
-        
-        setPeople(mapped);
+        const expiredDayIds = applyRows(data);
         setLoadError(null);
+        writeCache(cacheKey('people', user.id), data);
 
         if (expiredDayIds.length > 0) {
           supabase.from('special_days').delete().in('id', expiredDayIds).then(({ error: delError }) => {
@@ -227,18 +255,30 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.error('Error fetching people:', err);
-      // The previously loaded list is deliberately left in place — showing stale
-      // people beats blanking the screen on a dropped connection.
-      setLoadError(describeLoadError(err, "Couldn't load your connections."));
+      // Whatever is already on screen stays — a cached or stale list beats a
+      // blank one when the connection drops.
+      setLoadError(describeLoadError(err, "Couldn't reach the server. Showing your saved copy."));
     }
+  };
+
+  // Paints the last known data before the network is even tried, so a cold start
+  // without a connection shows the app rather than an empty screen.
+  const hydrateFromCache = async (userId: string) => {
+    const cached = await readCache<any[]>(cacheKey('people', userId));
+    if (!cached?.rows?.length) return;
+    // Only fills an empty screen — a refresh that already landed wins.
+    if (peopleRef.current.length === 0) applyRows(cached.rows);
   };
 
   useEffect(() => {
     if (user) {
       setLoading(true);
-      refreshPeople().finally(() => setLoading(false));
+      hydrateFromCache(user.id).finally(() => {
+        refreshPeople().finally(() => setLoading(false));
+      });
     } else {
       setPeople([]);
+      setLoadError(null);
     }
   }, [user]);
 
@@ -581,8 +621,80 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Deleting a person takes their days and notes with it, so it gets a grace
+  // period. The row stays in the database until the window closes — nothing is
+  // lost if the app is killed in between.
+  const removePersonWithUndo = (person: Person) => {
+    setHiddenIds((prev) => [...prev, person.id]);
+
+    stage({
+      message: `${person.name} deleted`,
+      commit: async () => {
+        try {
+          await removePerson(person.id);
+        } finally {
+          setHiddenIds((prev) => prev.filter((id) => id !== person.id));
+        }
+      },
+      undo: () => setHiddenIds((prev) => prev.filter((id) => id !== person.id)),
+    });
+  };
+
+  const deleteNoteWithUndo = (noteId: string) => {
+    setHiddenNoteIds((prev) => [...prev, noteId]);
+
+    stage({
+      message: 'Note deleted',
+      commit: async () => {
+        try {
+          await deleteNote(noteId);
+        } finally {
+          setHiddenNoteIds((prev) => prev.filter((id) => id !== noteId));
+        }
+      },
+      undo: () => setHiddenNoteIds((prev) => prev.filter((id) => id !== noteId)),
+    });
+  };
+
+  // Same grace period for a single day. The screen that triggers this usually
+  // navigates away, which is why the staging lives here rather than in it.
+  const deleteSpecialDayWithUndo = (dayId: string, title: string) => {
+    setHiddenDayIds((prev) => [...prev, dayId]);
+
+    stage({
+      message: `${title} deleted`,
+      commit: async () => {
+        try {
+          await deleteSpecialDay(dayId);
+        } finally {
+          setHiddenDayIds((prev) => prev.filter((id) => id !== dayId));
+        }
+      },
+      undo: () => setHiddenDayIds((prev) => prev.filter((id) => id !== dayId)),
+    });
+  };
+
+  // Everything downstream — lists, search, notification scheduling — should
+  // behave as if a staged deletion already happened.
+  const visiblePeople = people
+    .filter((p) => !hiddenIds.includes(p.id))
+    .map((p) => {
+      if (hiddenDayIds.length === 0 && hiddenNoteIds.length === 0) return p;
+      return {
+        ...p,
+        notes: p.notes?.filter((n) => !hiddenNoteIds.includes(n.id)),
+        specialDays: p.specialDays
+          ?.filter((d) => !hiddenDayIds.includes(d.id))
+          .map((d) =>
+            hiddenNoteIds.length === 0
+              ? d
+              : { ...d, notes: d.notes?.filter((n) => !hiddenNoteIds.includes(n.id)) },
+          ),
+      };
+    });
+
   const getPerson = (id: string) => {
-    return people.find((p) => p.id === id);
+    return visiblePeople.find((p) => p.id === id);
   };
 
   const togglePin = async (id: string, isPinned: boolean) => {
@@ -615,12 +727,13 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
   return (
     <PeopleContext.Provider
       value={{
-        people,
+        people: visiblePeople,
         loading,
         loadError,
         addPerson,
         updatePerson,
         removePerson,
+        removePersonWithUndo,
         togglePin,
         refreshPeople,
         getPerson,
@@ -628,9 +741,11 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
         syncNotes,
         updateNote,
         deleteNote,
+        deleteNoteWithUndo,
         addSpecialDay,
         updateSpecialDay,
         deleteSpecialDay,
+        deleteSpecialDayWithUndo,
         addBirthday,
         updateBirthday,
         deleteBirthday,

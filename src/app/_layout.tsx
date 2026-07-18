@@ -21,6 +21,8 @@ import { PeopleProvider } from '@/context/PeopleContext';
 import { EventsProvider } from '@/context/EventsContext';
 import { HolidaysProvider } from '@/context/HolidaysContext';
 import { NotificationSync } from '@/components/NotificationSync';
+import { UndoProvider } from '@/context/UndoContext';
+import { UndoSnackbar } from '@/components/UndoSnackbar';
 
 import { Platform, LogBox } from 'react-native';
 
@@ -126,6 +128,7 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
+      <UndoProvider>
       <PeopleProvider>
         <EventsProvider>
           <HolidaysProvider>
@@ -133,10 +136,12 @@ export default function RootLayout() {
               <StatusBar style="dark" />
               <NotificationSync />
               <RootLayoutNav />
+              <UndoSnackbar />
             </GestureHandlerRootView>
           </HolidaysProvider>
         </EventsProvider>
       </PeopleProvider>
+      </UndoProvider>
     </AuthProvider>
   );
 }
