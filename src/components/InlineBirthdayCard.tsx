@@ -139,7 +139,7 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
                   <View style={{ marginTop: 8, gap: 4 }}>
                     {reminders.map((r, i) => (
                       <View key={`${r.value}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Icon name={r.type === 'custom' ? 'calendar-today' : 'schedule'} size={12} color={colors.primary} />
+                        <Icon name={r.type === 'date' ? 'calendar-today' : 'schedule'} size={12} color={colors.primary} />
                         <Txt variant="labelSm" color={colors.outline}>{r.label}</Txt>
                       </View>
                     ))}

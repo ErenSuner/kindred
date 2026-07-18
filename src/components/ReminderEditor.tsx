@@ -1,265 +1,245 @@
 import { useState } from 'react';
 import { View, StyleSheet, Pressable, Modal } from 'react-native';
-import Animated, { SlideInDown } from 'react-native-reanimated';
+import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, radius, spacing } from '@/theme/tokens';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
-import { Nudge, PRESET_REMINDERS, formatCustomDate } from '@/utils/nudges';
+import {
+  DAY_OF,
+  LEAD_UNITS,
+  LeadUnit,
+  MAX_LEAD_AMOUNT,
+  Nudge,
+  PRESET_REMINDERS,
+  leadLabel,
+  leadValue,
+  offsetDaysFor,
+} from '@/utils/nudges';
 
-const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const MONTHS_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
-export const MAX_REMINDERS = 3;
+export const MAX_REMINDERS = 4;
 
 type Props = {
   reminders: Nudge[];
   onChange: (next: Nudge[]) => void;
-  // The event's own date, used to keep custom reminders from landing after it.
-  eventDate: Date | null;
+  // The event's own date. Kept for call-site compatibility; lead times are
+  // relative so nothing needs validating against it any more.
+  eventDate?: Date | null;
 };
 
-export function ReminderEditor({ reminders, onChange, eventDate }: Props) {
-  const [modalVisible, setModalVisible] = useState(false);
-  const [customDateMode, setCustomDateMode] = useState(false);
-  const [customDay, setCustomDay] = useState<number | null>(null);
-  const [customMonth, setCustomMonth] = useState<number | null>(null);
-  const [customYear, setCustomYear] = useState<number | null>(null);
+// Everything except the day itself, which is fixed and shown separately.
+const CHOOSABLE_PRESETS = PRESET_REMINDERS.filter((p) => p.value !== DAY_OF);
+
+export function ReminderEditor({ reminders, onChange }: Props) {
   const [pickerVisible, setPickerVisible] = useState(false);
-  const [pickerType, setPickerType] = useState<'day' | 'month' | 'year'>('day');
+  const [leadAmount, setLeadAmount] = useState(4);
+  const [leadUnit, setLeadUnit] = useState<LeadUnit>('day');
+  const [amountPickerVisible, setAmountPickerVisible] = useState(false);
+  const [unitPickerVisible, setUnitPickerVisible] = useState(false);
 
-  const addReminder = (reminder: Nudge) => {
-    if (reminders.length >= MAX_REMINDERS) return;
-    if (reminders.some((r) => r.value === reminder.value)) return;
-    onChange([...reminders, reminder]);
-    setModalVisible(false);
-    setCustomDateMode(false);
+  // The day-of reminder is never in the editable list — it is guaranteed.
+  const chosen = reminders.filter((r) => r.value !== DAY_OF);
+  const chosenValues = new Set(chosen.map((r) => r.value));
+  const atLimit = chosen.length >= MAX_REMINDERS;
+
+  const toggle = (nudge: Nudge) => {
+    if (chosenValues.has(nudge.value)) {
+      onChange(chosen.filter((r) => r.value !== nudge.value));
+      return;
+    }
+    if (atLimit) return;
+    onChange([...chosen, nudge]);
   };
 
-  const removeReminder = (index: number) => {
-    onChange(reminders.filter((_, i) => i !== index));
+  const customLead = leadValue(leadAmount, leadUnit);
+  const customChosen = chosenValues.has(customLead);
+  // A custom amount that happens to equal a preset would be a duplicate row.
+  const customMatchesPreset = CHOOSABLE_PRESETS.some(
+    (p) => offsetDaysFor({ type: 'preset', label: '', value: p.value }) ===
+      offsetDaysFor({ type: 'lead', label: '', value: customLead }),
+  );
+
+  const addCustom = () => {
+    if (customChosen || atLimit) return;
+    onChange([...chosen, { type: 'lead', label: leadLabel(leadAmount, leadUnit), value: customLead }]);
+    setPickerVisible(false);
   };
 
-  const isCustomDateValid = () => {
-    if (!customDay || !customMonth || !customYear) return false;
-    const customDate = new Date(customYear, customMonth - 1, customDay);
-    if (!eventDate) return true; // no event date yet, nothing to validate against
-    return customDate.getTime() <= eventDate.getTime();
-  };
-
-  const addCustomDateReminder = () => {
-    if (!isCustomDateValid()) return;
-    const dateStr = `${customYear}-${String(customMonth).padStart(2, '0')}-${String(customDay).padStart(2, '0')}`;
-    addReminder({ type: 'custom', label: formatCustomDate(dateStr), value: dateStr });
-    setCustomDay(null);
-    setCustomMonth(null);
-    setCustomYear(null);
-  };
-
-  const currentYear = new Date().getFullYear();
-  const yearOptions = [
-    { label: String(currentYear), value: currentYear },
-    { label: String(currentYear + 1), value: currentYear + 1 },
-  ];
+  // Furthest out first, so the list reads as a run-up to the day.
+  const sorted = [...chosen].sort((a, b) => (offsetDaysFor(b) ?? 0) - (offsetDaysFor(a) ?? 0));
 
   return (
-    <View style={styles.nudgeBox}>
+    <View style={styles.box}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Icon name="notifications-active" size={16} color={colors.primary} />
-        <Txt variant="labelMd" color={colors.onSurface}>
-          Gentle Nudges
+        <Txt variant="labelMd" color={colors.onSurface}>Gentle Nudges</Txt>
+      </View>
+
+      {/* Stated, not offered — the day itself is not something to switch off. */}
+      <View style={styles.guaranteed}>
+        <Icon name="check-circle" size={16} color={colors.secondary} />
+        <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ flex: 1, fontWeight: 'normal' }}>
+          You&apos;ll always be reminded on the day itself.
         </Txt>
       </View>
-      <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 4, marginBottom: 12 }}>
-        When would you like to be softly reminded?
-      </Txt>
 
-      {reminders.length > 0 && (
-        <View style={{ gap: 8, marginBottom: 12 }}>
-          {reminders.map((r, i) => (
-            <View key={`${r.value}-${i}`} style={styles.reminderRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-                <Icon name={r.type === 'custom' ? 'calendar-today' : 'schedule'} size={16} color={colors.primary} />
-                <Txt variant="labelMd" color={colors.onSurface}>{r.label}</Txt>
-              </View>
-              <Pressable onPress={() => removeReminder(i)} hitSlop={8}>
-                <Icon name="close" size={16} color={colors.onSurfaceVariant} />
-              </Pressable>
-            </View>
+      {sorted.length > 0 && (
+        <View style={styles.chosenWrap}>
+          {sorted.map((r) => (
+            <Pressable
+              key={r.value}
+              onPress={() => toggle(r)}
+              style={({ pressed }) => [styles.chosenChip, pressed && { opacity: 0.75 }]}
+            >
+              <Txt variant="labelSm" color={colors.onSecondaryContainer}>{r.label}</Txt>
+              <Icon name="close" size={13} color={colors.onSecondaryContainer} />
+            </Pressable>
           ))}
         </View>
       )}
 
-      {reminders.length < MAX_REMINDERS ? (
-        <Pressable
-          onPress={() => { setModalVisible(true); setCustomDateMode(false); }}
-          style={({ pressed }) => [styles.addReminderBtn, pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }]}
-        >
-          <Icon name="add" size={18} color={colors.primary} />
-          <Txt variant="labelMd" color={colors.primary}>
-            Add Reminder {reminders.length > 0 ? `(${reminders.length}/${MAX_REMINDERS})` : ''}
-          </Txt>
-        </Pressable>
-      ) : (
-        <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ textAlign: 'center', opacity: 0.7 }}>
-          Maximum {MAX_REMINDERS} reminders reached
+      <Pressable
+        onPress={() => setPickerVisible(true)}
+        style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.8 }]}
+      >
+        <Icon name="add" size={18} color={colors.primary} />
+        <Txt variant="labelMd" color={colors.primary}>
+          {sorted.length > 0 ? `Earlier reminders (${sorted.length}/${MAX_REMINDERS})` : 'Remind me earlier too'}
         </Txt>
-      )}
+      </Pressable>
 
-      <ScrollPickerModal
-        visible={pickerVisible}
-        onClose={() => setPickerVisible(false)}
-        title={pickerType === 'day' ? 'Select Day' : pickerType === 'month' ? 'Select Month' : 'Select Year'}
-        options={
-          pickerType === 'day'
-            ? Array.from({ length: 31 }, (_, i) => ({ label: String(i + 1), value: i + 1 }))
-            : pickerType === 'month'
-            ? MONTHS_FULL.map((m, i) => ({ label: m, value: i + 1 }))
-            : yearOptions
-        }
-        selectedValue={
-          pickerType === 'day' ? customDay || undefined
-          : pickerType === 'month' ? customMonth || undefined
-          : customYear || undefined
-        }
-        onSelect={(val) => {
-          if (pickerType === 'day') setCustomDay(val as number);
-          else if (pickerType === 'month') setCustomMonth(val as number);
-          else setCustomYear(val as number);
-          setPickerVisible(false);
-        }}
-      />
-
-      <Modal visible={modalVisible} transparent animationType="fade">
-        <Pressable style={styles.modalOverlay} onPress={() => { setModalVisible(false); setCustomDateMode(false); }}>
-          <Animated.View entering={SlideInDown.duration(300)} style={styles.modalContent}>
+      <Modal visible={pickerVisible} transparent animationType="fade" onRequestClose={() => setPickerVisible(false)}>
+        <Pressable style={styles.overlay} onPress={() => setPickerVisible(false)}>
+          <Animated.View entering={SlideInDown.duration(280)} style={styles.sheet}>
             <Pressable onPress={(e) => e.stopPropagation()}>
               <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.outlineVariant }} />
+                <View style={styles.handle} />
               </View>
 
-              {!customDateMode ? (
-                <>
-                  <Txt variant="headlineMd" color={colors.onSurface} style={{ marginBottom: 4 }}>
-                    Add Reminder
-                  </Txt>
-                  <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginBottom: 20 }}>
-                    Choose when you&apos;d like to be reminded
-                  </Txt>
+              <Txt variant="headlineMd" color={colors.onSurface}>Remind me earlier</Txt>
+              <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 4, marginBottom: 20 }}>
+                Tap to turn one on or off. Up to {MAX_REMINDERS}, on top of the day itself.
+              </Txt>
 
-                  <View style={{ gap: 6 }}>
-                    {PRESET_REMINDERS.map((preset) => {
-                      const alreadyAdded = reminders.some((r) => r.value === preset.value);
-                      return (
-                        <Pressable
-                          key={preset.value}
-                          onPress={() => {
-                            if (!alreadyAdded) {
-                              addReminder({ type: 'preset', label: preset.label, value: preset.value });
-                            }
-                          }}
-                          disabled={alreadyAdded}
-                          style={({ pressed }) => [
-                            styles.presetRow,
-                            alreadyAdded && { opacity: 0.4 },
-                            pressed && !alreadyAdded && { backgroundColor: colors.surfaceContainerHigh },
-                          ]}
-                        >
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                            <Icon name="schedule" size={20} color={alreadyAdded ? colors.outline : colors.primary} />
-                            <Txt variant="bodyMd" color={alreadyAdded ? colors.outline : colors.onSurface}>
-                              {preset.label}
-                            </Txt>
-                          </View>
-                          {alreadyAdded && <Icon name="check" size={18} color={colors.secondary} />}
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 16 }}>
-                    <View style={{ flex: 1, height: 1, backgroundColor: colors.surfaceVariant }} />
-                    <Txt variant="labelSm" color={colors.onSurfaceVariant}>OR</Txt>
-                    <View style={{ flex: 1, height: 1, backgroundColor: colors.surfaceVariant }} />
-                  </View>
-
-                  <Pressable
-                    onPress={() => setCustomDateMode(true)}
-                    style={({ pressed }) => [styles.customDateBtn, pressed && { backgroundColor: colors.surfaceContainerHigh }]}
-                  >
-                    <Icon name="calendar-today" size={20} color={colors.tertiary} />
-                    <View style={{ flex: 1 }}>
-                      <Txt variant="labelMd" color={colors.onSurface}>Pick a Specific Date</Txt>
-                      <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontWeight: 'normal' }}>
-                        Choose an exact date from the calendar
-                      </Txt>
-                    </View>
-                    <Icon name="chevron-right" size={20} color={colors.onSurfaceVariant} />
-                  </Pressable>
-                </>
-              ) : (
-                <>
-                  <Pressable onPress={() => setCustomDateMode(false)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 16 }}>
-                    <Icon name="arrow-back" size={20} color={colors.primary} />
-                    <Txt variant="labelMd" color={colors.primary}>Back</Txt>
-                  </Pressable>
-
-                  <Txt variant="headlineMd" color={colors.onSurface} style={{ marginBottom: 4 }}>
-                    Pick a Date
-                  </Txt>
-                  <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginBottom: 20 }}>
-                    {eventDate
-                      ? `Must be on or before ${MONTHS_SHORT[eventDate.getMonth()]} ${eventDate.getDate()}`
-                      : 'Set the event date first for validation'}
-                  </Txt>
-
-                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
-                    <Pressable onPress={() => { setPickerType('day'); setPickerVisible(true); }} style={[styles.input, styles.inputCenter, { flex: 1 }]}>
-                      <Txt variant="bodyMd" color={customDay ? colors.onSurface : colors.outline}>{customDay || 'Day'}</Txt>
-                    </Pressable>
-                    <Pressable onPress={() => { setPickerType('month'); setPickerVisible(true); }} style={[styles.input, styles.inputCenter, { flex: 1.5 }]}>
-                      <Txt variant="bodyMd" color={customMonth ? colors.onSurface : colors.outline}>
-                        {customMonth ? MONTHS_SHORT[customMonth - 1] : 'Month'}
+              {/* Toggles, not checkboxes: on is solid, off is faded. */}
+              <View style={styles.optionWrap}>
+                {CHOOSABLE_PRESETS.map((preset) => {
+                  const on = chosenValues.has(preset.value);
+                  const disabled = !on && atLimit;
+                  return (
+                    <Pressable
+                      key={preset.value}
+                      onPress={() => toggle({ type: 'preset', label: preset.label, value: preset.value })}
+                      style={({ pressed }) => [
+                        styles.option,
+                        on && styles.optionOn,
+                        disabled && styles.optionDisabled,
+                        pressed && { transform: [{ scale: 0.97 }] },
+                      ]}
+                    >
+                      <Txt
+                        variant="labelMd"
+                        color={on ? colors.onSecondaryContainer : colors.onSurfaceVariant}
+                      >
+                        {preset.label}
                       </Txt>
                     </Pressable>
-                    <Pressable onPress={() => { setPickerType('year'); setPickerVisible(true); }} style={[styles.input, styles.inputCenter, { flex: 1.2 }]}>
-                      <Txt variant="bodyMd" color={customYear ? colors.onSurface : colors.outline}>{customYear || 'Year'}</Txt>
-                    </Pressable>
-                  </View>
+                  );
+                })}
+              </View>
 
-                  {customDay && customMonth && customYear && !isCustomDateValid() && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                      <Icon name="error-outline" size={16} color={colors.error} />
-                      <Txt variant="labelSm" color={colors.error}>
-                        Reminder date must be before the event date
-                      </Txt>
-                    </View>
-                  )}
+              <View style={styles.divider}>
+                <View style={styles.rule} />
+                <Txt variant="labelSm" color={colors.onSurfaceVariant}>OR A SPECIFIC AMOUNT</Txt>
+                <View style={styles.rule} />
+              </View>
 
-                  <Pressable
-                    onPress={addCustomDateReminder}
-                    disabled={!isCustomDateValid()}
-                    style={({ pressed }) => [
-                      styles.confirmDateBtn,
-                      !isCustomDateValid() && { opacity: 0.4 },
-                      pressed && { opacity: 0.85 },
-                    ]}
-                  >
-                    <Icon name="check" size={18} color={colors.onPrimary} />
-                    <Txt variant="labelMd" color={colors.onPrimary}>Add This Date</Txt>
-                  </Pressable>
-                </>
+              {/* Two steppers instead of a calendar — the reminder is relative to
+                  the day, so an absolute date was never the right question. */}
+              <View style={styles.leadRow}>
+                <Pressable
+                  onPress={() => setAmountPickerVisible(true)}
+                  style={({ pressed }) => [styles.stepper, { minWidth: 72 }, pressed && { opacity: 0.8 }]}
+                >
+                  <Txt variant="bodyMd" color={colors.onSurface}>{leadAmount}</Txt>
+                  <Icon name="expand-more" size={16} color={colors.onSurfaceVariant} />
+                </Pressable>
+
+                <Pressable
+                  onPress={() => setUnitPickerVisible(true)}
+                  style={({ pressed }) => [styles.stepper, { flex: 1 }, pressed && { opacity: 0.8 }]}
+                >
+                  <Txt variant="bodyMd" color={colors.onSurface}>
+                    {leadAmount === 1
+                      ? LEAD_UNITS.find((u) => u.value === leadUnit)?.label
+                      : LEAD_UNITS.find((u) => u.value === leadUnit)?.plural}
+                  </Txt>
+                  <Icon name="expand-more" size={16} color={colors.onSurfaceVariant} />
+                </Pressable>
+
+                <Txt variant="bodyMd" color={colors.onSurfaceVariant}>before</Txt>
+              </View>
+
+              <Pressable
+                onPress={addCustom}
+                disabled={customChosen || atLimit || customMatchesPreset}
+                style={({ pressed }) => [
+                  styles.confirmBtn,
+                  (customChosen || atLimit || customMatchesPreset) && { opacity: 0.4 },
+                  pressed && { opacity: 0.85 },
+                ]}
+              >
+                <Icon name={customChosen ? 'check' : 'add'} size={18} color={colors.onPrimary} />
+                <Txt variant="labelMd" color={colors.onPrimary}>
+                  {customChosen ? 'Already added' : customMatchesPreset ? 'Already an option above' : `Add ${leadLabel(leadAmount, leadUnit)}`}
+                </Txt>
+              </Pressable>
+
+              {atLimit && (
+                <Animated.View entering={FadeIn.duration(180)}>
+                  <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.limitNote}>
+                    That&apos;s {MAX_REMINDERS} — turn one off to add another.
+                  </Txt>
+                </Animated.View>
               )}
+
+              <Pressable onPress={() => setPickerVisible(false)} style={styles.doneBtn}>
+                <Txt variant="labelMd" color={colors.primary}>Done</Txt>
+              </Pressable>
             </Pressable>
           </Animated.View>
         </Pressable>
       </Modal>
+
+      <ScrollPickerModal
+        visible={amountPickerVisible}
+        onClose={() => setAmountPickerVisible(false)}
+        title="How many?"
+        options={Array.from({ length: MAX_LEAD_AMOUNT }, (_, i) => ({ label: String(i + 1), value: i + 1 }))}
+        selectedValue={leadAmount}
+        onSelect={(v) => {
+          setLeadAmount(v as number);
+          setAmountPickerVisible(false);
+        }}
+      />
+
+      <ScrollPickerModal
+        visible={unitPickerVisible}
+        onClose={() => setUnitPickerVisible(false)}
+        title="Days, weeks or months?"
+        options={LEAD_UNITS.map((u) => ({ label: u.plural, value: u.value }))}
+        selectedValue={leadUnit}
+        onSelect={(v) => {
+          setLeadUnit(v as LeadUnit);
+          setUnitPickerVisible(false);
+        }}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  nudgeBox: {
+  box: {
     backgroundColor: colors.surfaceContainerLow,
     borderRadius: radius.lg,
     borderWidth: 1,
@@ -267,28 +247,24 @@ const styles = StyleSheet.create({
     padding: 16,
     marginTop: spacing.stackSm,
   },
-  input: {
-    backgroundColor: 'rgba(228,226,225,0.4)',
-    borderRadius: radius.DEFAULT,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 16,
-    color: colors.onSurface,
-  },
-  inputCenter: { alignItems: 'center', justifyContent: 'center' },
-  reminderRow: {
+  guaranteed: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radius.DEFAULT,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: colors.primaryContainer,
+    gap: 8,
+    marginTop: 10,
+    marginBottom: 12,
   },
-  addReminderBtn: {
+  chosenWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  chosenChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.secondaryContainer,
+    borderRadius: radius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -300,40 +276,49 @@ const styles = StyleSheet.create({
     borderColor: colors.outlineVariant,
     backgroundColor: 'rgba(255,255,255,0.5)',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet: {
     backgroundColor: colors.surfaceContainerLowest,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     padding: 24,
-    paddingBottom: 48,
-    maxHeight: '80%',
+    paddingBottom: 40,
+    maxHeight: '88%',
   },
-  presetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.outlineVariant },
+  optionWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  option: {
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceContainerLow,
-  },
-  customDateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: radius.md,
+    paddingVertical: 10,
+    borderRadius: radius.full,
     borderWidth: 1,
     borderColor: colors.outlineVariant,
     backgroundColor: colors.surfaceContainerLow,
+    // Unselected reads as faded rather than empty — no checkbox needed.
+    opacity: 0.55,
   },
-  confirmDateBtn: {
+  optionOn: {
+    opacity: 1,
+    backgroundColor: colors.secondaryContainer,
+    borderColor: colors.secondary,
+  },
+  optionDisabled: { opacity: 0.28 },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 20 },
+  rule: { flex: 1, height: 1, backgroundColor: colors.surfaceVariant },
+  leadRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 4,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radius.DEFAULT,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  confirmBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -342,4 +327,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: radius.full,
   },
+  limitNote: { textAlign: 'center', marginTop: 12, fontWeight: 'normal', opacity: 0.8 },
+  doneBtn: { alignItems: 'center', paddingVertical: 16, marginTop: 4 },
 });

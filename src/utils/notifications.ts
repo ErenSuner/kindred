@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { MyEvent, Person } from '@/data/mock';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Nudge, PRESET_OFFSET_DAYS, parseNudges } from '@/utils/nudges';
+import { DAY_OF, Nudge, offsetDaysFor, parseNudge, parseNudges } from '@/utils/nudges';
 import { Recurrence, YEARLY } from '@/utils/recurrence';
 import { getUpcomingOccurrences } from '@/utils/dates';
 import { Holiday } from '@/data/holidays';
@@ -37,18 +37,19 @@ export async function getReminderHour(): Promise<number> {
 
 type PendingNotification = { title: string; body: string; date: Date; id: string };
 
-// Nudges fire relative to an occurrence: a preset is N days before it, a custom
-// nudge is an absolute date and ignores the cycle entirely.
+// Nudges fire relative to an occurrence — a preset or a custom lead time is N
+// days before it. A legacy absolute date is pinned to itself and ignores the
+// cycle entirely.
 function notificationDatesFor(anchorDate: string, recurrence: Recurrence, nudge: Nudge, hour: number): Date[] {
   const now = new Date();
 
-  if (nudge.type === 'custom') {
+  if (nudge.type === 'date') {
     const [y, m, d] = nudge.value.split('-').map(Number);
     const at = new Date(y, m - 1, d, hour, 0, 0, 0);
     return at.getTime() > now.getTime() ? [at] : [];
   }
 
-  const offsetDays = PRESET_OFFSET_DAYS[nudge.value] ?? 0;
+  const offsetDays = offsetDaysFor(nudge) ?? 0;
 
   return getUpcomingOccurrences(anchorDate, recurrence, MAX_OCCURRENCES_PER_NUDGE)
     .map((occurrence) => {
@@ -57,6 +58,16 @@ function notificationDatesFor(anchorDate: string, recurrence: Recurrence, nudge:
       return at;
     })
     .filter((at) => at.getTime() > now.getTime());
+}
+
+// The day itself always fires, whatever is stored. Older rows were saved before
+// that was guaranteed, so it is added on read rather than trusted from the data.
+function nudgesFor(stored: unknown): Nudge[] {
+  const parsed = parseNudges(stored);
+  if (parsed.some((n) => n.value === DAY_OF)) return parsed;
+
+  const dayOf = parseNudge(DAY_OF);
+  return dayOf ? [...parsed, dayOf] : parsed;
 }
 
 function collectPeopleNotifications(people: Person[], hour: number): PendingNotification[] {
@@ -72,7 +83,7 @@ function collectPeopleNotifications(people: Person[], hour: number): PendingNoti
       const isBirthday = sd.isBirthday === true;
       const turningStr = isBirthday && sd.turningAge ? ` (turning ${sd.turningAge})` : '';
 
-      for (const nudge of parseNudges(sd.nudges)) {
+      for (const nudge of nudgesFor(sd.nudges)) {
         const dates = notificationDatesFor(dateStr, sd.recurrence ?? YEARLY, nudge, hour);
         dates.forEach((date, i) => {
           let body: string;
@@ -106,7 +117,7 @@ function collectMyEventNotifications(myEvents: MyEvent[], hour: number): Pending
   const pending: PendingNotification[] = [];
 
   for (const event of myEvents) {
-    for (const nudge of parseNudges(event.nudges)) {
+    for (const nudge of nudgesFor(event.nudges)) {
       const dates = notificationDatesFor(event.originalDate, event.recurrence, nudge, hour);
       dates.forEach((date, i) => {
         let body = `${event.title} is on ${event.date}.`;

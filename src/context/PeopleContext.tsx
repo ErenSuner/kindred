@@ -687,10 +687,19 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
             },
         );
 
+      // `birthday` is a view onto the birthday row, so clearing it has to take
+      // the accessor with it — otherwise the card keeps rendering from a day
+      // that is no longer in the list.
+      const birthdayDay = specialDays?.find((d) => d.isBirthday);
+      const birthday = birthdayDay
+        ? { id: birthdayDay.id, date: birthdayDay.originalDate ?? '', nudges: birthdayDay.nudges ?? [] }
+        : undefined;
+
       return {
         ...p,
         notes: p.notes?.filter((n) => !hiddenNoteIds.includes(n.id)),
         specialDays,
+        birthday,
         // Deleting the day someone was counting down to has to move the
         // countdown on immediately, not at the next refresh.
         ...deriveUpcoming(p.name, p.eventTag, specialDays ?? []),
