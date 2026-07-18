@@ -58,7 +58,7 @@ export default function NewConnection() {
       router.back();
     } catch (e) {
       console.error(e);
-      alert('Failed to save connection.');
+      setNameError('Could not save. Check your connection and try again.');
     }
   };
 

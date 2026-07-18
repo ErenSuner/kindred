@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { getNextOccurrence } from '@/utils/dates';
 import { Recurrence, YEARLY, parseRecurrence, serializeRecurrence } from '@/utils/recurrence';
+import { describeLoadError } from '@/utils/loadError';
 
 type EventInput = {
   title: string;
@@ -16,6 +17,8 @@ type EventInput = {
 type EventsContextValue = {
   events: MyEvent[];
   loading: boolean;
+  // Set when the last load failed; `events` may still hold the previous result.
+  loadError: string | null;
   addEvent: (data: EventInput) => Promise<void>;
   updateEvent: (id: string, data: Partial<EventInput>) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
@@ -59,10 +62,12 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [events, setEvents] = useState<MyEvent[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refreshEvents = async () => {
     if (!user) {
       setEvents([]);
+      setLoadError(null);
       return;
     }
     try {
@@ -81,6 +86,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
       const live = mapped.filter((e) => !e.isExpired);
       live.sort((a, b) => a.daysAway - b.daysAway);
       setEvents(live);
+      setLoadError(null);
 
       if (expiredIds.length > 0) {
         const { error: delError } = await supabase.from('my_events').delete().in('id', expiredIds);
@@ -88,6 +94,8 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.error('Error fetching events:', err);
+      // Previously loaded events are left in place rather than blanked out.
+      setLoadError(describeLoadError(err, "Couldn't load your reminders."));
     }
   };
 
@@ -162,7 +170,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <EventsContext.Provider
-      value={{ events, loading, addEvent, updateEvent, deleteEvent, refreshEvents, getEvent }}
+      value={{ events, loading, loadError, addEvent, updateEvent, deleteEvent, refreshEvents, getEvent }}
     >
       {children}
     </EventsContext.Provider>

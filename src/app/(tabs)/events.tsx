@@ -6,6 +6,7 @@ import { colors, spacing, radius } from '@/theme/tokens';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Card } from '@/components/Card';
+import { FormError } from '@/components/FormError';
 import { useEvents } from '@/context/EventsContext';
 import { parseNudges } from '@/utils/nudges';
 import { recurrenceIcon, recurrenceShortLabel } from '@/utils/recurrence';
@@ -36,7 +37,7 @@ function NudgeSummary({ event }: { event: MyEvent }) {
 export default function MyEvents() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { events } = useEvents();
+  const { events, loadError, refreshEvents } = useEvents();
 
   const featured = events[0];
   const rest = events.slice(1);
@@ -55,7 +56,15 @@ export default function MyEvents() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {events.length === 0 ? (
+        {loadError && (
+          <View style={{ marginBottom: spacing.stackMd }}>
+            <FormError message={loadError} onRetry={refreshEvents} retryLabel="Retry" />
+          </View>
+        )}
+
+        {/* The empty card is suppressed on a failed load — an empty list there
+            means "couldn't fetch", not "you have nothing". */}
+        {events.length === 0 && !loadError ? (
           <Animated.View entering={FadeInDown.duration(500).delay(100)}>
             <Card style={styles.emptyCard}>
               <View style={styles.emptyAccent} />

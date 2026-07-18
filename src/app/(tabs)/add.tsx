@@ -10,6 +10,7 @@ import { Avatar } from '@/components/Avatar';
 import { Chip } from '@/components/Chip';
 import { Button } from '@/components/Button';
 import { SearchBar } from '@/components/SearchBar';
+import { FormError } from '@/components/FormError';
 import { NotePreview } from '@/components/NotePreview';
 import { usePeople } from '@/context/PeopleContext';
 import { searchPeople } from '@/utils/search';
@@ -18,7 +19,7 @@ import type { Person } from '@/data/mock';
 export default function Connections() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { people, togglePin, removePerson } = usePeople();
+  const { people, togglePin, removePerson, loadError, refreshPeople } = usePeople();
 
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -96,6 +97,8 @@ export default function Connections() {
             </Txt>
           </Pressable>
         </Animated.View>
+
+        <FormError message={loadError} onRetry={refreshPeople} retryLabel="Retry" />
 
         {/* Search — hidden until there's something to search through */}
         {people.length > 0 && (
@@ -195,8 +198,9 @@ export default function Connections() {
           </Animated.View>
         )}
 
-        {/* Empty state */}
-        {!searching && people.length === 0 && (
+        {/* Empty state — suppressed on a failed load, where an empty list means
+            "couldn't fetch", not "you have nobody". */}
+        {!searching && people.length === 0 && !loadError && (
           <Animated.View entering={FadeInDown.duration(500).delay(100)} style={styles.emptyState}>
             <Icon name="people" size={48} color={colors.outlineVariant} />
             <Txt variant="headlineMd" color={colors.onSurface} style={{ marginTop: 16, textAlign: 'center' }}>

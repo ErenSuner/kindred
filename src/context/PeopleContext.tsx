@@ -5,10 +5,13 @@ import { useAuth } from './AuthContext';
 import { getNextOccurrence } from '@/utils/dates';
 import { Recurrence, YEARLY, parseRecurrence, serializeRecurrence } from '@/utils/recurrence';
 import { distributeNotes, mapDbNote } from '@/utils/notes';
+import { describeLoadError } from '@/utils/loadError';
 
 type PeopleContextValue = {
   people: Person[];
   loading: boolean;
+  // Set when the last load failed; `people` may still hold the previous result.
+  loadError: string | null;
   addPerson: (data: {
     name: string;
     role: Relationship;
@@ -60,6 +63,7 @@ export type NoteTarget =
 // A note supplied alongside the occasion it belongs to, before that occasion
 // has an id of its own.
 export type NoteDraft = { kind: string; body: string };
+
 
 export function mapDbPersonToPerson(dbPerson: any): Person {
   const specialDays: any[] = (dbPerson.special_days || []).map((sd: any) => {
@@ -177,10 +181,14 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(false);
+  // A failed load used to leave an empty list behind with nothing to explain it,
+  // which reads exactly like "all your data is gone". Screens show this instead.
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refreshPeople = async () => {
     if (!user) {
       setPeople([]);
+      setLoadError(null);
       return;
     }
     try {
@@ -223,7 +231,8 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
         });
         
         setPeople(mapped);
-        
+        setLoadError(null);
+
         if (expiredDayIds.length > 0) {
           supabase.from('special_days').delete().in('id', expiredDayIds).then(({ error: delError }) => {
             if (delError) console.warn('Failed to delete expired one-time events', delError);
@@ -232,6 +241,9 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.error('Error fetching people:', err);
+      // The previously loaded list is deliberately left in place — showing stale
+      // people beats blanking the screen on a dropped connection.
+      setLoadError(describeLoadError(err, "Couldn't load your connections."));
     }
   };
 
@@ -607,6 +619,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
       value={{
         people,
         loading,
+        loadError,
         addPerson,
         updatePerson,
         removePerson,

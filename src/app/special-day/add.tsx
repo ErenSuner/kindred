@@ -1,36 +1,24 @@
 import { useState } from 'react';
-import { View, ScrollView, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform, Modal } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, SlideInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { colors, spacing, radius, softShadow } from '@/theme/tokens';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
-
+import { FormError } from '@/components/FormError';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
 import { RecurrencePicker } from '@/components/RecurrencePicker';
+import { ReminderEditor } from '@/components/ReminderEditor';
 import { DraftNote, NotesEditor } from '@/components/NotesEditor';
 import { usePeople } from '@/context/PeopleContext';
 import { Recurrence, YEARLY } from '@/utils/recurrence';
+import { Nudge, serializeNudges } from '@/utils/nudges';
+import { SKIPPED_YEAR } from '@/utils/dates';
 
-const PRESET_REMINDERS = [
-  { label: 'Day Of', value: 'day_of' },
-  { label: '1 Day Before', value: '1_day' },
-  { label: '3 Days Before', value: '3_days' },
-  { label: '1 Week Before', value: '1_week' },
-  { label: '2 Weeks Before', value: '2_weeks' },
-  { label: '1 Month Before', value: '1_month' },
-  { label: '2 Months Before', value: '2_months' },
-];
-
-const MAX_REMINDERS = 3;
-
-type Reminder = {
-  type: 'preset' | 'custom';
-  label: string;
-  value: string; // preset key or YYYY-MM-DD
-};
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHS_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -40,21 +28,12 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const MONTHS_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
-function formatCustomDate(dateStr: string) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return `${MONTHS_SHORT[m - 1]} ${d}, ${y}`;
-}
-
 export default function AddSpecialDay() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { personId } = useLocalSearchParams<{ personId: string }>();
   const { addSpecialDay } = usePeople();
 
-  // Occasion state
   const [occasion, setOccasion] = useState('');
   const [recurrence, setRecurrence] = useState<Recurrence>(YEARLY);
 
@@ -64,91 +43,54 @@ export default function AddSpecialDay() {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerType, setPickerType] = useState<'day' | 'month' | 'year'>('day');
 
-  // Reminder state
-  const [reminders, setReminders] = useState<Reminder[]>([
+  const [reminders, setReminders] = useState<Nudge[]>([
     { type: 'preset', label: '1 Week Before', value: '1_week' },
     { type: 'preset', label: '1 Day Before', value: '1_day' },
   ]);
   const [notes, setNotes] = useState<DraftNote[]>([]);
-  const [reminderModalVisible, setReminderModalVisible] = useState(false);
-  const [customDateMode, setCustomDateMode] = useState(false);
-  const [customDay, setCustomDay] = useState<number | null>(null);
-  const [customMonth, setCustomMonth] = useState<number | null>(null);
-  const [customYear, setCustomYear] = useState<number | null>(null);
-  const [customPickerVisible, setCustomPickerVisible] = useState(false);
-  const [customPickerType, setCustomPickerType] = useState<'day' | 'month' | 'year'>('day');
 
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  const hasYear = year !== null && year !== SKIPPED_YEAR;
 
-  const addReminder = (reminder: Reminder) => {
-    if (reminders.length >= MAX_REMINDERS) return;
-    if (reminders.some(r => r.type === reminder.type && r.value === reminder.value)) return;
-    setReminders(prev => [...prev, reminder]);
-    setReminderModalVisible(false);
-    setCustomDateMode(false);
-  };
-
-  const removeReminder = (index: number) => {
-    setReminders(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const getSpecialDayDate = (): Date | null => {
+  const eventDate = (): Date | null => {
     if (!day || !month) return null;
-    const y = year && year !== 1000 ? year : new Date().getFullYear();
-    return new Date(y, month - 1, day);
-  };
-
-  const isCustomDateValid = (): boolean => {
-    if (!customDay || !customMonth || !customYear) return false;
-    const customDate = new Date(customYear, customMonth - 1, customDay);
-    const eventDate = getSpecialDayDate();
-    if (!eventDate) return true; // If no event date set yet, allow any date
-    return customDate.getTime() <= eventDate.getTime();
-  };
-
-  const addCustomDateReminder = () => {
-    if (!customDay || !customMonth || !customYear) return;
-    if (!isCustomDateValid()) return;
-    const dateStr = `${customYear}-${String(customMonth).padStart(2, '0')}-${String(customDay).padStart(2, '0')}`;
-    addReminder({
-      type: 'custom',
-      label: formatCustomDate(dateStr),
-      value: dateStr,
-    });
-    setCustomDay(null);
-    setCustomMonth(null);
-    setCustomYear(null);
+    return new Date(hasYear ? (year as number) : new Date().getFullYear(), month - 1, day);
   };
 
   const handleSubmit = async () => {
-    if (!day || !month || !occasion.trim()) {
-      alert('Please fill out the event details.');
+    setError(null);
+
+    if (!occasion.trim()) {
+      setError('Give this day a title.');
+      return;
+    }
+    if (!day || !month) {
+      setError('Pick a day and a month.');
       return;
     }
 
+    const y = hasYear ? year : SKIPPED_YEAR;
+    const formattedDate = `${y}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+    setSaving(true);
     try {
-      const y = year && year !== 1000 ? year : 1000;
-      const formattedDate = `${y}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       await addSpecialDay(personId ?? '', {
         title: occasion.trim(),
         date: formattedDate,
-        nudges: reminders.map(r => r.value),
+        nudges: serializeNudges(reminders),
         recurrence,
-        notes: notes.map(n => ({ kind: n.kind, body: n.body })),
+        notes: notes.map((n) => ({ kind: n.kind, body: n.body })),
       });
       router.back();
     } catch (e) {
       console.error(e);
-      alert('Failed to save.');
+      setError('Could not save. Check your connection and try again.');
+    } finally {
+      setSaving(false);
     }
   };
-
-  // For custom date picker: restrict years to current and next year only
-  const currentYear = new Date().getFullYear();
-  const customYearOptions = [
-    { label: String(currentYear), value: currentYear },
-    { label: String(currentYear + 1), value: currentYear + 1 },
-  ];
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -162,17 +104,18 @@ export default function AddSpecialDay() {
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={{ padding: spacing.containerMobile, gap: spacing.stackLg, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
-
-
-
-          {/* Important date */}
+        <ScrollView
+          contentContainerStyle={{ padding: spacing.containerMobile, gap: spacing.stackLg, paddingBottom: insets.bottom + 40 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           <Animated.View entering={FadeInDown.duration(500).delay(200)} style={[styles.card, { gap: spacing.stackMd }]}>
             <View style={styles.cardHeader}>
               <Txt variant="headlineMd" color={colors.onSurface}>
                 An Important Date
               </Txt>
             </View>
+
             <View style={{ gap: spacing.stackMd }}>
               <View style={{ gap: 4 }}>
                 <FieldLabel>Title</FieldLabel>
@@ -184,102 +127,72 @@ export default function AddSpecialDay() {
                   style={styles.input}
                 />
               </View>
+
               <View style={{ gap: 4 }}>
-                <FieldLabel>Date <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{fontWeight: 'normal'}}>(Year optional)</Txt></FieldLabel>
+                <FieldLabel>
+                  Date{' '}
+                  <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontWeight: 'normal' }}>
+                    (Year optional)
+                  </Txt>
+                </FieldLabel>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <Pressable onPress={() => { setPickerType('day'); setPickerVisible(true); }} style={[styles.input, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Pressable onPress={() => { setPickerType('day'); setPickerVisible(true); }} style={[styles.input, styles.inputCenter, { flex: 1 }]}>
                     <Txt variant="bodyMd" color={day ? colors.onSurface : colors.outline}>{day || 'Day'}</Txt>
                   </Pressable>
-                  <Pressable onPress={() => { setPickerType('month'); setPickerVisible(true); }} style={[styles.input, { flex: 1.5, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Pressable onPress={() => { setPickerType('month'); setPickerVisible(true); }} style={[styles.input, styles.inputCenter, { flex: 1.5 }]}>
                     <Txt variant="bodyMd" color={month ? colors.onSurface : colors.outline}>
                       {month ? MONTHS_SHORT[month - 1] : 'Month'}
                     </Txt>
                   </Pressable>
-                  <Pressable onPress={() => { setPickerType('year'); setPickerVisible(true); }} style={[styles.input, { flex: 1.2, alignItems: 'center', justifyContent: 'center' }]}>
-                    <Txt variant="bodyMd" color={year && year !== 1000 ? colors.onSurface : colors.outline}>{year && year !== 1000 ? year : 'Year'}</Txt>
+                  <Pressable onPress={() => { setPickerType('year'); setPickerVisible(true); }} style={[styles.input, styles.inputCenter, { flex: 1.2 }]}>
+                    <Txt variant="bodyMd" color={hasYear ? colors.onSurface : colors.outline}>{hasYear ? year : 'Year'}</Txt>
                   </Pressable>
                 </View>
               </View>
             </View>
 
-            {/* How often it comes back around */}
             <RecurrencePicker value={recurrence} onChange={setRecurrence} />
 
-            {/* Gentle nudges — advanced */}
-            <View style={styles.nudgeBox}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Icon name="notifications-active" size={16} color={colors.primary} />
-                <Txt variant="labelMd" color={colors.onSurface}>
-                  Gentle Nudges
-                </Txt>
-              </View>
-              <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 4, marginBottom: 12 }}>
-                When would you like to be softly reminded?
-              </Txt>
+            <ReminderEditor reminders={reminders} onChange={setReminders} eventDate={eventDate()} />
 
-              {/* Active reminders */}
-              {reminders.length > 0 && (
-                <View style={{ gap: 8, marginBottom: 12 }}>
-                  {reminders.map((r, i) => (
-                    <View key={`${r.value}-${i}`} style={styles.reminderRow}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-                        <Icon name={r.type === 'custom' ? 'calendar-today' : 'schedule'} size={16} color={colors.primary} />
-                        <Txt variant="labelMd" color={colors.onSurface}>{r.label}</Txt>
-                      </View>
-                      <Pressable onPress={() => removeReminder(i)} hitSlop={8}>
-                        <Icon name="close" size={16} color={colors.onSurfaceVariant} />
-                      </Pressable>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {/* Add reminder button */}
-              {reminders.length < MAX_REMINDERS && (
-                <Pressable
-                  onPress={() => { setReminderModalVisible(true); setCustomDateMode(false); }}
-                  style={({ pressed }) => [
-                    styles.addReminderBtn,
-                    pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
-                  ]}
-                >
-                  <Icon name="add" size={18} color={colors.primary} />
-                  <Txt variant="labelMd" color={colors.primary}>
-                    Add Reminder {reminders.length > 0 ? `(${reminders.length}/${MAX_REMINDERS})` : ''}
-                  </Txt>
-                </Pressable>
-              )}
-              {reminders.length >= MAX_REMINDERS && (
-                <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ textAlign: 'center', opacity: 0.7 }}>
-                  Maximum {MAX_REMINDERS} reminders reached
-                </Txt>
-              )}
-            </View>
-
-            {/* Notes kept with this day */}
             <NotesEditor notes={notes} onChange={setNotes} />
           </Animated.View>
 
-          {/* Submit */}
+          <FormError message={error} />
+
           <Animated.View entering={FadeInDown.duration(500).delay(200)} style={{ alignItems: 'center' }}>
-            <Button label="Save Special Day" icon="check" onPress={handleSubmit} />
+            <Button
+              label={saving ? 'Saving…' : 'Save Special Day'}
+              icon="check"
+              onPress={handleSubmit}
+              disabled={saving}
+            />
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Date picker for the special day date */}
       <ScrollPickerModal
         visible={pickerVisible}
         onClose={() => setPickerVisible(false)}
         title={pickerType === 'day' ? 'Select Day' : pickerType === 'month' ? 'Select Month' : 'Select Year'}
         options={
-          pickerType === 'day' 
-            ? Array.from({length: 31}, (_, i) => ({ label: String(i + 1), value: i + 1 }))
+          pickerType === 'day'
+            ? Array.from({ length: 31 }, (_, i) => ({ label: String(i + 1), value: i + 1 }))
             : pickerType === 'month'
             ? MONTHS_FULL.map((m, i) => ({ label: m, value: i + 1 }))
-            : [{ label: 'Skip Year', value: 1000 }, ...Array.from({length: 101}, (_, i) => ({ label: String(new Date().getFullYear() - i), value: new Date().getFullYear() - i }))]
+            : [
+                { label: 'Skip Year', value: SKIPPED_YEAR },
+                ...Array.from({ length: 101 }, (_, i) => ({
+                  label: String(new Date().getFullYear() - i),
+                  value: new Date().getFullYear() - i,
+                })),
+              ]
         }
-        selectedValue={pickerType === 'day' ? (day || undefined) : pickerType === 'month' ? (month || undefined) : (year || undefined)}
+        selectedValue={
+          pickerType === 'day' ? day || undefined
+          : pickerType === 'month' ? month || undefined
+          : year || undefined
+        }
         onSelect={(val) => {
           if (pickerType === 'day') setDay(val as number);
           else if (pickerType === 'month') setMonth(val as number);
@@ -287,171 +200,6 @@ export default function AddSpecialDay() {
           setPickerVisible(false);
         }}
       />
-
-      {/* Custom date picker for reminders */}
-      <ScrollPickerModal
-        visible={customPickerVisible}
-        onClose={() => setCustomPickerVisible(false)}
-        title={customPickerType === 'day' ? 'Select Day' : customPickerType === 'month' ? 'Select Month' : 'Select Year'}
-        options={
-          customPickerType === 'day'
-            ? Array.from({length: 31}, (_, i) => ({ label: String(i + 1), value: i + 1 }))
-            : customPickerType === 'month'
-            ? MONTHS_FULL.map((m, i) => ({ label: m, value: i + 1 }))
-            : customYearOptions
-        }
-        selectedValue={customPickerType === 'day' ? (customDay || undefined) : customPickerType === 'month' ? (customMonth || undefined) : (customYear || undefined)}
-        onSelect={(val) => {
-          if (customPickerType === 'day') setCustomDay(val as number);
-          else if (customPickerType === 'month') setCustomMonth(val as number);
-          else setCustomYear(val as number);
-          setCustomPickerVisible(false);
-        }}
-      />
-
-      {/* Add Reminder Modal */}
-      <Modal visible={reminderModalVisible} transparent animationType="fade">
-        <Pressable style={styles.modalOverlay} onPress={() => { setReminderModalVisible(false); setCustomDateMode(false); }}>
-          <Animated.View
-            entering={SlideInDown.duration(300)}
-            style={styles.modalContent}
-          >
-            <Pressable onPress={(e) => e.stopPropagation()}>
-              {/* Handle */}
-              <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.outlineVariant }} />
-              </View>
-
-              {!customDateMode ? (
-                <>
-                  <Txt variant="headlineMd" color={colors.onSurface} style={{ marginBottom: 4 }}>
-                    Add Reminder
-                  </Txt>
-                  <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginBottom: 20 }}>
-                    Choose when you'd like to be reminded
-                  </Txt>
-
-                  {/* Preset options */}
-                  <View style={{ gap: 6 }}>
-                    {PRESET_REMINDERS.map((preset) => {
-                      const alreadyAdded = reminders.some(r => r.type === 'preset' && r.value === preset.value);
-                      return (
-                        <Pressable
-                          key={preset.value}
-                          onPress={() => {
-                            if (!alreadyAdded) {
-                              addReminder({ type: 'preset', label: preset.label, value: preset.value });
-                            }
-                          }}
-                          disabled={alreadyAdded}
-                          style={({ pressed }) => [
-                            styles.presetRow,
-                            alreadyAdded && { opacity: 0.4 },
-                            pressed && !alreadyAdded && { backgroundColor: colors.surfaceContainerHigh },
-                          ]}
-                        >
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                            <Icon name="schedule" size={20} color={alreadyAdded ? colors.outline : colors.primary} />
-                            <Txt variant="bodyMd" color={alreadyAdded ? colors.outline : colors.onSurface}>
-                              {preset.label}
-                            </Txt>
-                          </View>
-                          {alreadyAdded && (
-                            <Icon name="check" size={18} color={colors.secondary} />
-                          )}
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-
-                  {/* Divider */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 16 }}>
-                    <View style={{ flex: 1, height: 1, backgroundColor: colors.surfaceVariant }} />
-                    <Txt variant="labelSm" color={colors.onSurfaceVariant}>OR</Txt>
-                    <View style={{ flex: 1, height: 1, backgroundColor: colors.surfaceVariant }} />
-                  </View>
-
-                  {/* Custom date button */}
-                  <Pressable
-                    onPress={() => setCustomDateMode(true)}
-                    style={({ pressed }) => [
-                      styles.customDateBtn,
-                      pressed && { backgroundColor: colors.surfaceContainerHigh },
-                    ]}
-                  >
-                    <Icon name="calendar-today" size={20} color={colors.tertiary} />
-                    <View style={{ flex: 1 }}>
-                      <Txt variant="labelMd" color={colors.onSurface}>
-                        Pick a Specific Date
-                      </Txt>
-                      <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontWeight: 'normal' }}>
-                        Choose an exact date from the calendar
-                      </Txt>
-                    </View>
-                    <Icon name="chevron-right" size={20} color={colors.onSurfaceVariant} />
-                  </Pressable>
-                </>
-              ) : (
-                /* Custom date picker view */
-                <>
-                  <Pressable onPress={() => setCustomDateMode(false)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 16 }}>
-                    <Icon name="arrow-back" size={20} color={colors.primary} />
-                    <Txt variant="labelMd" color={colors.primary}>Back</Txt>
-                  </Pressable>
-
-                  <Txt variant="headlineMd" color={colors.onSurface} style={{ marginBottom: 4 }}>
-                    Pick a Date
-                  </Txt>
-                  <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginBottom: 20 }}>
-                    {day && month ? `Must be on or before ${MONTHS_SHORT[month - 1]} ${day}` : 'Set the event date first for validation'}
-                  </Txt>
-
-                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
-                    <Pressable onPress={() => { setCustomPickerType('day'); setCustomPickerVisible(true); }} style={[styles.input, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
-                      <Txt variant="bodyMd" color={customDay ? colors.onSurface : colors.outline}>{customDay || 'Day'}</Txt>
-                    </Pressable>
-                    <Pressable onPress={() => { setCustomPickerType('month'); setCustomPickerVisible(true); }} style={[styles.input, { flex: 1.5, alignItems: 'center', justifyContent: 'center' }]}>
-                      <Txt variant="bodyMd" color={customMonth ? colors.onSurface : colors.outline}>
-                        {customMonth ? MONTHS_SHORT[customMonth - 1] : 'Month'}
-                      </Txt>
-                    </Pressable>
-                    <Pressable onPress={() => { setCustomPickerType('year'); setCustomPickerVisible(true); }} style={[styles.input, { flex: 1.2, alignItems: 'center', justifyContent: 'center' }]}>
-                      <Txt variant="bodyMd" color={customYear ? colors.onSurface : colors.outline}>{customYear || 'Year'}</Txt>
-                    </Pressable>
-                  </View>
-
-                  {/* Validation message */}
-                  {customDay && customMonth && customYear && !isCustomDateValid() && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                      <Icon name="error-outline" size={16} color={colors.error} />
-                      <Txt variant="labelSm" color={colors.error}>
-                        Reminder date must be before the event date
-                      </Txt>
-                    </View>
-                  )}
-
-                  <Pressable
-                    onPress={addCustomDateReminder}
-                    disabled={!customDay || !customMonth || !customYear || !isCustomDateValid()}
-                    style={({ pressed }) => [
-                      styles.confirmDateBtn,
-                      (!customDay || !customMonth || !customYear || !isCustomDateValid()) && { opacity: 0.4 },
-                      pressed && { opacity: 0.85 },
-                    ]}
-                  >
-                    <Icon name="check" size={18} color={colors.onPrimary} />
-                    <Txt variant="labelMd" color={colors.onPrimary}>
-                      Add This Date
-                    </Txt>
-                  </Pressable>
-                </>
-              )}
-            </Pressable>
-          </Animated.View>
-        </Pressable>
-      </Modal>
-
-
     </View>
   );
 }
@@ -481,90 +229,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.onSurface,
   },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  selectChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
-  selectChipActive: {
-    backgroundColor: colors.secondaryContainer,
-    borderColor: colors.secondary,
-  },
-  nudgeBox: {
-    backgroundColor: colors.surfaceContainerLow,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.surfaceVariant,
-    padding: 16,
-    marginTop: spacing.stackSm,
-  },
-  reminderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radius.DEFAULT,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: colors.primaryContainer,
-  },
-  addReminderBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: radius.DEFAULT,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.outlineVariant,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    padding: 24,
-    paddingBottom: 48,
-    maxHeight: '80%',
-  },
-  presetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceContainerLow,
-  },
-  customDateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    backgroundColor: colors.surfaceContainerLow,
-  },
-  confirmDateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.primary,
-    paddingVertical: 14,
-    borderRadius: radius.full,
-  },
-
+  inputCenter: { alignItems: 'center', justifyContent: 'center' },
 });

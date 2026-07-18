@@ -9,6 +9,7 @@ import { Avatar } from '@/components/Avatar';
 import { Chip } from '@/components/Chip';
 import { Card } from '@/components/Card';
 import { NotePreview } from '@/components/NotePreview';
+import { FormError } from '@/components/FormError';
 import { currentUser } from '@/data/mock';
 import type { MyEvent, Person } from '@/data/mock';
 import { usePeople } from '@/context/PeopleContext';
@@ -23,7 +24,7 @@ type FeedItem =
 export default function Home() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { people } = usePeople();
+  const { people, loadError, refreshPeople } = usePeople();
   const { events } = useEvents();
   const { imminent } = useHolidays();
   const { user } = useAuth();
@@ -135,8 +136,11 @@ export default function Home() {
           </Animated.View>
         ))}
 
-        {/* Empty state */}
-        {people.length === 0 && events.length === 0 && (
+        <FormError message={loadError} onRetry={refreshPeople} retryLabel="Retry" />
+
+        {/* Empty state — suppressed on a failed load, where an empty list means
+            "couldn't fetch", not "you have nobody". */}
+        {people.length === 0 && events.length === 0 && !loadError && (
           <Animated.View entering={FadeInDown.duration(500).delay(120)} style={styles.emptyState}>
             <Icon name="people" size={48} color={colors.outlineVariant} />
             <Txt variant="headlineMd" color={colors.onSurface} style={{ marginTop: 16, textAlign: 'center' }}>
