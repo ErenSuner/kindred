@@ -18,6 +18,8 @@ type EventInput = {
 
 type EventsContextValue = {
   events: MyEvent[];
+  // Reminders that have already happened, most recent first.
+  pastEvents: MyEvent[];
   loading: boolean;
   // Set when the last load failed; `events` may still hold the previous result.
   loadError: string | null;
@@ -68,23 +70,25 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
+  // One-off reminders whose date has passed. Kept so they can be looked back on.
+  const [pastEvents, setPastEvents] = useState<MyEvent[]>([]);
   const { stage } = useUndo();
   const eventsRef = useRef<MyEvent[]>([]);
 
   // Rows in, sorted events out — used by both the network and the cache so
   // countdowns are always recomputed from today.
-  const applyRows = (rows: any[]): string[] => {
+  const applyRows = (rows: any[]) => {
     const mapped = rows.map(mapDbEvent);
 
-    // One-time events that have passed are dropped, matching how special days
-    // are cleaned up in PeopleContext.
-    const expiredIds = mapped.filter((e) => e.isExpired).map((e) => e.id);
+    // A passed one-off used to be deleted here. It's kept now and simply moved
+    // out of the upcoming list — deleting the user's own record of something
+    // that happened was never the app's call to make.
     const live = mapped.filter((e) => !e.isExpired);
     live.sort((a, b) => a.daysAway - b.daysAway);
 
     setEvents(live);
+    setPastEvents(mapped.filter((e) => e.isExpired).sort((a, b) => b.daysAway - a.daysAway));
     eventsRef.current = live;
-    return expiredIds;
   };
 
   const hydrateFromCache = async (userId: string) => {
@@ -107,14 +111,9 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
       if (!data) return;
 
-      const expiredIds = applyRows(data);
+      applyRows(data);
       setLoadError(null);
       writeCache(cacheKey('events', user.id), data);
-
-      if (expiredIds.length > 0) {
-        const { error: delError } = await supabase.from('my_events').delete().in('id', expiredIds);
-        if (delError) console.warn('Failed to delete expired one-time events', delError);
-      }
     } catch (err) {
       console.error('Error fetching events:', err);
       // Previously loaded events are left in place rather than blanked out.
@@ -214,7 +213,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <EventsContext.Provider
-      value={{ events: visibleEvents, loading, loadError, addEvent, updateEvent, deleteEvent, deleteEventWithUndo, refreshEvents, getEvent }}
+      value={{ events: visibleEvents, pastEvents, loading, loadError, addEvent, updateEvent, deleteEvent, deleteEventWithUndo, refreshEvents, getEvent }}
     >
       {children}
     </EventsContext.Provider>

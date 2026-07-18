@@ -14,7 +14,10 @@ export type SpecialDay = {
   daysAway?: number;
   turningAge?: number;
   nudges?: any[];
+  // Standing notes — plans and ideas for the next time this comes round.
   notes?: Note[];
+  // Notes tied to a past occurrence: what actually happened that year.
+  memories?: Note[];
   isBirthday?: boolean;
   recurrence?: Recurrence;
   isExpired?: boolean;
@@ -28,6 +31,9 @@ export type Note = {
   // Set when the note belongs to one occasion rather than to the person as a
   // whole. Birthdays are special days, so they use this too.
   specialDayId?: string;
+  // Set when the note records what happened on one particular occurrence
+  // rather than being a standing note. Stored as YYYY-MM-DD.
+  occurredOn?: string;
 };
 
 // An event the user keeps for themselves — no person attached.
@@ -64,6 +70,9 @@ export type Person = {
     progress: number; // 0..1
   };
   specialDays?: SpecialDay[];
+  // One-off dates that have already passed. Kept rather than deleted so there
+  // is something to look back on.
+  pastDays?: SpecialDay[];
   birthday?: { id: string; date: string; nudges: any[] };
   notes?: Note[];
   isPinned?: boolean;

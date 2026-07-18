@@ -19,6 +19,7 @@ export function mapDbNote(row: any, now?: number): Note {
     when: relativeWhen(row.created_at, now),
     body: row.body,
     specialDayId: row.special_day_id || undefined,
+    occurredOn: row.occurred_on || undefined,
   };
 }
 

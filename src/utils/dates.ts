@@ -141,3 +141,34 @@ export function getUpcomingOccurrences(dateStr: string, recurrence: Recurrence, 
   }
   return out;
 }
+
+// The most recent `count` occurrences strictly before `from`, newest first.
+// Never reaches back past the anchor itself: a birthday recorded with the year
+// 1990 has no occurrences in 1989.
+export function getPastOccurrences(dateStr: string, recurrence: Recurrence, count: number, from: Date = startOfToday()): Date[] {
+  const anchor = resolveAnchor(dateStr, recurrence);
+
+  if (recurrence.unit === 'none') {
+    const only = occurrenceAt(anchor, recurrence, 0);
+    return only.getTime() < from.getTime() ? [only] : [];
+  }
+
+  // firstIndexOnOrAfter lands on the next one due, so everything below it is past.
+  const next = firstIndexOnOrAfter(anchor, recurrence, from);
+
+  const out: Date[] = [];
+  for (let k = next - 1; k >= 0 && out.length < count; k--) {
+    out.push(occurrenceAt(anchor, recurrence, k));
+  }
+  return out;
+}
+
+// Formats a date the way the rest of the app writes them.
+export function formatOccurrenceDate(date: Date): string {
+  return `${MONTHS_FULL[date.getMonth()]} ${getOrdinal(date.getDate())}, ${date.getFullYear()}`;
+}
+
+// 'YYYY-MM-DD' for a Date, in local time — matching how dates are stored.
+export function toISODate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}

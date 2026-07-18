@@ -37,7 +37,7 @@ function NudgeSummary({ event }: { event: MyEvent }) {
 export default function MyEvents() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { events, loadError, refreshEvents } = useEvents();
+  const { events, pastEvents, loadError, refreshEvents } = useEvents();
 
   const featured = events[0];
   const rest = events.slice(1);
@@ -183,6 +183,40 @@ export default function MyEvents() {
             </Animated.View>
           </>
         )}
+
+        {/* Reminders that have already happened, kept rather than deleted */}
+        {pastEvents.length > 0 && (
+          <Animated.View entering={FadeInDown.duration(500).delay(320)} style={{ marginTop: spacing.stackLg, gap: spacing.stackSm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 2 }}>
+              <Icon name="history" size={18} color={colors.onSurfaceVariant} />
+              <Txt variant="labelSm" color={colors.onSurfaceVariant}>ALREADY HAPPENED</Txt>
+            </View>
+
+            {pastEvents.map((event) => (
+              <Card
+                key={event.id}
+                pressable
+                onPress={() => router.push(`/my-event/edit/${event.id}` as any)}
+                style={[styles.rowCard, styles.pastCard]}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flex: 1 }}>
+                  <View style={[styles.iconBadgeSm, { backgroundColor: colors.surfaceContainerHigh }]}>
+                    <Icon name={event.icon as any} size={20} color={colors.onSurfaceVariant} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Txt variant="bodyLg" color={colors.onSurfaceVariant} style={{ fontFamily: 'Inter_500Medium' }}>
+                      {event.title}
+                    </Txt>
+                    <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ opacity: 0.8 }}>{event.date}</Txt>
+                  </View>
+                </View>
+                <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ opacity: 0.8 }}>
+                  {Math.abs(event.daysAway)}d ago
+                </Txt>
+              </Card>
+            ))}
+          </Animated.View>
+        )}
       </ScrollView>
     </View>
   );
@@ -256,6 +290,7 @@ const styles = StyleSheet.create({
     borderColor: colors.outlineVariant,
     backgroundColor: colors.surfaceContainer,
   },
+  pastCard: { opacity: 0.75 },
   emptyCard: {
     overflow: 'hidden',
     paddingVertical: 40,

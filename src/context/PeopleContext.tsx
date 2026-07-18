@@ -51,6 +51,8 @@ type PeopleContextValue = {
     next: { id?: string; kind: string; body: string }[],
   ) => Promise<void>;
   updateNote: (noteId: string, data: { kind?: string; body?: string }) => Promise<void>;
+  // Records or edits what happened on one occurrence of a day.
+  saveMemory: (personId: string, specialDayId: string, occurredOn: string, body: string, existingNoteId?: string) => Promise<void>;
   deleteNote: (noteId: string) => Promise<void>;
   // Hides the note immediately and offers an undo before it reaches the database.
   deleteNoteWithUndo: (noteId: string) => void;
@@ -114,7 +116,11 @@ export function mapDbPersonToPerson(dbPerson: any): Person {
   // about the person.
   const { byDay, general: generalNotes } = distributeNotes(notes, specialDays);
   for (const day of specialDays) {
-    day.notes = byDay.get(day.id) ?? [];
+    const mine = byDay.get(day.id) ?? [];
+    // A memory of last year shouldn't appear as a plan for next year — and the
+    // day's editor must not be able to overwrite it.
+    day.notes = mine.filter((n) => !n.occurredOn);
+    day.memories = mine.filter((n) => n.occurredOn);
   }
 
   // Calculate upcoming event properties
@@ -193,19 +199,16 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
   // Rows in, sorted people out. Shared by the network and the offline cache so
   // both paths produce identical state — and so countdowns are always computed
   // from today, never from whenever the cache was written.
-  const applyRows = (rows: any[]): string[] => {
+  const applyRows = (rows: any[]) => {
     const mapped = rows.map(mapDbPersonToPerson);
 
-    const expiredDayIds: string[] = [];
+    // A one-off date that has passed used to be deleted here, taking its notes
+    // with it. It's kept now and simply moved out of the upcoming list, so
+    // "Looking back" has something to show.
     mapped.forEach((p) => {
       if (p.specialDays) {
-        p.specialDays = p.specialDays.filter((sd) => {
-          if (sd.isExpired) {
-            expiredDayIds.push(sd.id);
-            return false;
-          }
-          return true;
-        });
+        p.pastDays = p.specialDays.filter((sd) => sd.isExpired);
+        p.specialDays = p.specialDays.filter((sd) => !sd.isExpired);
       }
     });
 
@@ -218,7 +221,6 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
 
     setPeople(mapped);
     peopleRef.current = mapped;
-    return expiredDayIds;
   };
 
   const refreshPeople = async () => {
@@ -237,21 +239,15 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
           avatar_url,
           is_pinned,
           special_days (id, title, date, icon, accent, nudges, repeat_unit, repeat_interval, is_birthday),
-          notes (id, kind, body, created_at, special_day_id)
+          notes (id, kind, body, created_at, special_day_id, occurred_on)
         `);
 
       if (error) throw error;
 
       if (data) {
-        const expiredDayIds = applyRows(data);
+        applyRows(data);
         setLoadError(null);
         writeCache(cacheKey('people', user.id), data);
-
-        if (expiredDayIds.length > 0) {
-          supabase.from('special_days').delete().in('id', expiredDayIds).then(({ error: delError }) => {
-            if (delError) console.warn('Failed to delete expired one-time events', delError);
-          });
-        }
       }
     } catch (err) {
       console.error('Error fetching people:', err);
@@ -521,6 +517,38 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // A memory is a note pinned to one occurrence of a day. It deliberately does
+  // not go through syncNotes — the day's editor only knows about standing notes
+  // and would treat a memory it has never seen as deleted.
+  const saveMemory = async (
+    personId: string,
+    specialDayId: string,
+    occurredOn: string,
+    body: string,
+    existingNoteId?: string,
+  ) => {
+    if (!user) return;
+    try {
+      if (existingNoteId) {
+        const { error } = await supabase.from('notes').update({ body }).eq('id', existingNoteId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('notes').insert({
+          person_id: personId,
+          special_day_id: specialDayId,
+          occurred_on: occurredOn,
+          kind: 'Memory',
+          body,
+        });
+        if (error) throw error;
+      }
+      await refreshPeople();
+    } catch (err) {
+      console.error('Error saving memory:', err);
+      throw err;
+    }
+  };
+
   const updateNote = async (noteId: string, data: { kind?: string; body?: string }) => {
     if (!user) return;
     try {
@@ -688,7 +716,11 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
           .map((d) =>
             hiddenNoteIds.length === 0
               ? d
-              : { ...d, notes: d.notes?.filter((n) => !hiddenNoteIds.includes(n.id)) },
+              : {
+                  ...d,
+                  notes: d.notes?.filter((n) => !hiddenNoteIds.includes(n.id)),
+                  memories: d.memories?.filter((n) => !hiddenNoteIds.includes(n.id)),
+                },
           ),
       };
     });
@@ -740,6 +772,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
         addNoteToPerson,
         syncNotes,
         updateNote,
+        saveMemory,
         deleteNote,
         deleteNoteWithUndo,
         addSpecialDay,

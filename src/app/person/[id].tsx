@@ -12,6 +12,7 @@ import { Button } from '@/components/Button';
 import { usePeople } from '@/context/PeopleContext';
 import { InlineBirthdayCard } from '@/components/InlineBirthdayCard';
 import { NotePreview } from '@/components/NotePreview';
+import { LookingBack } from '@/components/LookingBack';
 import type { SpecialDay } from '@/data/mock';
 
 const accentMap = {
@@ -301,6 +302,9 @@ export default function PersonDetail() {
             style={{ marginTop: spacing.stackSm }}
           />
         </Animated.View>
+
+        {/* What already happened — renders nothing until there is a past to show */}
+        <LookingBack person={person} />
 
         {/* General notes — the ones not tied to any single occasion */}
         <Animated.View entering={FadeInDown.duration(500).delay(260)} style={styles.notesCard}>
