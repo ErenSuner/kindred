@@ -1,13 +1,13 @@
 import type { Note, Person, Relationship } from '@/data/mock';
 import { supabase } from '@/lib/supabase';
+import { cacheKey, readCache, writeCache } from '@/utils/cache';
+import { getNextOccurrence } from '@/utils/dates';
+import { describeLoadError } from '@/utils/loadError';
+import { distributeNotes, mapDbNote } from '@/utils/notes';
+import { Recurrence, YEARLY, parseRecurrence, serializeRecurrence } from '@/utils/recurrence';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
-import { getNextOccurrence } from '@/utils/dates';
-import { Recurrence, YEARLY, parseRecurrence, serializeRecurrence } from '@/utils/recurrence';
-import { distributeNotes, mapDbNote } from '@/utils/notes';
-import { describeLoadError } from '@/utils/loadError';
 import { useUndo } from './UndoContext';
-import { cacheKey, readCache, writeCache } from '@/utils/cache';
 
 type PeopleContextValue = {
   people: Person[];
@@ -91,6 +91,7 @@ export function mapDbPersonToPerson(dbPerson: any): Person {
       icon: isBirthday ? 'cake' : sd.icon || 'event',
       accent: isBirthday ? 'tertiary' : sd.accent || 'primary',
       originalDate: sd.date,
+      createdAt: sd.created_at,
       daysAway,
       turningAge,
       nudges: sd.nudges || [],
@@ -238,7 +239,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
           role,
           avatar_url,
           is_pinned,
-          special_days (id, title, date, icon, accent, nudges, repeat_unit, repeat_interval, is_birthday),
+          special_days (id, title, date, icon, accent, nudges, repeat_unit, repeat_interval, is_birthday, created_at),
           notes (id, kind, body, created_at, special_day_id, occurred_on)
         `);
 
@@ -717,10 +718,10 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
             hiddenNoteIds.length === 0
               ? d
               : {
-                  ...d,
-                  notes: d.notes?.filter((n) => !hiddenNoteIds.includes(n.id)),
-                  memories: d.memories?.filter((n) => !hiddenNoteIds.includes(n.id)),
-                },
+                ...d,
+                notes: d.notes?.filter((n) => !hiddenNoteIds.includes(n.id)),
+                memories: d.memories?.filter((n) => !hiddenNoteIds.includes(n.id)),
+              },
           ),
       };
     });

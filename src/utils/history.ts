@@ -2,18 +2,14 @@ import type { Note, Person, SpecialDay } from '@/data/mock';
 import { YEARLY } from '@/utils/recurrence';
 import { formatOccurrenceDate, getPastOccurrences, toISODate } from '@/utils/dates';
 
-// How far back to look, per day, before filtering.
-const LOOKBACK_DEPTH = 8;
+// How far back to compute before filtering. Generous, because the filters below
+// throw most of it away.
+const LOOKBACK_DEPTH = 24;
 
-// A yearly date is a life event — "she turned 34 last May" is worth seeing even
-// if you only started tracking her yesterday.
-const YEARLY_LIMIT = 4;
-
-// A weekly or monthly reminder is a chore, not a memory. Listing every past one
-// would bury everything else under an endless run of identical rows, so only the
-// most recent gets shown — enough to give somewhere to write — plus any older
-// ones you actually recorded something about.
-const FAST_CADENCE_LIMIT = 1;
+// A weekly or monthly reminder tracked for a while still racks up rows fast, so
+// cap how many bare ones show. Anything you wrote about is kept regardless.
+const FAST_CADENCE_LIMIT = 2;
+const SLOW_CADENCE_LIMIT = 6;
 
 export type PastOccurrence = {
   key: string;
@@ -24,14 +20,11 @@ export type PastOccurrence = {
   date: Date;
   isoDate: string;
   formattedDate: string;
-  // "Last year", "3 years ago", "Turned 34" — whichever reads best.
   relativeLabel: string;
-  // What was written down about this particular occurrence.
   memories: Note[];
 };
 
 // How old they turned on that occurrence, when that's a thing worth saying.
-// Only a yearly cycle with a real anchor year has an age to count.
 function ageOn(date: Date, day: SpecialDay): number | null {
   if (!day.isBirthday && day.recurrence?.unit !== 'year') return null;
 
@@ -55,19 +48,26 @@ function relativeLabel(date: Date, day: SpecialDay, from: Date): string {
     base = years === 1 ? 'Last year' : `${years} years ago`;
   }
 
-  // The age applies however recently it happened — a birthday two months back
-  // is exactly when you still want to know they turned 36.
   const age = ageOn(date, day);
   return age === null ? base : `${base} · turned ${age}`;
 }
 
-// Builds the "Looking back" timeline: past occurrences worth showing, newest
-// first, each carrying whatever was written about it.
+// The day this occasion started being tracked. Occurrences before it are
+// arithmetic, not history — the app was not there for them.
+function trackedFrom(day: SpecialDay): Date | null {
+  if (!day.createdAt) return null;
+  const created = new Date(day.createdAt);
+  if (isNaN(created.getTime())) return null;
+  created.setHours(0, 0, 0, 0);
+  return created;
+}
+
+// Builds the "Looking back" timeline: occurrences that actually went by while
+// the day existed in Kindred, newest first.
 //
-// Occurrences are computed from the recurrence rule rather than stored, so a
-// birthday added today still shows the years that already went by. The trade is
-// that a fast cadence can invent a long run of dates nobody experienced with the
-// app, which is why how much shows depends on the cadence.
+// Occurrences are derived from the recurrence rule rather than stored, so the
+// rule alone would happily produce dates from before the app was installed.
+// Everything earlier than the day's own created_at is dropped for that reason.
 export function buildHistory(person: Person, from: Date = new Date()): PastOccurrence[] {
   const today = new Date(from);
   today.setHours(0, 0, 0, 0);
@@ -81,39 +81,43 @@ export function buildHistory(person: Person, from: Date = new Date()): PastOccur
 
     const recurrence = day.recurrence ?? YEARLY;
     const memories = day.memories ?? [];
+    const since = trackedFrom(day);
 
-    const entries = getPastOccurrences(anchor, recurrence, LOOKBACK_DEPTH, today).map((date) => {
-      const isoDate = toISODate(date);
-      return {
-        key: `${day.id}:${isoDate}`,
-        dayId: day.id,
-        title: day.title,
-        icon: day.icon,
-        isBirthday: day.isBirthday === true,
-        date,
-        isoDate,
-        formattedDate: formatOccurrenceDate(date),
-        relativeLabel: relativeLabel(date, day, today),
-        memories: memories.filter((m) => m.occurredOn === isoDate),
-      };
-    });
+    const entries = getPastOccurrences(anchor, recurrence, LOOKBACK_DEPTH, today)
+      // The core rule: it only counts if it happened after you added the day.
+      .filter((date) => !since || date.getTime() >= since.getTime())
+      .map((date) => {
+        const isoDate = toISODate(date);
+        return {
+          key: `${day.id}:${isoDate}`,
+          dayId: day.id,
+          title: day.title,
+          icon: day.icon,
+          isBirthday: day.isBirthday === true,
+          date,
+          isoDate,
+          formattedDate: formatOccurrenceDate(date),
+          relativeLabel: relativeLabel(date, day, today),
+          memories: memories.filter((m) => m.occurredOn === isoDate),
+        };
+      });
 
-    // getPastOccurrences already returns newest first.
     if (recurrence.unit === 'none') {
       // A one-off that has passed is the whole story; there is only ever one.
       out.push(...entries);
-    } else if (recurrence.unit === 'year' && recurrence.interval === 1) {
-      out.push(...entries.slice(0, YEARLY_LIMIT));
-    } else {
-      const recorded = entries.filter((e) => e.memories.length > 0);
-      const mostRecent = entries.slice(0, FAST_CADENCE_LIMIT);
-      // Union, keeping chronological order and no duplicates.
-      const seen = new Set<string>();
-      for (const entry of [...mostRecent, ...recorded]) {
-        if (seen.has(entry.key)) continue;
-        seen.add(entry.key);
-        out.push(entry);
-      }
+      continue;
+    }
+
+    const fast = recurrence.unit === 'week' || recurrence.unit === 'month';
+    const limit = fast ? FAST_CADENCE_LIMIT : SLOW_CADENCE_LIMIT;
+
+    // Newest few, plus anything recorded however far back — a written memory is
+    // the whole point of the section and must never be trimmed away.
+    const seen = new Set<string>();
+    for (const entry of [...entries.slice(0, limit), ...entries.filter((e) => e.memories.length > 0)]) {
+      if (seen.has(entry.key)) continue;
+      seen.add(entry.key);
+      out.push(entry);
     }
   }
 

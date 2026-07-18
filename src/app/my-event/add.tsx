@@ -1,19 +1,19 @@
-import { useState } from 'react';
-import { View, ScrollView, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { colors, spacing, radius, softShadow } from '@/theme/tokens';
-import { Txt } from '@/components/Txt';
-import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
 import { DateFields, DateValue } from '@/components/DateFields';
 import { FormError } from '@/components/FormError';
+import { Icon } from '@/components/Icon';
 import { RecurrencePicker } from '@/components/RecurrencePicker';
 import { ReminderEditor } from '@/components/ReminderEditor';
+import { Txt } from '@/components/Txt';
 import { useEvents } from '@/context/EventsContext';
+import { colors, radius, softShadow, spacing } from '@/theme/tokens';
 import { Nudge, serializeNudges } from '@/utils/nudges';
 import { Recurrence, YEARLY } from '@/utils/recurrence';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SUGGESTIONS = ['Dentist', 'Rent Due', 'Renew Passport', 'Gym Renewal', 'Car Service'];
 

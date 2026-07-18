@@ -11,6 +11,9 @@ export type SpecialDay = {
   icon: string; // MaterialIcons name
   accent: 'primary' | 'tertiary' | 'secondary';
   originalDate?: string; // e.g. YYYY-MM-DD
+  // When this day was added to Kindred. Anything before it was never actually
+  // tracked, so history must not claim it happened.
+  createdAt?: string;
   daysAway?: number;
   turningAge?: number;
   nudges?: any[];

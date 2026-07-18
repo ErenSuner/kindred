@@ -1,21 +1,21 @@
-import { useState, useEffect, useRef } from 'react';
-import { View, ScrollView, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform, Modal } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
-import { colors, spacing, radius, softShadow, ambientShadow } from '@/theme/tokens';
-import { Txt } from '@/components/Txt';
-import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
-import { FormError } from '@/components/FormError';
 import { DateFields, DateValue } from '@/components/DateFields';
+import { FormError } from '@/components/FormError';
+import { Icon } from '@/components/Icon';
+import { DraftNote, NotesEditor, draftFromNote } from '@/components/NotesEditor';
 import { RecurrencePicker } from '@/components/RecurrencePicker';
 import { ReminderEditor } from '@/components/ReminderEditor';
-import { DraftNote, NotesEditor, draftFromNote } from '@/components/NotesEditor';
+import { Txt } from '@/components/Txt';
 import { usePeople } from '@/context/PeopleContext';
-import { Recurrence, YEARLY } from '@/utils/recurrence';
-import { Nudge, parseNudges, serializeNudges } from '@/utils/nudges';
+import { ambientShadow, colors, radius, softShadow, spacing } from '@/theme/tokens';
 import { SKIPPED_YEAR } from '@/utils/dates';
+import { Nudge, parseNudges, serializeNudges } from '@/utils/nudges';
+import { Recurrence, YEARLY } from '@/utils/recurrence';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (

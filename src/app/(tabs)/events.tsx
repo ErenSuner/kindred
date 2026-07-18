@@ -235,22 +235,6 @@ const styles = StyleSheet.create({
   featuredTop: { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
   daysRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   rowCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  iconBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.primaryFixed,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconBadgeSm: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primaryFixed,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   repeatChip: {
     flexDirection: 'row',
     alignItems: 'center',

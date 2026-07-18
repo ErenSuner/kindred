@@ -363,14 +363,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   featuredTop: { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
-  eventIconBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.primaryFixed,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   // Warm/tertiary so a shared occasion reads as a different kind of thing from
   // the blush-toned people and personal event cards.
   holidayCard: {
@@ -412,14 +404,6 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: 'rgba(0,0,0,0.06)',
-  },
-  eventIconBadgeSm: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primaryFixed,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   daysRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   rowCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
