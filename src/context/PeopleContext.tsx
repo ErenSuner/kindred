@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { getNextOccurrence } from '@/utils/dates';
 import { Recurrence, YEARLY, parseRecurrence, serializeRecurrence } from '@/utils/recurrence';
+import { distributeNotes, mapDbNote } from '@/utils/notes';
 
 type PeopleContextValue = {
   people: Person[];
@@ -21,6 +22,7 @@ type PeopleContextValue = {
     date: string;
     nudges?: string[];
     recurrence?: Recurrence;
+    notes?: NoteDraft[];
   }) => Promise<void>;
   updateSpecialDay: (dayId: string, data: {
     title?: string;
@@ -29,10 +31,16 @@ type PeopleContextValue = {
     recurrence?: Recurrence;
   }) => Promise<void>;
   deleteSpecialDay: (dayId: string) => Promise<void>;
-  addBirthday: (personId: string, data: { date: string; nudges?: string[] }) => Promise<void>;
+  addBirthday: (personId: string, data: { date: string; nudges?: string[]; notes?: NoteDraft[] }) => Promise<void>;
   updateBirthday: (birthdayId: string, data: { date?: string; nudges?: string[] }) => Promise<void>;
   deleteBirthday: (birthdayId: string) => Promise<void>;
-  addNoteToPerson: (personId: string, kind: string, body: string) => Promise<void>;
+  addNoteToPerson: (personId: string, kind: string, body: string, target?: NoteTarget) => Promise<void>;
+  syncNotes: (
+    personId: string,
+    target: NoteTarget,
+    existing: Note[],
+    next: { id?: string; kind: string; body: string }[],
+  ) => Promise<void>;
   updateNote: (noteId: string, data: { kind?: string; body?: string }) => Promise<void>;
   deleteNote: (noteId: string) => Promise<void>;
   removePerson: (id: string) => Promise<void>;
@@ -42,6 +50,16 @@ type PeopleContextValue = {
 };
 
 const PeopleContext = createContext<PeopleContextValue | null>(null);
+
+// Which occasion a note hangs off, if any. Omitting it writes a general note
+// about the person.
+export type NoteTarget =
+  | { specialDayId: string }
+  | { birthdayId: string };
+
+// A note supplied alongside the occasion it belongs to, before that occasion
+// has an id of its own.
+export type NoteDraft = { kind: string; body: string };
 
 export function mapDbPersonToPerson(dbPerson: any): Person {
   const specialDays: any[] = (dbPerson.special_days || []).map((sd: any) => {
@@ -90,27 +108,14 @@ export function mapDbPersonToPerson(dbPerson: any): Person {
 
   const notes: Note[] = (dbPerson.notes || [])
     .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .map((n: any) => {
-      const created = new Date(n.created_at);
-      const diffMs = Date.now() - created.getTime();
-      const diffMins = Math.floor(diffMs / 60000);
-      const diffHours = Math.floor(diffMins / 60);
-      const diffDays = Math.floor(diffHours / 24);
-      let when = 'Just now';
-      if (diffDays > 0) {
-        when = diffDays === 1 ? 'Yesterday' : `${diffDays} days ago`;
-      } else if (diffHours > 0) {
-        when = `${diffHours} hours ago`;
-      } else if (diffMins > 0) {
-        when = `${diffMins} mins ago`;
-      }
-      return {
-        id: n.id,
-        kind: n.kind,
-        when,
-        body: n.body,
-      };
-    });
+    .map((n: any) => mapDbNote(n));
+
+  // Hand each note to the occasion it belongs to; the rest are general notes
+  // about the person.
+  const { byDay, general: generalNotes } = distributeNotes(notes, specialDays);
+  for (const day of specialDays) {
+    day.notes = byDay.get(day.id) ?? [];
+  }
 
   // Calculate upcoming event properties
   let eventTitle = 'No upcoming events';
@@ -163,7 +168,7 @@ export function mapDbPersonToPerson(dbPerson: any): Person {
     countdown,
     specialDays: returnedSpecialDays,
     birthday,
-    notes,
+    notes: generalNotes,
     isPinned: dbPerson.is_pinned || false,
   };
 }
@@ -189,7 +194,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
           is_pinned,
           special_days (id, title, date, icon, accent, nudges, repeat_unit, repeat_interval),
           birthdays (id, date, nudges),
-          notes (id, kind, body, created_at)
+          notes (id, kind, body, created_at, special_day_id, birthday_id)
         `);
 
       if (error) throw error;
@@ -298,10 +303,11 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
     date: string;
     nudges?: string[];
     recurrence?: Recurrence;
+    notes?: NoteDraft[];
   }) => {
     try {
       if (!user) throw new Error('Not logged in');
-      const { error } = await supabase
+      const { data: inserted, error } = await supabase
         .from('special_days')
         .insert({
           person_id: personId,
@@ -311,8 +317,27 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
           icon: data.title.toLowerCase().includes('birthday') ? 'cake' : 'event',
           accent: 'primary',
           ...serializeRecurrence(data.recurrence ?? YEARLY),
-        });
+        })
+        .select('id')
+        .single();
       if (error) throw error;
+
+      // Notes are written against the row that was just created, so they can
+      // only go in once its id exists.
+      if (data.notes?.length && inserted) {
+        const { error: notesError } = await supabase.from('notes').insert(
+          data.notes.map((n) => ({
+            person_id: personId,
+            special_day_id: inserted.id,
+            kind: n.kind,
+            body: n.body,
+          })),
+        );
+        // The day itself saved fine; losing the notes shouldn't read as a
+        // failed save, so this is reported rather than thrown.
+        if (notesError) console.error('Special day saved, but its notes failed:', notesError);
+      }
+
       await refreshPeople();
     } catch (err) {
       console.error('Error adding special day:', err);
@@ -362,17 +387,32 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addBirthday = async (personId: string, data: { date: string; nudges?: string[] }) => {
+  const addBirthday = async (personId: string, data: { date: string; nudges?: string[]; notes?: NoteDraft[] }) => {
     if (!user) return;
     try {
-      const { error } = await supabase
+      const { data: inserted, error } = await supabase
         .from('birthdays')
         .insert({
           person_id: personId,
           date: data.date,
           nudges: data.nudges || [],
-        });
+        })
+        .select('id')
+        .single();
       if (error) throw error;
+
+      if (data.notes?.length && inserted) {
+        const { error: notesError } = await supabase.from('notes').insert(
+          data.notes.map((n) => ({
+            person_id: personId,
+            birthday_id: inserted.id,
+            kind: n.kind,
+            body: n.body,
+          })),
+        );
+        if (notesError) console.error('Birthday saved, but its notes failed:', notesError);
+      }
+
       await refreshPeople();
     } catch (err) {
       console.error('Error adding birthday:', err);
@@ -410,7 +450,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addNoteToPerson = async (personId: string, kind: string, body: string) => {
+  const addNoteToPerson = async (personId: string, kind: string, body: string, target?: NoteTarget) => {
     if (!user) return;
     try {
       const { error } = await supabase
@@ -419,6 +459,8 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
           person_id: personId,
           kind,
           body,
+          special_day_id: target && 'specialDayId' in target ? target.specialDayId : null,
+          birthday_id: target && 'birthdayId' in target ? target.birthdayId : null,
         });
       if (error) throw error;
       await refreshPeople();
@@ -454,6 +496,59 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
       await refreshPeople();
     } catch (err) {
       console.error('Error deleting note:', err);
+      throw err;
+    }
+  };
+
+  // Reconciles the notes attached to one occasion against what the editor is
+  // holding: anything gone from `next` is deleted, anything with an id is
+  // updated if its text changed, and the rest are created.
+  const syncNotes = async (
+    personId: string,
+    target: NoteTarget,
+    existing: Note[],
+    next: { id?: string; kind: string; body: string }[],
+  ) => {
+    if (!user) return;
+
+    const keptIds = new Set(next.map((n) => n.id).filter(Boolean) as string[]);
+    const removedIds = existing.filter((n) => !keptIds.has(n.id)).map((n) => n.id);
+
+    const toInsert = next.filter((n) => !n.id);
+    const toUpdate = next.filter((n) => {
+      if (!n.id) return false;
+      const before = existing.find((e) => e.id === n.id);
+      return before && (before.body !== n.body || before.kind !== n.kind);
+    });
+
+    try {
+      if (removedIds.length > 0) {
+        const { error } = await supabase.from('notes').delete().in('id', removedIds);
+        if (error) throw error;
+      }
+
+      if (toInsert.length > 0) {
+        const { error } = await supabase.from('notes').insert(
+          toInsert.map((n) => ({
+            person_id: personId,
+            special_day_id: 'specialDayId' in target ? target.specialDayId : null,
+            birthday_id: 'birthdayId' in target ? target.birthdayId : null,
+            kind: n.kind,
+            body: n.body,
+          })),
+        );
+        if (error) throw error;
+      }
+
+      for (const n of toUpdate) {
+        const { error } = await supabase
+          .from('notes')
+          .update({ kind: n.kind, body: n.body })
+          .eq('id', n.id as string);
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error('Error syncing notes:', err);
       throw err;
     }
   };
@@ -519,6 +614,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
         refreshPeople,
         getPerson,
         addNoteToPerson,
+        syncNotes,
         updateNote,
         deleteNote,
         addSpecialDay,

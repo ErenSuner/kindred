@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, ScrollView, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform, Alert, Modal } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { Button } from '@/components/Button';
 import { SelectableChip } from '@/components/Chip';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
 import { RecurrencePicker } from '@/components/RecurrencePicker';
+import { DraftNote, NotesEditor, draftFromNote } from '@/components/NotesEditor';
 import { usePeople } from '@/context/PeopleContext';
 import { Recurrence, YEARLY } from '@/utils/recurrence';
 import { parseNudges, serializeNudges } from '@/utils/nudges';
@@ -52,7 +53,7 @@ export default function EditSpecialDay() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { dayId, personId } = useLocalSearchParams<{ dayId: string; personId: string }>();
-  const { people, updateSpecialDay, deleteSpecialDay } = usePeople();
+  const { people, updateSpecialDay, deleteSpecialDay, syncNotes } = usePeople();
 
   const person = people.find((p) => p.id === personId);
   const specialDay = person?.specialDays?.find((sd) => sd.id === dayId);
@@ -60,6 +61,7 @@ export default function EditSpecialDay() {
   // Occasion state
   const [occasion, setOccasion] = useState('');
   const [recurrence, setRecurrence] = useState<Recurrence>(YEARLY);
+  const [notes, setNotes] = useState<DraftNote[]>([]);
 
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -83,23 +85,29 @@ export default function EditSpecialDay() {
   const [customPickerVisible, setCustomPickerVisible] = useState(false);
   const [customPickerType, setCustomPickerType] = useState<'day' | 'month' | 'year'>('day');
 
+  // Only fill the form once. `specialDay` is a fresh object after any refresh,
+  // so re-running this would throw away whatever the user is part-way through
+  // typing.
+  const hydratedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (specialDay) {
-      setOccasion(specialDay.title);
+    if (!specialDay || hydratedFor.current === specialDay.id) return;
+    hydratedFor.current = specialDay.id;
 
-      const parts = (specialDay.originalDate || '').split('-');
-      if (parts.length === 3) {
-        const y = parseInt(parts[0], 10);
-        const m = parseInt(parts[1], 10);
-        const d = parseInt(parts[2], 10);
-        if (y !== 1000 && !isNaN(y)) setYear(y);
-        if (!isNaN(m)) setMonth(m);
-        if (!isNaN(d)) setDay(d);
-      }
-      
-      setRecurrence(specialDay.recurrence ?? YEARLY);
-      setReminders(parseNudges(specialDay.nudges));
+    setOccasion(specialDay.title);
+
+    const parts = (specialDay.originalDate || '').split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const d = parseInt(parts[2], 10);
+      if (y !== 1000 && !isNaN(y)) setYear(y);
+      if (!isNaN(m)) setMonth(m);
+      if (!isNaN(d)) setDay(d);
     }
+
+    setRecurrence(specialDay.recurrence ?? YEARLY);
+    setReminders(parseNudges(specialDay.nudges));
+    setNotes((specialDay.notes ?? []).map(draftFromNote));
   }, [specialDay]);
 
   const addReminder = (reminder: Reminder) => {
@@ -151,6 +159,16 @@ export default function EditSpecialDay() {
     try {
       const y = year && year !== 1000 ? year : 1000;
       const formattedDate = `${y}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+      // Notes are written first: updateSpecialDay refreshes the people list,
+      // and doing it in the other order would leave the screen showing stale
+      // notes for a moment before it pops.
+      await syncNotes(
+        personId ?? '',
+        { specialDayId: dayId ?? '' },
+        specialDay?.notes ?? [],
+        notes.map((n) => ({ id: n.id, kind: n.kind, body: n.body })),
+      );
 
       await updateSpecialDay(dayId ?? '', {
         title: occasion.trim(),
@@ -296,6 +314,9 @@ export default function EditSpecialDay() {
                 </Txt>
               )}
             </View>
+
+            {/* Notes kept with this day */}
+            <NotesEditor notes={notes} onChange={setNotes} />
           </Animated.View>
 
           {/* Submit */}

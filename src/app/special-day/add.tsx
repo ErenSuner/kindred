@@ -10,6 +10,7 @@ import { Button } from '@/components/Button';
 
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
 import { RecurrencePicker } from '@/components/RecurrencePicker';
+import { DraftNote, NotesEditor } from '@/components/NotesEditor';
 import { usePeople } from '@/context/PeopleContext';
 import { Recurrence, YEARLY } from '@/utils/recurrence';
 
@@ -68,6 +69,7 @@ export default function AddSpecialDay() {
     { type: 'preset', label: '1 Week Before', value: '1_week' },
     { type: 'preset', label: '1 Day Before', value: '1_day' },
   ]);
+  const [notes, setNotes] = useState<DraftNote[]>([]);
   const [reminderModalVisible, setReminderModalVisible] = useState(false);
   const [customDateMode, setCustomDateMode] = useState(false);
   const [customDay, setCustomDay] = useState<number | null>(null);
@@ -132,6 +134,7 @@ export default function AddSpecialDay() {
         date: formattedDate,
         nudges: reminders.map(r => r.value),
         recurrence,
+        notes: notes.map(n => ({ kind: n.kind, body: n.body })),
       });
       router.back();
     } catch (e) {
@@ -252,6 +255,9 @@ export default function AddSpecialDay() {
                 </Txt>
               )}
             </View>
+
+            {/* Notes kept with this day */}
+            <NotesEditor notes={notes} onChange={setNotes} />
           </Animated.View>
 
           {/* Submit */}

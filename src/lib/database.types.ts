@@ -130,6 +130,8 @@ export type Database = {
         Row: {
           id: string;
           person_id: string;
+          special_day_id: string | null;
+          birthday_id: string | null;
           kind: string;
           body: string;
           created_at: string;
@@ -137,6 +139,8 @@ export type Database = {
         Insert: {
           id?: string;
           person_id: string;
+          special_day_id?: string | null;
+          birthday_id?: string | null;
           kind: string;
           body: string;
           created_at?: string;
@@ -144,6 +148,8 @@ export type Database = {
         Update: {
           id?: string;
           person_id?: string;
+          special_day_id?: string | null;
+          birthday_id?: string | null;
           kind?: string;
           body?: string;
           created_at?: string;

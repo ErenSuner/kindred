@@ -9,6 +9,7 @@ import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
 import { HighlightCard, HighlightHandle } from '@/components/HighlightCard';
+import { DraftNote, NotesEditor, draftFromNote } from '@/components/NotesEditor';
 import { usePeople } from '@/context/PeopleContext';
 
 const PRESET_REMINDERS = [
@@ -49,10 +50,13 @@ export default function EditBirthday() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { personId, highlight } = useLocalSearchParams<{ personId: string; highlight?: string }>();
-  const { people, updateBirthday, deleteBirthday } = usePeople();
+  const { people, updateBirthday, deleteBirthday, syncNotes } = usePeople();
 
   const person = people.find((p) => p.id === personId);
   const birthday = person?.birthday;
+  // The birthday also appears in specialDays, which is where its notes live.
+  const birthdayDay = person?.specialDays?.find((d) => d.isBirthday);
+  const [notes, setNotes] = useState<DraftNote[]>([]);
 
   // Set when the user arrives from the "that looks like a birthday" prompt on
   // the special-day screen, so the card they were sent to announces itself.
@@ -79,32 +83,38 @@ export default function EditBirthday() {
   const [customPickerVisible, setCustomPickerVisible] = useState(false);
   const [customPickerType, setCustomPickerType] = useState<'day' | 'month' | 'year'>('day');
 
+  // Fill the form once — `birthday` is a fresh object after any refresh, and
+  // re-running this would discard in-progress edits.
+  const hydratedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (birthday) {
-      const parts = (birthday.date || '').split('-');
-      if (parts.length === 3) {
-        const y = parseInt(parts[0], 10);
-        const m = parseInt(parts[1], 10);
-        const d = parseInt(parts[2], 10);
-        if (y !== 1000 && !isNaN(y)) setYear(y);
-        if (!isNaN(m)) setMonth(m);
-        if (!isNaN(d)) setDay(d);
-      }
+    if (!birthday || hydratedFor.current === birthday.id) return;
+    hydratedFor.current = birthday.id;
 
-      // Initialize reminders from bd.nudges
-      if (birthday.nudges && birthday.nudges.length > 0) {
-        const parsed = birthday.nudges.map((val: string) => {
-          const preset = PRESET_REMINDERS.find(p => p.value === val);
-          if (preset) {
-            return { type: 'preset' as const, label: preset.label, value: val };
-          } else {
-            return { type: 'custom' as const, label: formatCustomDate(val), value: val };
-          }
-        });
-        setReminders(parsed);
-      }
+    const parts = (birthday.date || '').split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const d = parseInt(parts[2], 10);
+      if (y !== 1000 && !isNaN(y)) setYear(y);
+      if (!isNaN(m)) setMonth(m);
+      if (!isNaN(d)) setDay(d);
     }
-  }, [birthday]);
+
+    // Initialize reminders from bd.nudges
+    if (birthday.nudges && birthday.nudges.length > 0) {
+      const parsed = birthday.nudges.map((val: string) => {
+        const preset = PRESET_REMINDERS.find(p => p.value === val);
+        if (preset) {
+          return { type: 'preset' as const, label: preset.label, value: val };
+        } else {
+          return { type: 'custom' as const, label: formatCustomDate(val), value: val };
+        }
+      });
+      setReminders(parsed);
+    }
+
+    setNotes((birthdayDay?.notes ?? []).map(draftFromNote));
+  }, [birthday, birthdayDay]);
 
   const addReminder = (reminder: Reminder) => {
     if (reminders.length >= MAX_REMINDERS) return;
@@ -155,6 +165,13 @@ export default function EditBirthday() {
     try {
       const y = year && year !== 1000 ? year : 1000;
       const formattedDate = `${y}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+      await syncNotes(
+        personId ?? '',
+        { birthdayId: birthday.id },
+        birthdayDay?.notes ?? [],
+        notes.map((n) => ({ id: n.id, kind: n.kind, body: n.body })),
+      );
 
       await updateBirthday(birthday.id, {
         date: formattedDate,
@@ -296,6 +313,13 @@ export default function EditBirthday() {
                   </Txt>
                 )}
               </View>
+
+              {/* Notes kept with this birthday */}
+              <NotesEditor
+                notes={notes}
+                onChange={setNotes}
+                blurb="Gift ideas, plans, anything you want to remember for this birthday."
+              />
             </View>
           </Animated.View>
           </HighlightCard>

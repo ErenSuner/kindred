@@ -14,6 +14,7 @@ export type SpecialDay = {
   daysAway?: number;
   turningAge?: number;
   nudges?: any[];
+  notes?: Note[];
   isBirthday?: boolean;
   recurrence?: Recurrence;
   isExpired?: boolean;
@@ -24,6 +25,10 @@ export type Note = {
   kind: string; // e.g. "Gift Idea", "Memory"
   when: string;
   body: string;
+  // Set when the note belongs to one occasion rather than to the person as a
+  // whole. At most one of these is ever populated.
+  specialDayId?: string;
+  birthdayId?: string;
 };
 
 // An event the user keeps for themselves — no person attached.

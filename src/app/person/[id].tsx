@@ -11,6 +11,7 @@ import { Chip, SelectableChip } from '@/components/Chip';
 import { Button } from '@/components/Button';
 import { usePeople } from '@/context/PeopleContext';
 import { InlineBirthdayCard } from '@/components/InlineBirthdayCard';
+import { NotePreview } from '@/components/NotePreview';
 import type { SpecialDay } from '@/data/mock';
 
 const accentMap = {
@@ -40,13 +41,18 @@ function SpecialDayRow({ day, personId, onLongPress }: { day: SpecialDay, person
         <View style={[styles.dayIcon, { backgroundColor: a.bg }]}>
           <Icon name={day.icon as any} size={22} color={a.fg} />
         </View>
-        <View>
+        <View style={{ flex: 1 }}>
           <Txt variant="bodyMd" color={colors.onSurface} style={{ fontFamily: 'Inter_500Medium' }}>
             {day.title}{day.turningAge ? ` (Turning ${day.turningAge})` : ''}
           </Txt>
           <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontFamily: 'Inter_400Regular' }}>
             {day.date}
           </Txt>
+          {day.notes && day.notes.length > 0 && (
+            <View style={{ marginTop: 6 }}>
+              <NotePreview notes={day.notes} lines={2} compact />
+            </View>
+          )}
         </View>
       </View>
       <Icon name="chevron-right" size={22} color={colors.onSurfaceVariant} style={{ opacity: 0.5 }} />
@@ -308,16 +314,19 @@ export default function PersonDetail() {
           />
         </Animated.View>
 
-        {/* Notes & Ideas */}
+        {/* General notes — the ones not tied to any single occasion */}
         <Animated.View entering={FadeInDown.duration(500).delay(260)} style={styles.notesCard}>
           <View style={[styles.cardHeaderRow, styles.notesHeader]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Icon name="edit-note" size={24} color={colors.tertiary} />
               <Txt variant="headlineMd" color={colors.onSurface}>
-                Notes &amp; Ideas
+                About {person.name}
               </Txt>
             </View>
           </View>
+          <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: -8, marginBottom: 16 }}>
+            Notes about them in general. For a specific occasion, add notes to that day instead.
+          </Txt>
 
           {/* Existing notes list */}
           {person.notes && person.notes.length > 0 ? (
@@ -381,7 +390,7 @@ export default function PersonDetail() {
             </View>
           ) : (
             <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginBottom: 20, fontStyle: 'italic' }}>
-              No notes written down yet. Jot down gift ideas or memories!
+              Nothing written down yet. Things that are true of them generally — sizes, allergies, what they love.
             </Txt>
           )}
 

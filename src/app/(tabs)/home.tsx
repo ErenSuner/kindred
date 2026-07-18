@@ -8,6 +8,7 @@ import { Icon } from '@/components/Icon';
 import { Avatar } from '@/components/Avatar';
 import { Chip } from '@/components/Chip';
 import { Card } from '@/components/Card';
+import { NotePreview } from '@/components/NotePreview';
 import { currentUser } from '@/data/mock';
 import type { MyEvent, Person } from '@/data/mock';
 import { usePeople } from '@/context/PeopleContext';
@@ -223,6 +224,9 @@ export default function Home() {
           }
 
           const featured = item.person;
+          // specialDays is sorted soonest-first, so the headline event is the
+          // first one and its notes are the ones worth previewing.
+          const upcomingDay = featured.specialDays?.[0];
           const nextDay = featured.specialDays && featured.specialDays.length > 1 ? featured.specialDays[1] : null;
           return (
             <Animated.View key={`person-${featured.id}`} entering={FadeInDown.duration(500).delay(120 + index * 50)} style={{ marginBottom: spacing.gutter }}>
@@ -251,6 +255,11 @@ export default function Home() {
                   <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 4 }}>
                     {featured.eventDate}
                   </Txt>
+                  {upcomingDay?.notes && upcomingDay.notes.length > 0 && (
+                    <View style={{ marginTop: 12 }}>
+                      <NotePreview notes={upcomingDay.notes} lines={2} />
+                    </View>
+                  )}
                 </View>
                 {nextDay && (
                   <View style={styles.nextEventDivider}>
@@ -279,6 +288,7 @@ export default function Home() {
                 : () => router.push(`/person/${item.id}` as any);
               const primaryText = isEvent ? item.event.title : item.person.name;
               const secondaryText = isEvent ? item.event.date : item.person.eventTitle;
+              const rowNotes = isEvent ? undefined : item.person.specialDays?.[0]?.notes;
 
               return (
                 <Card key={`${item.kind}-${item.id}`} pressable onPress={onPress} style={styles.rowCard}>
@@ -297,6 +307,11 @@ export default function Home() {
                       <Txt variant="bodyMd" color={colors.onSurfaceVariant}>
                         {secondaryText}
                       </Txt>
+                      {rowNotes && rowNotes.length > 0 && (
+                        <View style={{ marginTop: 6 }}>
+                          <NotePreview notes={rowNotes} lines={1} compact />
+                        </View>
+                      )}
                     </View>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
