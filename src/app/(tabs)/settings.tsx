@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react';
 import { View, ScrollView, StyleSheet, Pressable, Modal, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { colors, spacing, radius, softShadow, ambientShadow } from '@/theme/tokens';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
-import { currentUser } from '@/data/mock';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { syncNotifications } from '@/utils/notifications';
+import { DEFAULT_REMINDER_HOUR, REMINDER_HOUR_KEY, getReminderHour, syncNotifications } from '@/utils/notifications';
+import { useNotificationPermission } from '@/utils/notificationPermission';
+import { AvatarPicker } from '@/components/AvatarPicker';
+import { FormError } from '@/components/FormError';
+import { ScrollPickerModal } from '@/components/ScrollPickerModal';
 import { usePeople } from '@/context/PeopleContext';
 import { useEvents } from '@/context/EventsContext';
 import { useHolidays } from '@/context/HolidaysContext';
@@ -64,6 +66,13 @@ function Row({ icon, label, sublabel, value, trailingIcon = 'chevron-right', rig
   );
 }
 
+// 12-hour clock, matching how the rest of the app writes dates in plain English.
+function formatHour(hour: number): string {
+  const suffix = hour < 12 ? 'AM' : 'PM';
+  const h = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h}:00 ${suffix}`;
+}
+
 function SectionTitle({ children }: { children: string }) {
   return (
     <Txt variant="labelSm" color={colors.primary} style={styles.sectionTitle}>
@@ -76,6 +85,10 @@ export default function Settings() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [nudges, setNudges] = useState(true);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [reminderHour, setReminderHour] = useState(DEFAULT_REMINDER_HOUR);
+  const [hourPickerVisible, setHourPickerVisible] = useState(false);
+  const permission = useNotificationPermission();
   const { user, signOut } = useAuth();
   const { people } = usePeople();
   const { events } = useEvents();
@@ -85,7 +98,17 @@ export default function Settings() {
     AsyncStorage.getItem('@settings_nudges').then(val => {
       if (val !== null) setNudges(val === 'true');
     });
+    getReminderHour().then(setReminderHour);
   }, []);
+
+  const handlePickHour = async (hour: number) => {
+    setReminderHour(hour);
+    setHourPickerVisible(false);
+    await AsyncStorage.setItem(REMINDER_HOUR_KEY, String(hour));
+    // Everything already scheduled is pinned to the old time, so it all has to
+    // be laid down again.
+    syncNotifications(people, events, HOLIDAYS.filter(h => enabledIds.includes(h.id)), nudges);
+  };
 
   const handleToggleNudges = async (val: boolean) => {
     setNudges(val);
@@ -123,8 +146,20 @@ export default function Settings() {
     }
   };
 
-  const userEmail = user?.email || currentUser.email;
-  const userName = user?.user_metadata?.name || (user?.email ? user.email.split('@')[0] : currentUser.name);
+  const userEmail = user?.email ?? '';
+  const userName = user?.user_metadata?.name || (user?.email ? user.email.split('@')[0] : 'You');
+  // Kept on the auth user rather than a table of its own — it's one field and it
+  // travels with the session.
+  const ownAvatarUrl: string | null = user?.user_metadata?.avatar_url ?? null;
+
+  const saveOwnAvatar = async (publicUrl: string) => {
+    setAvatarError(null);
+    const { error } = await supabase.auth.updateUser({ data: { avatar_url: publicUrl } });
+    if (error) {
+      console.error('Could not save avatar', error);
+      setAvatarError('Photo uploaded, but saving it to your profile failed.');
+    }
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -147,15 +182,20 @@ export default function Settings() {
       >
         {/* Profile */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.profile}>
-          <View>
-            <Image source={{ uri: currentUser.avatar }} style={styles.profileAvatar} contentFit="cover" />
-            <View style={styles.editBadge}>
-              <Icon name="edit" size={16} color={colors.primary} />
-            </View>
-          </View>
+          <AvatarPicker
+            uri={ownAvatarUrl}
+            initials={userName.charAt(0).toUpperCase() || undefined}
+            size={96}
+            subjectId="me"
+            onUploaded={saveOwnAvatar}
+            onError={setAvatarError}
+          />
           <Txt variant="headlineLgMobile" color={colors.onSurface} style={{ marginTop: 8, textTransform: 'capitalize' }}>
             {userName}
           </Txt>
+          <View style={{ alignSelf: 'stretch', marginTop: 12 }}>
+            <FormError message={avatarError} />
+          </View>
           <Txt variant="bodyMd" color={colors.onSurfaceVariant}>
             {userEmail}
           </Txt>
@@ -171,6 +211,22 @@ export default function Settings() {
 
         <View style={{ gap: spacing.stackSm }}>
           <SectionTitle>Notifications</SectionTitle>
+
+          {/* Without this, someone can set up a dozen reminders, receive none of
+              them, and never find out why. */}
+          {permission.status === 'denied' && (
+            <Pressable onPress={permission.request} style={styles.permissionWarning}>
+              <Icon name="notifications-off" size={20} color={colors.onErrorContainer} />
+              <View style={{ flex: 1 }}>
+                <Txt variant="labelMd" color={colors.onErrorContainer}>Notifications are turned off</Txt>
+                <Txt variant="labelSm" color={colors.onErrorContainer} style={{ fontWeight: 'normal', marginTop: 2 }}>
+                  Nudges won&apos;t reach you until you allow them. Tap to fix.
+                </Txt>
+              </View>
+              <Icon name="chevron-right" size={20} color={colors.onErrorContainer} />
+            </Pressable>
+          )}
+
           <View style={styles.group}>
             <Row
               icon="notifications-active"
@@ -186,7 +242,14 @@ export default function Settings() {
               value={`${enabledIds.length} on`}
               onPress={() => router.push('/settings/holidays')}
             />
-            <Row icon="schedule" label="Global Reminder Times" last />
+            <Row
+              icon="schedule"
+              label="Reminder Time"
+              sublabel="When nudges arrive each day"
+              value={formatHour(reminderHour)}
+              onPress={() => setHourPickerVisible(true)}
+              last
+            />
           </View>
         </View>
 
@@ -264,6 +327,15 @@ export default function Settings() {
           </Animated.View>
         </Animated.View>
       </Modal>
+
+      <ScrollPickerModal
+        visible={hourPickerVisible}
+        onClose={() => setHourPickerVisible(false)}
+        title="Reminder Time"
+        options={Array.from({ length: 24 }, (_, h) => ({ label: formatHour(h), value: h }))}
+        selectedValue={reminderHour}
+        onSelect={(val) => handlePickHour(val as number)}
+      />
     </View>
   );
 }
@@ -278,6 +350,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   profile: { alignItems: 'center' },
+  permissionWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.errorContainer,
+    borderRadius: radius.lg,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
   profileAvatar: {
     width: 96,
     height: 96,

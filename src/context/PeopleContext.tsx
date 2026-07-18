@@ -15,10 +15,12 @@ type PeopleContextValue = {
   addPerson: (data: {
     name: string;
     role: Relationship;
+    avatarUrl?: string | null;
   }) => Promise<void>;
   updatePerson: (id: string, data: {
     name: string;
     role: Relationship;
+    avatarUrl?: string | null;
   }) => Promise<void>;
   addSpecialDay: (personId: string, data: {
     title: string;
@@ -243,19 +245,19 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
   const addPerson = async (data: {
     name: string;
     role: Relationship;
+    avatarUrl?: string | null;
   }) => {
     if (!user) return;
     setLoading(true);
     try {
-      const { data: personData, error: personError } = await supabase
+      const { error: personError } = await supabase
         .from('people')
         .insert({
           user_id: user.id,
           name: data.name,
           role: data.role,
-        })
-        .select()
-        .single();
+          avatar_url: data.avatarUrl ?? null,
+        });
 
       if (personError) throw personError;
 
@@ -271,16 +273,22 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
   const updatePerson = async (id: string, data: {
     name: string;
     role: Relationship;
+    avatarUrl?: string | null;
   }) => {
     if (!user) return;
     setLoading(true);
     try {
+      const updates: Record<string, unknown> = {
+        name: data.name,
+        role: data.role,
+      };
+      // Left untouched unless the caller actually supplied one, so saving the
+      // name doesn't wipe an existing picture.
+      if (data.avatarUrl !== undefined) updates.avatar_url = data.avatarUrl;
+
       const { error: personError } = await supabase
         .from('people')
-        .update({
-          name: data.name,
-          role: data.role,
-        })
+        .update(updates)
         .eq('id', id);
 
       if (personError) throw personError;

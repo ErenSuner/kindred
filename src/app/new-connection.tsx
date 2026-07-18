@@ -1,3 +1,4 @@
+import { AvatarPicker } from '@/components/AvatarPicker';
 import { Button } from '@/components/Button';
 import { SelectableChip } from '@/components/Chip';
 import { Icon } from '@/components/Icon';
@@ -29,6 +30,9 @@ export default function NewConnection() {
   // Form state
   const [relationship, setRelationship] = useState<Relationship>('Friend');
   const [name, setName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  // The person has no id yet, so uploads are filed under a one-off key.
+  const [draftId] = useState(() => `draft-${Date.now()}`);
 
   // Validation
   const [nameError, setNameError] = useState('');
@@ -54,6 +58,7 @@ export default function NewConnection() {
       await addPerson({
         name: name.trim(),
         role: relationship,
+        avatarUrl,
       });
       router.back();
     } catch (e) {
@@ -87,9 +92,13 @@ export default function NewConnection() {
         >
           {/* Intro */}
           <Animated.View entering={FadeInDown.duration(500)} style={{ alignItems: 'center' }}>
-            <Pressable style={styles.avatarUpload}>
-              <Icon name="add-a-photo" size={30} color={colors.onSurfaceVariant} />
-            </Pressable>
+            <AvatarPicker
+              uri={avatarUrl}
+              initials={name.trim().charAt(0).toUpperCase() || undefined}
+              subjectId={draftId}
+              onUploaded={setAvatarUrl}
+              onError={setNameError}
+            />
             <Txt variant="headlineLgMobile" color={colors.onSurface} style={{ marginTop: 24, textAlign: 'center' }}>
               A New Connection
             </Txt>

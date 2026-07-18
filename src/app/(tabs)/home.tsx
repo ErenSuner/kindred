@@ -10,7 +10,6 @@ import { Chip } from '@/components/Chip';
 import { Card } from '@/components/Card';
 import { NotePreview } from '@/components/NotePreview';
 import { FormError } from '@/components/FormError';
-import { currentUser } from '@/data/mock';
 import type { MyEvent, Person } from '@/data/mock';
 import { usePeople } from '@/context/PeopleContext';
 import { useEvents } from '@/context/EventsContext';
@@ -29,7 +28,7 @@ export default function Home() {
   const { imminent } = useHolidays();
   const { user } = useAuth();
 
-  const userName = user?.email ? user.email.split('@')[0] : currentUser.name;
+  const userName = user?.user_metadata?.name || (user?.email ? user.email.split('@')[0] : 'there');
 
   const activePeople = people.filter(p => p.specialDays && p.specialDays.length > 0);
 

@@ -19,16 +19,32 @@ const MAX_OCCURRENCES_PER_NUDGE = 6;
 const HOLIDAY_OFFSET_DAYS = [7, 1];
 const HOLIDAY_YEARS_AHEAD = 2;
 
+// What time of day nudges arrive. One setting for all of them — per-reminder
+// times would be a lot of picker for very little gain.
+export const REMINDER_HOUR_KEY = '@settings_reminder_hour';
+export const DEFAULT_REMINDER_HOUR = 9;
+
+export async function getReminderHour(): Promise<number> {
+  try {
+    const raw = await AsyncStorage.getItem(REMINDER_HOUR_KEY);
+    if (raw === null) return DEFAULT_REMINDER_HOUR;
+    const hour = Number(raw);
+    return Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : DEFAULT_REMINDER_HOUR;
+  } catch {
+    return DEFAULT_REMINDER_HOUR;
+  }
+}
+
 type PendingNotification = { title: string; body: string; date: Date; id: string };
 
 // Nudges fire relative to an occurrence: a preset is N days before it, a custom
 // nudge is an absolute date and ignores the cycle entirely.
-function notificationDatesFor(anchorDate: string, recurrence: Recurrence, nudge: Nudge): Date[] {
+function notificationDatesFor(anchorDate: string, recurrence: Recurrence, nudge: Nudge, hour: number): Date[] {
   const now = new Date();
 
   if (nudge.type === 'custom') {
     const [y, m, d] = nudge.value.split('-').map(Number);
-    const at = new Date(y, m - 1, d, 9, 0, 0, 0); // 9:00 AM
+    const at = new Date(y, m - 1, d, hour, 0, 0, 0);
     return at.getTime() > now.getTime() ? [at] : [];
   }
 
@@ -36,14 +52,14 @@ function notificationDatesFor(anchorDate: string, recurrence: Recurrence, nudge:
 
   return getUpcomingOccurrences(anchorDate, recurrence, MAX_OCCURRENCES_PER_NUDGE)
     .map((occurrence) => {
-      const at = new Date(occurrence.getFullYear(), occurrence.getMonth(), occurrence.getDate(), 9, 0, 0, 0);
+      const at = new Date(occurrence.getFullYear(), occurrence.getMonth(), occurrence.getDate(), hour, 0, 0, 0);
       at.setDate(at.getDate() - offsetDays);
       return at;
     })
     .filter((at) => at.getTime() > now.getTime());
 }
 
-function collectPeopleNotifications(people: Person[]): PendingNotification[] {
+function collectPeopleNotifications(people: Person[], hour: number): PendingNotification[] {
   const pending: PendingNotification[] = [];
 
   for (const person of people) {
@@ -57,7 +73,7 @@ function collectPeopleNotifications(people: Person[]): PendingNotification[] {
       const turningStr = isBirthday && sd.turningAge ? ` (turning ${sd.turningAge})` : '';
 
       for (const nudge of parseNudges(sd.nudges)) {
-        const dates = notificationDatesFor(dateStr, sd.recurrence ?? YEARLY, nudge);
+        const dates = notificationDatesFor(dateStr, sd.recurrence ?? YEARLY, nudge, hour);
         dates.forEach((date, i) => {
           let body: string;
           if (isBirthday) {
@@ -86,12 +102,12 @@ function collectPeopleNotifications(people: Person[]): PendingNotification[] {
   return pending;
 }
 
-function collectMyEventNotifications(myEvents: MyEvent[]): PendingNotification[] {
+function collectMyEventNotifications(myEvents: MyEvent[], hour: number): PendingNotification[] {
   const pending: PendingNotification[] = [];
 
   for (const event of myEvents) {
     for (const nudge of parseNudges(event.nudges)) {
-      const dates = notificationDatesFor(event.originalDate, event.recurrence, nudge);
+      const dates = notificationDatesFor(event.originalDate, event.recurrence, nudge, hour);
       dates.forEach((date, i) => {
         let body = `${event.title} is on ${event.date}.`;
         if (nudge.value === 'day_of') body = `${event.title} is today!`;
@@ -109,14 +125,14 @@ function collectMyEventNotifications(myEvents: MyEvent[]): PendingNotification[]
   return pending;
 }
 
-function collectHolidayNotifications(holidays: Holiday[]): PendingNotification[] {
+function collectHolidayNotifications(holidays: Holiday[], hour: number): PendingNotification[] {
   const pending: PendingNotification[] = [];
   const now = new Date();
 
   for (const holiday of holidays) {
     for (const date of nextHolidayDates(holiday.rule, HOLIDAY_YEARS_AHEAD)) {
       for (const offset of HOLIDAY_OFFSET_DAYS) {
-        const at = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 9, 0, 0, 0);
+        const at = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, 0, 0, 0);
         at.setDate(at.getDate() - offset);
         if (at.getTime() <= now.getTime()) continue;
 
@@ -166,11 +182,13 @@ export async function syncNotifications(
     return;
   }
 
+  const hour = await getReminderHour();
+
   // 2. Gather all reminders
   const upcomingNotifications = [
-    ...collectPeopleNotifications(people),
-    ...collectMyEventNotifications(myEvents),
-    ...collectHolidayNotifications(holidays),
+    ...collectPeopleNotifications(people, hour),
+    ...collectMyEventNotifications(myEvents, hour),
+    ...collectHolidayNotifications(holidays, hour),
   ];
 
   // 3. Sort by closest date

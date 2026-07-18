@@ -1,3 +1,4 @@
+import { AvatarPicker } from '@/components/AvatarPicker';
 import { Button } from '@/components/Button';
 import { SelectableChip } from '@/components/Chip';
 import { Icon } from '@/components/Icon';
@@ -32,6 +33,7 @@ export default function EditConnection() {
   // Form state
   const [relationship, setRelationship] = useState<Relationship>('Friend');
   const [name, setName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   // Validation
   const [nameError, setNameError] = useState('');
@@ -41,6 +43,7 @@ export default function EditConnection() {
     if (person) {
       setName(person.name);
       setRelationship(person.role as Relationship);
+      setAvatarUrl(person.avatar ?? null);
     }
   }, [person]);
 
@@ -66,6 +69,7 @@ export default function EditConnection() {
       await updatePerson(id ?? '', {
         name: trimmedName,
         role: relationship,
+        avatarUrl,
       });
 
       router.back();
@@ -99,9 +103,13 @@ export default function EditConnection() {
         >
           {/* Intro */}
           <Animated.View entering={FadeInDown.duration(500)} style={{ alignItems: 'center' }}>
-            <Pressable style={styles.avatarUpload}>
-              <Icon name="add-a-photo" size={30} color={colors.onSurfaceVariant} />
-            </Pressable>
+            <AvatarPicker
+              uri={avatarUrl}
+              initials={name.trim().charAt(0).toUpperCase() || undefined}
+              subjectId={id ?? 'person'}
+              onUploaded={setAvatarUrl}
+              onError={setNameError}
+            />
             <Txt variant="headlineLgMobile" color={colors.onSurface} style={{ marginTop: 24, textAlign: 'center' }}>
               Edit Connection
             </Txt>
