@@ -1,15 +1,18 @@
-import { useState } from 'react';
-import { View, ScrollView, StyleSheet, Pressable, Modal } from 'react-native';
+import { useMemo, useState } from 'react';
+import { View, ScrollView, StyleSheet, Pressable, Modal, Keyboard } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeIn, FadeOut } from 'react-native-reanimated';
 import { colors, spacing, radius, softShadow, ambientShadow } from '@/theme/tokens';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Avatar } from '@/components/Avatar';
 import { Chip } from '@/components/Chip';
 import { Button } from '@/components/Button';
+import { SearchBar } from '@/components/SearchBar';
+import { NotePreview } from '@/components/NotePreview';
 import { usePeople } from '@/context/PeopleContext';
+import { searchPeople } from '@/utils/search';
 import type { Person } from '@/data/mock';
 
 export default function Connections() {
@@ -20,6 +23,10 @@ export default function Connections() {
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+
+  const [query, setQuery] = useState('');
+  const searching = query.trim().length > 0;
+  const hits = useMemo(() => (searching ? searchPeople(people, query) : []), [people, query, searching]);
 
   const handleLongPress = (person: Person) => {
     setSelectedPerson(person);
@@ -60,6 +67,8 @@ export default function Connections() {
           gap: spacing.stackMd,
         }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         {/* Subtitle & Add Button */}
         <Animated.View entering={FadeInDown.duration(500)} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -88,8 +97,106 @@ export default function Connections() {
           </Pressable>
         </Animated.View>
 
+        {/* Search — hidden until there's something to search through */}
+        {people.length > 0 && (
+          <SearchBar value={query} onChange={setQuery} placeholder="Search people, days, notes" />
+        )}
+
+        {/* Search results replace the list while a query is active */}
+        {searching && (
+          <Animated.View entering={FadeIn.duration(200)} style={{ gap: spacing.stackMd }}>
+            <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+              {hits.length === 0
+                ? 'NO MATCHES'
+                : `${hits.length} ${hits.length === 1 ? 'RESULT' : 'RESULTS'}`}
+            </Txt>
+
+            {hits.length === 0 ? (
+              <View style={styles.noResults}>
+                <Icon name="search-off" size={32} color={colors.outlineVariant} />
+                <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 12, textAlign: 'center' }}>
+                  Nothing matches &ldquo;{query.trim()}&rdquo;.
+                </Txt>
+                <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ marginTop: 6, textAlign: 'center', fontWeight: 'normal', opacity: 0.8 }}>
+                  Try a name, an occasion, or something you wrote in a note.
+                </Txt>
+              </View>
+            ) : (
+              hits.map((hit) => {
+                if (hit.kind === 'person') {
+                  return (
+                    <Pressable
+                      key={`person-${hit.id}`}
+                      onPress={() => { Keyboard.dismiss(); router.push(`/person/${hit.id}`); }}
+                      onLongPress={() => handleLongPress(hit.person)}
+                      style={({ pressed }) => [styles.personCard, pressed && { transform: [{ scale: 0.98 }], shadowOpacity: 0.04 }]}
+                    >
+                      <View style={styles.personLeft}>
+                        <Avatar uri={hit.person.avatar} initials={hit.person.initials} size={52} />
+                        <View style={{ flex: 1, gap: 4 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Txt variant="bodyLg" color={colors.onSurface} style={{ fontFamily: 'Inter_500Medium' }}>
+                              {hit.person.name}
+                            </Txt>
+                            {hit.person.isPinned && <Icon name="push-pin" size={16} color={colors.primary} />}
+                          </View>
+                          <Chip label={hit.person.eventTag} tone="secondary" role={hit.person.eventTag} />
+                        </View>
+                      </View>
+                      <Icon name="chevron-right" size={22} color={colors.onSurfaceVariant} style={{ opacity: 0.5 }} />
+                    </Pressable>
+                  );
+                }
+
+                const { day, person } = hit;
+                return (
+                  <Pressable
+                    key={`day-${hit.id}`}
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      if (day.isBirthday) {
+                        router.push({ pathname: '/birthday/edit/[personId]', params: { personId: person.id } } as any);
+                      } else {
+                        router.push({ pathname: '/special-day/edit/[dayId]', params: { dayId: day.id, personId: person.id } } as any);
+                      }
+                    }}
+                    style={({ pressed }) => [styles.dayCard, pressed && { transform: [{ scale: 0.98 }], shadowOpacity: 0.04 }]}
+                  >
+                    <View style={styles.dayIcon}>
+                      <Icon name={day.icon as any} size={20} color={colors.onPrimaryContainer} />
+                    </View>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Txt variant="bodyMd" color={colors.onSurface} style={{ fontFamily: 'Inter_500Medium' }}>
+                        {day.title}
+                      </Txt>
+                      <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontWeight: 'normal' }}>
+                        {person.name} · {day.date}
+                      </Txt>
+                      {hit.matchedOn === 'note' && day.notes && day.notes.length > 0 && (
+                        <View style={{ marginTop: 4 }}>
+                          <NotePreview notes={day.notes} lines={1} compact />
+                        </View>
+                      )}
+                    </View>
+                    {typeof day.daysAway === 'number' && (
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Txt variant="bodyLg" color={colors.primary} style={{ fontFamily: 'Inter_500Medium' }}>
+                          {day.daysAway === 0 ? 'Today!' : day.daysAway}
+                        </Txt>
+                        {day.daysAway !== 0 && (
+                          <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontWeight: 'normal' }}>days</Txt>
+                        )}
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })
+            )}
+          </Animated.View>
+        )}
+
         {/* Empty state */}
-        {people.length === 0 && (
+        {!searching && people.length === 0 && (
           <Animated.View entering={FadeInDown.duration(500).delay(100)} style={styles.emptyState}>
             <Icon name="people" size={48} color={colors.outlineVariant} />
             <Txt variant="headlineMd" color={colors.onSurface} style={{ marginTop: 16, textAlign: 'center' }}>
@@ -102,7 +209,7 @@ export default function Connections() {
         )}
 
         {/* People list */}
-        {people.map((person, index) => (
+        {!searching && people.map((person, index) => (
           <Animated.View
             key={person.id}
             entering={FadeInDown.duration(400).delay(100 + index * 60)}
@@ -240,6 +347,28 @@ const styles = StyleSheet.create({
   personRight: {
     alignItems: 'flex-end',
     minWidth: 40,
+  },
+  dayCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: radius.lg,
+    padding: 16,
+    ...softShadow,
+  },
+  dayIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primaryFixed,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noResults: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.stackXl,
   },
   addBtn: {
     flexDirection: 'row',
