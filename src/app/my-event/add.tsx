@@ -7,15 +7,13 @@ import { colors, spacing, radius, softShadow } from '@/theme/tokens';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
-import { ScrollPickerModal } from '@/components/ScrollPickerModal';
+import { DateFields, DateValue } from '@/components/DateFields';
+import { FormError } from '@/components/FormError';
 import { RecurrencePicker } from '@/components/RecurrencePicker';
 import { ReminderEditor } from '@/components/ReminderEditor';
 import { useEvents } from '@/context/EventsContext';
 import { Nudge, serializeNudges } from '@/utils/nudges';
 import { Recurrence, YEARLY } from '@/utils/recurrence';
-
-const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const MONTHS_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 const SUGGESTIONS = ['Dentist', 'Rent Due', 'Renew Passport', 'Gym Renewal', 'Car Service'];
 
@@ -34,11 +32,8 @@ export default function AddMyEvent() {
 
   const [title, setTitle] = useState('');
   const [recurrence, setRecurrence] = useState<Recurrence>(YEARLY);
-  const [day, setDay] = useState<number | null>(null);
-  const [month, setMonth] = useState<number | null>(null);
-  const [year, setYear] = useState<number | null>(null);
-  const [pickerVisible, setPickerVisible] = useState(false);
-  const [pickerType, setPickerType] = useState<'day' | 'month' | 'year'>('day');
+  const [date, setDate] = useState<DateValue>({ day: null, month: null, year: null });
+  const { day, month, year } = date;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,12 +51,6 @@ export default function AddMyEvent() {
     const y = hasYear ? (year as number) : new Date().getFullYear();
     return new Date(y, month - 1, day);
   };
-
-  const currentYear = new Date().getFullYear();
-  const yearOptions = [
-    { label: 'Skip Year', value: 1000 },
-    ...Array.from({ length: 6 }, (_, i) => ({ label: String(currentYear + i), value: currentYear + i })),
-  ];
 
   const handleSubmit = async () => {
     setError(null);
@@ -152,19 +141,7 @@ export default function AddMyEvent() {
                   {needsYear ? '(Year required)' : '(Year optional)'}
                 </Txt>
               </FieldLabel>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <Pressable onPress={() => { setPickerType('day'); setPickerVisible(true); }} style={[styles.input, styles.inputCenter, { flex: 1 }]}>
-                  <Txt variant="bodyMd" color={day ? colors.onSurface : colors.outline}>{day || 'Day'}</Txt>
-                </Pressable>
-                <Pressable onPress={() => { setPickerType('month'); setPickerVisible(true); }} style={[styles.input, styles.inputCenter, { flex: 1.5 }]}>
-                  <Txt variant="bodyMd" color={month ? colors.onSurface : colors.outline}>
-                    {month ? MONTHS_SHORT[month - 1] : 'Month'}
-                  </Txt>
-                </Pressable>
-                <Pressable onPress={() => { setPickerType('year'); setPickerVisible(true); }} style={[styles.input, styles.inputCenter, { flex: 1.2 }]}>
-                  <Txt variant="bodyMd" color={hasYear ? colors.onSurface : colors.outline}>{hasYear ? year : 'Year'}</Txt>
-                </Pressable>
-              </View>
+              <DateFields value={date} onChange={setDate} yearMode="future" allowSkipYear={!needsYear} />
             </View>
 
             <RecurrencePicker value={recurrence} onChange={setRecurrence} />
@@ -172,12 +149,7 @@ export default function AddMyEvent() {
             <ReminderEditor reminders={reminders} onChange={setReminders} eventDate={eventDate()} />
           </Animated.View>
 
-          {error && (
-            <Animated.View entering={FadeInDown.duration(200)} style={styles.errorRow}>
-              <Icon name="error-outline" size={16} color={colors.error} />
-              <Txt variant="labelSm" color={colors.error} style={{ flex: 1 }}>{error}</Txt>
-            </Animated.View>
-          )}
+          <FormError message={error} />
 
           <Animated.View entering={FadeInDown.duration(500).delay(200)} style={{ alignItems: 'center' }}>
             <Button label={saving ? 'Saving…' : 'Save Reminder'} icon="check" onPress={handleSubmit} disabled={saving} />
@@ -185,29 +157,6 @@ export default function AddMyEvent() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <ScrollPickerModal
-        visible={pickerVisible}
-        onClose={() => setPickerVisible(false)}
-        title={pickerType === 'day' ? 'Select Day' : pickerType === 'month' ? 'Select Month' : 'Select Year'}
-        options={
-          pickerType === 'day'
-            ? Array.from({ length: 31 }, (_, i) => ({ label: String(i + 1), value: i + 1 }))
-            : pickerType === 'month'
-            ? MONTHS_FULL.map((m, i) => ({ label: m, value: i + 1 }))
-            : yearOptions
-        }
-        selectedValue={
-          pickerType === 'day' ? day || undefined
-          : pickerType === 'month' ? month || undefined
-          : year || undefined
-        }
-        onSelect={(val) => {
-          if (pickerType === 'day') setDay(val as number);
-          else if (pickerType === 'month') setMonth(val as number);
-          else setYear(val as number);
-          setPickerVisible(false);
-        }}
-      />
     </View>
   );
 }

@@ -6,15 +6,12 @@ import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
 import { FormError } from '@/components/FormError';
-import { ScrollPickerModal } from '@/components/ScrollPickerModal';
+import { DateFields, DateValue } from '@/components/DateFields';
 import { ReminderEditor } from '@/components/ReminderEditor';
 import { usePeople } from '@/context/PeopleContext';
 import { Nudge, parseNudges, serializeNudges } from '@/utils/nudges';
 import { SKIPPED_YEAR } from '@/utils/dates';
 import type { Person } from '@/data/mock';
-
-const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const MONTHS_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -37,11 +34,8 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [day, setDay] = useState<number | null>(null);
-  const [month, setMonth] = useState<number | null>(null);
-  const [year, setYear] = useState<number | null>(null);
-  const [pickerVisible, setPickerVisible] = useState(false);
-  const [pickerType, setPickerType] = useState<'day' | 'month' | 'year'>('day');
+  const [date, setDate] = useState<DateValue>({ day: null, month: null, year: null });
+  const { day, month, year } = date;
 
   const [reminders, setReminders] = useState<Nudge[]>([]);
 
@@ -54,12 +48,12 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
 
     const parts = (birthday.date || '').split('-');
     if (parts.length === 3) {
-      const y = parseInt(parts[0], 10);
-      const m = parseInt(parts[1], 10);
-      const d = parseInt(parts[2], 10);
-      if (y !== SKIPPED_YEAR && !isNaN(y)) setYear(y);
-      if (!isNaN(m)) setMonth(m);
-      if (!isNaN(d)) setDay(d);
+      const [y, m, d] = parts.map((x) => parseInt(x, 10));
+      setDate({
+        year: !isNaN(y) && y !== SKIPPED_YEAR ? y : null,
+        month: !isNaN(m) ? m : null,
+        day: !isNaN(d) ? d : null,
+      });
     }
 
     setReminders(parseNudges(birthday.nudges));
@@ -165,19 +159,7 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
                   (Year optional)
                 </Txt>
               </FieldLabel>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <Pressable onPress={() => { setPickerType('day'); setPickerVisible(true); }} style={[styles.input, styles.inputCenter, { flex: 1 }]}>
-                  <Txt variant="bodyMd" color={day ? colors.onSurface : colors.outline}>{day || 'Day'}</Txt>
-                </Pressable>
-                <Pressable onPress={() => { setPickerType('month'); setPickerVisible(true); }} style={[styles.input, styles.inputCenter, { flex: 1.5 }]}>
-                  <Txt variant="bodyMd" color={month ? colors.onSurface : colors.outline}>
-                    {month ? MONTHS_SHORT[month - 1] : 'Month'}
-                  </Txt>
-                </Pressable>
-                <Pressable onPress={() => { setPickerType('year'); setPickerVisible(true); }} style={[styles.input, styles.inputCenter, { flex: 1.2 }]}>
-                  <Txt variant="bodyMd" color={hasYear ? colors.onSurface : colors.outline}>{hasYear ? year : 'Year'}</Txt>
-                </Pressable>
-              </View>
+              <DateFields value={date} onChange={setDate} yearMode="past" />
             </View>
 
             <ReminderEditor reminders={reminders} onChange={setReminders} eventDate={eventDate()} />
@@ -195,35 +177,6 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
         </Animated.View>
       )}
 
-      <ScrollPickerModal
-        visible={pickerVisible}
-        onClose={() => setPickerVisible(false)}
-        title={pickerType === 'day' ? 'Select Day' : pickerType === 'month' ? 'Select Month' : 'Select Year'}
-        options={
-          pickerType === 'day'
-            ? Array.from({ length: 31 }, (_, i) => ({ label: String(i + 1), value: i + 1 }))
-            : pickerType === 'month'
-            ? MONTHS_FULL.map((m, i) => ({ label: m, value: i + 1 }))
-            : [
-                { label: 'Skip Year', value: SKIPPED_YEAR },
-                ...Array.from({ length: 101 }, (_, i) => ({
-                  label: String(new Date().getFullYear() - i),
-                  value: new Date().getFullYear() - i,
-                })),
-              ]
-        }
-        selectedValue={
-          pickerType === 'day' ? day || undefined
-          : pickerType === 'month' ? month || undefined
-          : year || undefined
-        }
-        onSelect={(val) => {
-          if (pickerType === 'day') setDay(val as number);
-          else if (pickerType === 'month') setMonth(val as number);
-          else setYear(val as number);
-          setPickerVisible(false);
-        }}
-      />
     </Animated.View>
   );
 }

@@ -47,43 +47,34 @@ function collectPeopleNotifications(people: Person[]): PendingNotification[] {
   const pending: PendingNotification[] = [];
 
   for (const person of people) {
-    // Birthday — always yearly.
-    if (person.birthday) {
-      const bdSpecialDay = person.specialDays?.find((d) => d.isBirthday);
-      const turningStr = bdSpecialDay?.turningAge ? ` (turning ${bdSpecialDay.turningAge})` : '';
-      const displayDate = bdSpecialDay?.date ?? person.birthday.date;
-
-      for (const nudge of parseNudges(person.birthday.nudges)) {
-        const dates = notificationDatesFor(person.birthday.date, YEARLY, nudge);
-        dates.forEach((date, i) => {
-          let body = `${person.name}'s birthday${turningStr} is on ${displayDate}.`;
-          if (nudge.value === 'day_of') body = `It's ${person.name}'s birthday today!${turningStr}`;
-
-          pending.push({
-            id: `bd_${person.id}_${nudge.value}_${i}`,
-            title: `Birthday Reminder: ${person.name}`,
-            body,
-            date,
-          });
-        });
-      }
-    }
-
-    // Special days
+    // Birthdays are special days now, so one loop covers everything. Only the
+    // wording differs — a birthday gets the age, and its own notification title.
     for (const sd of person.specialDays ?? []) {
-      if (sd.isBirthday) continue; // handled above
       const dateStr = sd.originalDate;
       if (!dateStr) continue;
+
+      const isBirthday = sd.isBirthday === true;
+      const turningStr = isBirthday && sd.turningAge ? ` (turning ${sd.turningAge})` : '';
 
       for (const nudge of parseNudges(sd.nudges)) {
         const dates = notificationDatesFor(dateStr, sd.recurrence ?? YEARLY, nudge);
         dates.forEach((date, i) => {
-          let body = `${person.name}'s ${sd.title} is on ${sd.date}.`;
-          if (nudge.value === 'day_of') body = `It's ${person.name}'s ${sd.title} today!`;
+          let body: string;
+          if (isBirthday) {
+            body =
+              nudge.value === 'day_of'
+                ? `It's ${person.name}'s birthday today!${turningStr}`
+                : `${person.name}'s birthday${turningStr} is on ${sd.date}.`;
+          } else {
+            body =
+              nudge.value === 'day_of'
+                ? `It's ${person.name}'s ${sd.title} today!`
+                : `${person.name}'s ${sd.title} is on ${sd.date}.`;
+          }
 
           pending.push({
             id: `sd_${sd.id}_${nudge.value}_${i}`,
-            title: `Special Day: ${person.name}`,
+            title: isBirthday ? `Birthday Reminder: ${person.name}` : `Special Day: ${person.name}`,
             body,
             date,
           });

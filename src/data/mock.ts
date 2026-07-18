@@ -26,9 +26,8 @@ export type Note = {
   when: string;
   body: string;
   // Set when the note belongs to one occasion rather than to the person as a
-  // whole. At most one of these is ever populated.
+  // whole. Birthdays are special days, so they use this too.
   specialDayId?: string;
-  birthdayId?: string;
 };
 
 // An event the user keeps for themselves — no person attached.

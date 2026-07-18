@@ -38,6 +38,7 @@ export type Database = {
           nudges: string[];
           repeat_unit: string;
           repeat_interval: number;
+          is_birthday: boolean;
           created_at: string;
         };
         Insert: {
@@ -50,6 +51,7 @@ export type Database = {
           nudges?: string[];
           repeat_unit?: string;
           repeat_interval?: number;
+          is_birthday?: boolean;
           created_at?: string;
         };
         Update: {
@@ -62,29 +64,7 @@ export type Database = {
           nudges?: string[];
           repeat_unit?: string;
           repeat_interval?: number;
-          created_at?: string;
-        };
-      };
-      birthdays: {
-        Row: {
-          id: string;
-          person_id: string;
-          date: string;
-          nudges: string[];
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          person_id: string;
-          date: string;
-          nudges?: string[];
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          person_id?: string;
-          date?: string;
-          nudges?: string[];
+          is_birthday?: boolean;
           created_at?: string;
         };
       };
@@ -131,7 +111,6 @@ export type Database = {
           id: string;
           person_id: string;
           special_day_id: string | null;
-          birthday_id: string | null;
           kind: string;
           body: string;
           created_at: string;
@@ -140,7 +119,6 @@ export type Database = {
           id?: string;
           person_id: string;
           special_day_id?: string | null;
-          birthday_id?: string | null;
           kind: string;
           body: string;
           created_at?: string;
@@ -149,7 +127,6 @@ export type Database = {
           id?: string;
           person_id?: string;
           special_day_id?: string | null;
-          birthday_id?: string | null;
           kind?: string;
           body?: string;
           created_at?: string;

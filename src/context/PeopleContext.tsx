@@ -55,10 +55,8 @@ type PeopleContextValue = {
 const PeopleContext = createContext<PeopleContextValue | null>(null);
 
 // Which occasion a note hangs off, if any. Omitting it writes a general note
-// about the person.
-export type NoteTarget =
-  | { specialDayId: string }
-  | { birthdayId: string };
+// about the person. Birthdays are special days now, so they use the same target.
+export type NoteTarget = { specialDayId: string };
 
 // A note supplied alongside the occasion it belongs to, before that occasion
 // has an id of its own.
@@ -66,49 +64,36 @@ export type NoteDraft = { kind: string; body: string };
 
 
 export function mapDbPersonToPerson(dbPerson: any): Person {
+  // Birthdays live in special_days alongside everything else, flagged by
+  // is_birthday. A birthday is yearly by definition, so its stored recurrence is
+  // ignored in favour of YEARLY — nothing in the UI lets you change it.
   const specialDays: any[] = (dbPerson.special_days || []).map((sd: any) => {
-    const recurrence = parseRecurrence(sd);
+    const isBirthday = sd.is_birthday === true;
+    const recurrence = isBirthday ? YEARLY : parseRecurrence(sd);
     const { formattedDate, daysAway, turningAge } = getNextOccurrence(sd.date, recurrence);
     return {
       id: sd.id,
-      title: sd.title,
+      title: isBirthday ? 'Birthday' : sd.title,
       date: formattedDate,
-      icon: sd.icon || 'event',
-      accent: sd.accent || 'primary',
+      icon: isBirthday ? 'cake' : sd.icon || 'event',
+      accent: isBirthday ? 'tertiary' : sd.accent || 'primary',
       originalDate: sd.date,
       daysAway,
       turningAge,
       nudges: sd.nudges || [],
       recurrence,
-      isExpired: recurrence.unit === 'none' && daysAway < 0,
+      isBirthday,
+      // A birthday never expires; only a one-off date can.
+      isExpired: !isBirthday && recurrence.unit === 'none' && daysAway < 0,
     };
   });
 
-  let birthday: any = undefined;
-  if (dbPerson.birthdays) {
-    const bd = Array.isArray(dbPerson.birthdays) ? dbPerson.birthdays[0] : dbPerson.birthdays;
-    if (bd) {
-    // A birthday is yearly by definition — it has no recurrence picker.
-    const { formattedDate, daysAway, turningAge } = getNextOccurrence(bd.date, YEARLY);
-    birthday = {
-      id: bd.id,
-      date: bd.date,
-      nudges: bd.nudges || [],
-    };
-    specialDays.push({
-      id: bd.id,
-      title: 'Birthday',
-      date: formattedDate,
-      icon: 'cake',
-      accent: 'tertiary',
-      originalDate: bd.date,
-      daysAway,
-      turningAge,
-      recurrence: YEARLY,
-      isBirthday: true,
-    });
-    }
-  }
+  // Screens still reach for `person.birthday`, so keep it as a view onto the
+  // birthday row rather than a separate record.
+  const birthdayDay = specialDays.find((d) => d.isBirthday);
+  const birthday = birthdayDay
+    ? { id: birthdayDay.id, date: birthdayDay.originalDate, nudges: birthdayDay.nudges }
+    : undefined;
 
   const notes: Note[] = (dbPerson.notes || [])
     .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -200,9 +185,8 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
           role,
           avatar_url,
           is_pinned,
-          special_days (id, title, date, icon, accent, nudges, repeat_unit, repeat_interval),
-          birthdays (id, date, nudges),
-          notes (id, kind, body, created_at, special_day_id, birthday_id)
+          special_days (id, title, date, icon, accent, nudges, repeat_unit, repeat_interval, is_birthday),
+          notes (id, kind, body, created_at, special_day_id)
         `);
 
       if (error) throw error;
@@ -399,15 +383,23 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // A birthday is a special day with its title, icon and cycle fixed. The
+  // one-per-person rule is enforced by a partial unique index on the table.
   const addBirthday = async (personId: string, data: { date: string; nudges?: string[]; notes?: NoteDraft[] }) => {
     if (!user) return;
     try {
       const { data: inserted, error } = await supabase
-        .from('birthdays')
+        .from('special_days')
         .insert({
           person_id: personId,
+          title: 'Birthday',
           date: data.date,
           nudges: data.nudges || [],
+          icon: 'cake',
+          accent: 'tertiary',
+          repeat_unit: 'year',
+          repeat_interval: 1,
+          is_birthday: true,
         })
         .select('id')
         .single();
@@ -417,7 +409,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
         const { error: notesError } = await supabase.from('notes').insert(
           data.notes.map((n) => ({
             person_id: personId,
-            birthday_id: inserted.id,
+            special_day_id: inserted.id,
             kind: n.kind,
             body: n.body,
           })),
@@ -436,7 +428,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     try {
       const { error } = await supabase
-        .from('birthdays')
+        .from('special_days')
         .update(data)
         .eq('id', birthdayId);
       if (error) throw error;
@@ -451,7 +443,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     try {
       const { error } = await supabase
-        .from('birthdays')
+        .from('special_days')
         .delete()
         .eq('id', birthdayId);
       if (error) throw error;
@@ -471,8 +463,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
           person_id: personId,
           kind,
           body,
-          special_day_id: target && 'specialDayId' in target ? target.specialDayId : null,
-          birthday_id: target && 'birthdayId' in target ? target.birthdayId : null,
+          special_day_id: target?.specialDayId ?? null,
         });
       if (error) throw error;
       await refreshPeople();
@@ -543,8 +534,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
         const { error } = await supabase.from('notes').insert(
           toInsert.map((n) => ({
             person_id: personId,
-            special_day_id: 'specialDayId' in target ? target.specialDayId : null,
-            birthday_id: 'birthdayId' in target ? target.birthdayId : null,
+            special_day_id: target.specialDayId,
             kind: n.kind,
             body: n.body,
           })),

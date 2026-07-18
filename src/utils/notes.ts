@@ -19,14 +19,13 @@ export function mapDbNote(row: any, now?: number): Note {
     when: relativeWhen(row.created_at, now),
     body: row.body,
     specialDayId: row.special_day_id || undefined,
-    birthdayId: row.birthday_id || undefined,
   };
 }
 
-type DayLike = { id: string; isBirthday?: boolean };
+type DayLike = { id: string };
 
 // Splits notes between the occasions they belong to and the person as a whole.
-// A note written before notes could target an occasion has neither id set, so it
+// A note written before notes could target an occasion has no target set, so it
 // falls through to the general bucket rather than disappearing.
 export function distributeNotes<T extends DayLike>(notes: Note[], days: T[]): {
   byDay: Map<string, Note[]>;
@@ -35,10 +34,7 @@ export function distributeNotes<T extends DayLike>(notes: Note[], days: T[]): {
   const byDay = new Map<string, Note[]>();
 
   for (const day of days) {
-    byDay.set(
-      day.id,
-      notes.filter((n) => (day.isBirthday ? n.birthdayId === day.id : n.specialDayId === day.id)),
-    );
+    byDay.set(day.id, notes.filter((n) => n.specialDayId === day.id));
   }
 
   // Anything pointing at an occasion that no longer exists would otherwise be
