@@ -129,7 +129,7 @@ export default function AddSpecialDay() {
                     (Year optional)
                   </Txt>
                 </FieldLabel>
-                <DateFields value={date} onChange={setDate} yearMode="past" />
+                <DateFields value={date} onChange={setDate} yearMode="future" />
               </View>
             </View>
 

@@ -26,7 +26,7 @@ export type InlineBirthdayCardProps = {
 };
 
 export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
-  const { addBirthday, updateBirthday } = usePeople();
+  const { addBirthday, updateBirthday, deleteSpecialDayWithUndo } = usePeople();
   const birthday = person.birthday;
   const bdayEvent = person.specialDays?.find((d: any) => d.isBirthday);
 
@@ -93,6 +93,19 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Clearing a birthday goes through the same staged deletion as any other day,
+  // so it lands in the undo snackbar rather than vanishing for good.
+  const handleClear = () => {
+    if (!birthday) return;
+    setIsExpanded(false);
+    // The form is filled once per birthday id; letting it re-hydrate means a new
+    // birthday added after this one starts from a clean slate.
+    hydratedFor.current = null;
+    setDate({ day: null, month: null, year: null });
+    setReminders([]);
+    deleteSpecialDayWithUndo(birthday.id, 'Birthday');
   };
 
   return (
@@ -173,6 +186,18 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
               disabled={isSaving}
               style={{ marginTop: 8 }}
             />
+
+            {/* Only offered once there is one to clear. */}
+            {birthday && (
+              <Pressable
+                onPress={handleClear}
+                disabled={isSaving}
+                style={({ pressed }) => [styles.clearBtn, pressed && { opacity: 0.7 }]}
+              >
+                <Icon name="delete-outline" size={16} color={colors.error} />
+                <Txt variant="labelMd" color={colors.error}>Clear birthday</Txt>
+              </Pressable>
+            )}
           </View>
         </Animated.View>
       )}
@@ -219,6 +244,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   fieldLabel: { letterSpacing: 1, marginLeft: 2 },
+  clearBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+  },
   input: {
     backgroundColor: 'rgba(228,226,225,0.4)',
     borderRadius: radius.DEFAULT,

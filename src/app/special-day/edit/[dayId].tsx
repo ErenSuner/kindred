@@ -43,7 +43,6 @@ export default function EditSpecialDay() {
   const { day, month, year } = date;
 
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -176,7 +175,7 @@ export default function EditSpecialDay() {
                     (Year optional)
                   </Txt>
                 </FieldLabel>
-                <DateFields value={date} onChange={setDate} yearMode="past" />
+                <DateFields value={date} onChange={setDate} yearMode="future" />
               </View>
             </View>
 
@@ -213,8 +212,8 @@ export default function EditSpecialDay() {
               This removes the day and any notes kept with it. You&apos;ll have a moment to undo it.
             </Txt>
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, width: '100%' }}>
-              <Button label="Cancel" onPress={() => setDeleteConfirmVisible(false)} variant="tonal" style={{ flex: 1 }} disabled={isDeleting} />
-              <Button label="Delete" onPress={executeDelete} style={{ flex: 1, backgroundColor: colors.error }} disabled={isDeleting} />
+              <Button label="Cancel" onPress={() => setDeleteConfirmVisible(false)} variant="tonal" style={{ flex: 1 }} />
+              <Button label="Delete" onPress={executeDelete} style={{ flex: 1, backgroundColor: colors.error }} />
             </View>
           </Animated.View>
         </View>

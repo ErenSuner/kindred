@@ -8,6 +8,7 @@ import { Recurrence, YEARLY, parseRecurrence, serializeRecurrence } from '@/util
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { useUndo } from './UndoContext';
+import { deriveUpcoming } from '@/utils/upcoming';
 
 type PeopleContextValue = {
   people: Person[];
@@ -124,39 +125,6 @@ export function mapDbPersonToPerson(dbPerson: any): Person {
     day.memories = mine.filter((n) => n.occurredOn);
   }
 
-  // Calculate upcoming event properties
-  let eventTitle = 'No upcoming events';
-  let eventTag = dbPerson.role as Relationship;
-  let daysAway = 9999;
-  let eventDate = 'No date set';
-  let countdown: Person['countdown'] = undefined;
-
-  if (specialDays.length > 0) {
-    const sortedDays = [...specialDays].sort((a: any, b: any) => {
-      const aDays = a.daysAway ?? 9999;
-      const bDays = b.daysAway ?? 9999;
-      return aDays - bDays;
-    });
-    const upcoming = sortedDays[0];
-    const upcomingDays = upcoming.daysAway ?? 0;
-
-    const ageStr = upcoming.turningAge ? ` (Turning ${upcoming.turningAge})` : '';
-
-    eventTitle = `${dbPerson.name}'s ${upcoming.title}${ageStr}`;
-    eventTag = dbPerson.role as Relationship;
-    daysAway = upcomingDays;
-    eventDate = upcoming.date;
-    countdown = {
-      tag: upcoming.title,
-      days: upcomingDays,
-      title: `${dbPerson.name}'s ${upcoming.title}${ageStr}`,
-      date: upcoming.date,
-      progress: Math.max(0, Math.min(1, 1 - upcomingDays / 365)),
-    };
-  } else {
-    // Return empty sortedDays or just empty specialDays
-  }
-
   const returnedSpecialDays = specialDays.length > 0 ? [...specialDays].sort((a: any, b: any) => {
     return (a.daysAway ?? 9999) - (b.daysAway ?? 9999);
   }) : specialDays;
@@ -168,17 +136,14 @@ export function mapDbPersonToPerson(dbPerson: any): Person {
     avatar: dbPerson.avatar_url || undefined,
     initials: dbPerson.name.charAt(0).toUpperCase(),
     tags: [dbPerson.role],
-    eventTitle,
-    eventTag,
-    daysAway,
-    eventDate,
-    countdown,
+    ...deriveUpcoming(dbPerson.name, dbPerson.role as Relationship, returnedSpecialDays),
     specialDays: returnedSpecialDays,
     birthday,
     notes: generalNotes,
     isPinned: dbPerson.is_pinned || false,
   };
 }
+
 
 export function PeopleProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -709,20 +674,26 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
     .filter((p) => !hiddenIds.includes(p.id))
     .map((p) => {
       if (hiddenDayIds.length === 0 && hiddenNoteIds.length === 0) return p;
+
+      const specialDays = p.specialDays
+        ?.filter((d) => !hiddenDayIds.includes(d.id))
+        .map((d) =>
+          hiddenNoteIds.length === 0
+            ? d
+            : {
+              ...d,
+              notes: d.notes?.filter((n) => !hiddenNoteIds.includes(n.id)),
+              memories: d.memories?.filter((n) => !hiddenNoteIds.includes(n.id)),
+            },
+        );
+
       return {
         ...p,
         notes: p.notes?.filter((n) => !hiddenNoteIds.includes(n.id)),
-        specialDays: p.specialDays
-          ?.filter((d) => !hiddenDayIds.includes(d.id))
-          .map((d) =>
-            hiddenNoteIds.length === 0
-              ? d
-              : {
-                ...d,
-                notes: d.notes?.filter((n) => !hiddenNoteIds.includes(n.id)),
-                memories: d.memories?.filter((n) => !hiddenNoteIds.includes(n.id)),
-              },
-          ),
+        specialDays,
+        // Deleting the day someone was counting down to has to move the
+        // countdown on immediately, not at the next refresh.
+        ...deriveUpcoming(p.name, p.eventTag, specialDays ?? []),
       };
     });
 
