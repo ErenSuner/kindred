@@ -6,6 +6,7 @@ import { DAY_OF, Nudge, offsetDaysFor, parseNudge, parseNudges } from '@/utils/n
 import { Recurrence, YEARLY } from '@/utils/recurrence';
 import { getUpcomingOccurrences } from '@/utils/dates';
 import { Weekday, isRoutine } from '@/utils/routines';
+import { HEADS_UP_HOURS, dayOfFirings, formatTimeOfDay } from '@/utils/eventTime';
 import { Holiday } from '@/data/holidays';
 import { formatHolidayDate, nextHolidayDates } from '@/utils/holidays';
 
@@ -41,20 +42,29 @@ type PendingNotification = { title: string; body: string; date: Date; id: string
 // Nudges fire relative to an occurrence — a preset or a custom lead time is N
 // days before it. A legacy absolute date is pinned to itself and ignores the
 // cycle entirely.
-function notificationDatesFor(anchorDate: string, recurrence: Recurrence, nudge: Nudge, hour: number): Date[] {
+function notificationDatesFor(
+  anchorDate: string,
+  recurrence: Recurrence,
+  nudge: Nudge,
+  hour: number,
+  // A two-hour warning for an early-morning event lands the night before, which
+  // is a day earlier than the nudge itself says.
+  opts: { extraDaysEarlier?: number; minute?: number } = {},
+): Date[] {
   const now = new Date();
+  const minute = opts.minute ?? 0;
 
   if (nudge.type === 'date') {
     const [y, m, d] = nudge.value.split('-').map(Number);
-    const at = new Date(y, m - 1, d, hour, 0, 0, 0);
+    const at = new Date(y, m - 1, d, hour, minute, 0, 0);
     return at.getTime() > now.getTime() ? [at] : [];
   }
 
-  const offsetDays = offsetDaysFor(nudge) ?? 0;
+  const offsetDays = (offsetDaysFor(nudge) ?? 0) + (opts.extraDaysEarlier ?? 0);
 
   return getUpcomingOccurrences(anchorDate, recurrence, MAX_OCCURRENCES_PER_NUDGE)
     .map((occurrence) => {
-      const at = new Date(occurrence.getFullYear(), occurrence.getMonth(), occurrence.getDate(), hour, 0, 0, 0);
+      const at = new Date(occurrence.getFullYear(), occurrence.getMonth(), occurrence.getDate(), hour, minute, 0, 0);
       at.setDate(at.getDate() - offsetDays);
       return at;
     })
@@ -122,16 +132,40 @@ function collectMyEventNotifications(myEvents: MyEvent[], hour: number): Pending
     // collectRoutineTriggers.
     if (isRoutine(event.weekdays)) continue;
 
+    const at = event.timeOfDay ? ` at ${formatTimeOfDay(event.timeOfDay)}` : '';
+
     for (const nudge of nudgesFor(event.nudges)) {
+      // The day itself is where a time of day changes things: instead of one
+      // reminder at the global hour, a timed event gets the morning glance and
+      // a warning two hours out. Earlier nudges stay on the global hour — a
+      // week ahead, the exact minute is not the point.
+      if (nudge.value === DAY_OF) {
+        for (const firing of dayOfFirings(event.timeOfDay, hour)) {
+          const dates = notificationDatesFor(event.originalDate, event.recurrence, nudge, firing.hour, {
+            extraDaysEarlier: firing.dayOffset,
+            minute: firing.minute,
+          });
+          dates.forEach((date, i) => {
+            pending.push({
+              id: `me_${event.id}_${nudge.value}_${firing.kind}_${i}`,
+              title: 'Your Reminder',
+              body:
+                firing.kind === 'imminent'
+                  ? `${event.title} is in ${HEADS_UP_HOURS} hours${at}.`
+                  : `${event.title} is today${at}!`,
+              date,
+            });
+          });
+        }
+        continue;
+      }
+
       const dates = notificationDatesFor(event.originalDate, event.recurrence, nudge, hour);
       dates.forEach((date, i) => {
-        let body = `${event.title} is on ${event.date}.`;
-        if (nudge.value === 'day_of') body = `${event.title} is today!`;
-
         pending.push({
           id: `me_${event.id}_${nudge.value}_${i}`,
           title: 'Your Reminder',
-          body,
+          body: `${event.title} is on ${event.date}${at}.`,
           date,
         });
       });
@@ -144,7 +178,14 @@ function collectMyEventNotifications(myEvents: MyEvent[], hour: number): Pending
 // A weekly repeating trigger. Unlike a dated notification this never runs out,
 // so a routine costs a fixed number of slots forever instead of re-booking six
 // occurrences at a time and going quiet when they're used up.
-type RoutineTrigger = { id: string; title: string; body: string; weekday: Weekday; hour: number };
+type RoutineTrigger = {
+  id: string;
+  title: string;
+  body: string;
+  weekday: Weekday;
+  hour: number;
+  minute: number;
+};
 
 // Lead times of a week or more are dropped for routines. "A week before" a
 // weekly routine is the previous occurrence — it would fire every single week
@@ -157,26 +198,42 @@ function collectRoutineTriggers(myEvents: MyEvent[], hour: number): RoutineTrigg
   for (const event of myEvents) {
     if (!isRoutine(event.weekdays)) continue;
 
+    const at = event.timeOfDay ? ` at ${formatTimeOfDay(event.timeOfDay)}` : '';
+
     for (const nudge of nudgesFor(event.nudges)) {
       const offsetDays = offsetDaysFor(nudge) ?? 0;
       if (offsetDays > MAX_ROUTINE_LEAD_DAYS) continue;
 
-      for (const weekday of event.weekdays ?? []) {
-        // Firing N days earlier is the same as firing on an earlier weekday.
-        const fireOn = (((weekday - offsetDays) % 7) + 7) % 7;
+      // The day itself is where the time matters: an 18:00 class is worth
+      // hearing about in the morning and again at 16:00. Earlier nudges keep
+      // the global hour.
+      const firings =
+        nudge.value === DAY_OF
+          ? dayOfFirings(event.timeOfDay, hour)
+          : [{ dayOffset: 0, hour, minute: 0, kind: 'heads-up' as const }];
 
-        triggers.push({
-          id: `rt_${event.id}_${nudge.value}_${weekday}`,
-          title: 'Your Routine',
-          body:
-            offsetDays === 0
-              ? `${event.title} is today.`
-              : offsetDays === 1
-              ? `${event.title} is tomorrow.`
-              : `${event.title} is in ${offsetDays} days.`,
-          weekday: fireOn as Weekday,
-          hour,
-        });
+      for (const firing of firings) {
+        for (const weekday of event.weekdays ?? []) {
+          // Firing N days earlier is the same as firing on an earlier weekday.
+          const daysEarlier = offsetDays + firing.dayOffset;
+          const fireOn = (((weekday - daysEarlier) % 7) + 7) % 7;
+
+          triggers.push({
+            id: `rt_${event.id}_${nudge.value}_${firing.kind}_${weekday}`,
+            title: 'Your Routine',
+            body:
+              firing.kind === 'imminent'
+                ? `${event.title} is in ${HEADS_UP_HOURS} hours${at}.`
+                : offsetDays === 0
+                ? `${event.title} is today${at}.`
+                : offsetDays === 1
+                ? `${event.title} is tomorrow${at}.`
+                : `${event.title} is in ${offsetDays} days${at}.`,
+            weekday: fireOn as Weekday,
+            hour: firing.hour,
+            minute: firing.minute,
+          });
+        }
       }
     }
   }
@@ -258,7 +315,7 @@ export async function syncNotifications(
           // expo counts weekdays from 1 = Sunday; ours count from 0 = Sunday.
           weekday: trigger.weekday + 1,
           hour: trigger.hour,
-          minute: 0,
+          minute: trigger.minute,
         },
       });
       routinesScheduled++;

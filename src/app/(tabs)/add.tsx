@@ -76,26 +76,52 @@ export default function Connections() {
           <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ flex: 1, paddingRight: 16 }}>
             Your circle of people who matter most.
           </Txt>
-          <Pressable
-            onPress={() => router.push('/new-connection')}
-            style={({ pressed }) => [
-              {
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: colors.primaryContainer,
-                paddingHorizontal: 16,
-                paddingVertical: 8,
-                borderRadius: radius.full,
-                gap: 6
-              },
-              pressed && { opacity: 0.8, transform: [{ scale: 0.96 }] }
-            ]}
-          >
-            <Icon name="person-add" size={18} color={colors.onPrimaryContainer} />
-            <Txt variant="labelSm" color={colors.onPrimaryContainer}>
-              New
-            </Txt>
-          </Pressable>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {/* Importing is the faster path for most people, so it sits next to
+                the manual one rather than buried inside it. */}
+            <Pressable
+              onPress={() => router.push('/import-contacts' as any)}
+              style={({ pressed }) => [
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  borderWidth: 1,
+                  borderColor: colors.outlineVariant,
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  borderRadius: radius.full,
+                  gap: 6,
+                },
+                pressed && { opacity: 0.8, transform: [{ scale: 0.96 }] },
+              ]}
+            >
+              <Icon name="contacts" size={18} color={colors.onSurfaceVariant} />
+              <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                Import
+              </Txt>
+            </Pressable>
+
+            <Pressable
+              onPress={() => router.push('/new-connection')}
+              style={({ pressed }) => [
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: colors.primaryContainer,
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  borderRadius: radius.full,
+                  gap: 6
+                },
+                pressed && { opacity: 0.8, transform: [{ scale: 0.96 }] }
+              ]}
+            >
+              <Icon name="person-add" size={18} color={colors.onPrimaryContainer} />
+              <Txt variant="labelSm" color={colors.onPrimaryContainer}>
+                New
+              </Txt>
+            </Pressable>
+          </View>
         </Animated.View>
 
         <FormError message={loadError} onRetry={refreshPeople} retryLabel="Retry" />

@@ -9,6 +9,8 @@ import { colors, radius, softShadow, spacing } from '@/theme/tokens';
 import { toISODate } from '@/utils/dates';
 import { DAY_OF, Nudge, parseNudges, serializeNudges } from '@/utils/nudges';
 import { Weekday } from '@/utils/routines';
+import { TimeField } from '@/components/TimeField';
+import { TimeOfDay } from '@/utils/eventTime';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
@@ -38,6 +40,7 @@ export default function RoutineForm() {
 
   const [title, setTitle] = useState('');
   const [weekdays, setWeekdays] = useState<Weekday[]>([]);
+  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay | null>(null);
   const [reminders, setReminders] = useState<Nudge[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +52,7 @@ export default function RoutineForm() {
     if (!existing || hydrated) return;
     setTitle(existing.title);
     setWeekdays(existing.weekdays ?? []);
+    setTimeOfDay(existing.timeOfDay ?? null);
     // The day-of nudge is guaranteed and shown as fixed, so it never belongs in
     // the editable list.
     setReminders(parseNudges(existing.nudges).filter((n) => n.value !== DAY_OF));
@@ -72,6 +76,7 @@ export default function RoutineForm() {
       const payload = {
         title: title.trim(),
         weekdays,
+        timeOfDay,
         nudges: serializeNudges(reminders),
         // Pinned, or updateEvent would re-derive an icon from the title and a
         // routine called "Dentist" would stop looking like a routine.
@@ -143,6 +148,8 @@ export default function RoutineForm() {
             </View>
 
             <WeekdayPicker value={weekdays} onChange={setWeekdays} />
+
+            <TimeField value={timeOfDay} onChange={setTimeOfDay} />
 
             {/* A routine comes round weekly, so anything further out than six
                 days would fire every week and mean nothing. */}

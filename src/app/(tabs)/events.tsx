@@ -13,6 +13,7 @@ import { useEvents } from '@/context/EventsContext';
 import { parseNudges } from '@/utils/nudges';
 import { recurrenceIcon, recurrenceShortLabel } from '@/utils/recurrence';
 import { weekdaysLabel } from '@/utils/routines';
+import { formatTimeOfDay } from '@/utils/eventTime';
 import type { MyEvent } from '@/data/mock';
 
 function daysLabel(daysAway: number) {
@@ -133,7 +134,7 @@ export default function MyEvents() {
                     )}
                   </View>
                   <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 4 }}>
-                    {featured.date}
+                    {featured.date}{featured.timeOfDay ? ` · ${formatTimeOfDay(featured.timeOfDay)}` : ''}
                   </Txt>
                 </View>
 
@@ -162,7 +163,9 @@ export default function MyEvents() {
                         <Txt variant="bodyLg" color={colors.onSurface} style={{ fontFamily: 'Inter_500Medium' }}>
                           {event.title}
                         </Txt>
-                        <Txt variant="bodyMd" color={colors.onSurfaceVariant}>{event.date}</Txt>
+                        <Txt variant="bodyMd" color={colors.onSurfaceVariant}>
+                          {event.date}{event.timeOfDay ? ` · ${formatTimeOfDay(event.timeOfDay)}` : ''}
+                        </Txt>
                       </View>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
@@ -212,6 +215,7 @@ export default function MyEvents() {
                   </Txt>
                   <Txt variant="bodyMd" color={colors.onSurfaceVariant}>
                     {weekdaysLabel(routine.weekdays ?? [])}
+                    {routine.timeOfDay ? ` · ${formatTimeOfDay(routine.timeOfDay)}` : ''}
                   </Txt>
                 </View>
               </View>

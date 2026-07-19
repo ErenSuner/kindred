@@ -1,4 +1,5 @@
 import type { Person, SpecialDay } from '@/data/mock';
+import { NO_UPCOMING_DAYS } from '@/utils/upcoming';
 
 // Matching ignores case and accents, so "dogum" finds "Doğum", "cigdem" finds
 // "Çiğdem" and "rene" finds "René". Turkish dotted/dotless I is folded to plain
@@ -89,8 +90,8 @@ export function searchPeople(people: Person[], rawQuery: string): SearchHit[] {
   // Same score: whatever happens sooner is more useful.
   return hits.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
-    const aDays = a.kind === 'day' ? a.day.daysAway ?? 9999 : a.person.daysAway ?? 9999;
-    const bDays = b.kind === 'day' ? b.day.daysAway ?? 9999 : b.person.daysAway ?? 9999;
+    const aDays = a.kind === 'day' ? a.day.daysAway ?? NO_UPCOMING_DAYS : a.person.daysAway ?? NO_UPCOMING_DAYS;
+    const bDays = b.kind === 'day' ? b.day.daysAway ?? NO_UPCOMING_DAYS : b.person.daysAway ?? NO_UPCOMING_DAYS;
     return aDays - bDays;
   });
 }

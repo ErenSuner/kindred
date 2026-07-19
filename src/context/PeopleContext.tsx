@@ -1,31 +1,26 @@
 import type { Note, Person, Relationship } from '@/data/mock';
-import { supabase } from '@/lib/supabase';
 import { cacheKey, readCache, writeCache } from '@/utils/cache';
-import { removeAvatarByUrl } from '@/utils/avatars';
-import { getNextOccurrence } from '@/utils/dates';
 import { describeLoadError } from '@/utils/loadError';
-import { NOTEBOOK, distributeNotes, mapDbNote } from '@/utils/notes';
-import { Recurrence, YEARLY, parseRecurrence, serializeRecurrence } from '@/utils/recurrence';
+import { Recurrence } from '@/utils/recurrence';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { useUndo } from './UndoContext';
-import { deriveUpcoming } from '@/utils/upcoming';
+import { NO_UPCOMING_DAYS, deriveUpcoming } from '@/utils/upcoming';
+import { mapDbPersonToPerson } from '@/utils/mapPerson';
+import * as api from '@/lib/peopleApi';
+import type { NoteDraft, NoteTarget } from '@/lib/peopleApi';
+
+export type { NoteDraft, NoteTarget };
 
 type PeopleContextValue = {
   people: Person[];
   loading: boolean;
   // Set when the last load failed; `people` may still hold the previous result.
   loadError: string | null;
-  addPerson: (data: {
-    name: string;
-    role: Relationship;
-    avatarUrl?: string | null;
-  }) => Promise<void>;
-  updatePerson: (id: string, data: {
-    name: string;
-    role: Relationship;
-    avatarUrl?: string | null;
-  }) => Promise<void>;
+  // Returns the new person's id, so a caller can immediately attach a birthday
+  // without waiting for the list to come back round through React state.
+  addPerson: (data: { name: string; role: Relationship; avatarUrl?: string | null }) => Promise<string | undefined>;
+  updatePerson: (id: string, data: { name: string; role: Relationship; avatarUrl?: string | null }) => Promise<void>;
   addSpecialDay: (personId: string, data: {
     title: string;
     date: string;
@@ -56,6 +51,8 @@ type PeopleContextValue = {
     next: { id?: string; kind: string; body: string }[],
   ) => Promise<void>;
   updateNote: (noteId: string, data: { kind?: string; body?: string }) => Promise<void>;
+  // Ticks a gift idea off, or puts it back on the list.
+  setNoteDone: (noteId: string, done: boolean) => Promise<void>;
   // Records or edits what happened on one occurrence of a day.
   saveMemory: (personId: string, specialDayId: string, occurredOn: string, body: string, existingNoteId?: string) => Promise<void>;
   deleteNote: (noteId: string) => Promise<void>;
@@ -71,83 +68,6 @@ type PeopleContextValue = {
 };
 
 const PeopleContext = createContext<PeopleContextValue | null>(null);
-
-// Which occasion a note hangs off, if any. Omitting it writes a general note
-// about the person. Birthdays are special days now, so they use the same target.
-export type NoteTarget = { specialDayId: string };
-
-// A note supplied alongside the occasion it belongs to, before that occasion
-// has an id of its own.
-export type NoteDraft = { kind: string; body: string };
-
-
-export function mapDbPersonToPerson(dbPerson: any): Person {
-  // Birthdays live in special_days alongside everything else, flagged by
-  // is_birthday. A birthday is yearly by definition, so its stored recurrence is
-  // ignored in favour of YEARLY — nothing in the UI lets you change it.
-  const specialDays: any[] = (dbPerson.special_days || []).map((sd: any) => {
-    const isBirthday = sd.is_birthday === true;
-    const recurrence = isBirthday ? YEARLY : parseRecurrence(sd);
-    const { formattedDate, daysAway, turningAge } = getNextOccurrence(sd.date, recurrence, isBirthday);
-    return {
-      id: sd.id,
-      title: isBirthday ? 'Birthday' : sd.title,
-      date: formattedDate,
-      icon: isBirthday ? 'cake' : sd.icon || 'event',
-      accent: isBirthday ? 'tertiary' : sd.accent || 'primary',
-      originalDate: sd.date,
-      createdAt: sd.created_at,
-      daysAway,
-      turningAge,
-      nudges: sd.nudges || [],
-      recurrence,
-      isBirthday,
-      // A birthday never expires; only a one-off date can.
-      isExpired: !isBirthday && recurrence.unit === 'none' && daysAway < 0,
-    };
-  });
-
-  // Screens still reach for `person.birthday`, so keep it as a view onto the
-  // birthday row rather than a separate record.
-  const birthdayDay = specialDays.find((d) => d.isBirthday);
-  const birthday = birthdayDay
-    ? { id: birthdayDay.id, date: birthdayDay.originalDate, nudges: birthdayDay.nudges }
-    : undefined;
-
-  const notes: Note[] = (dbPerson.notes || [])
-    .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .map((n: any) => mapDbNote(n));
-
-  // Hand each note to the occasion it belongs to; the rest are general notes
-  // about the person.
-  const { byDay, general: generalNotes } = distributeNotes(notes, specialDays);
-  for (const day of specialDays) {
-    const mine = byDay.get(day.id) ?? [];
-    // A memory of last year shouldn't appear as a plan for next year — and the
-    // day's editor must not be able to overwrite it.
-    day.notes = mine.filter((n) => !n.occurredOn);
-    day.memories = mine.filter((n) => n.occurredOn);
-  }
-
-  const returnedSpecialDays = specialDays.length > 0 ? [...specialDays].sort((a: any, b: any) => {
-    return (a.daysAway ?? 9999) - (b.daysAway ?? 9999);
-  }) : specialDays;
-
-  return {
-    id: dbPerson.id,
-    name: dbPerson.name,
-    role: dbPerson.role,
-    avatar: dbPerson.avatar_url || undefined,
-    initials: dbPerson.name.charAt(0).toUpperCase(),
-    tags: [dbPerson.role],
-    ...deriveUpcoming(dbPerson.name, dbPerson.role as Relationship, returnedSpecialDays),
-    specialDays: returnedSpecialDays,
-    birthday,
-    notes: generalNotes,
-    isPinned: dbPerson.is_pinned || false,
-  };
-}
-
 
 export function PeopleProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -186,7 +106,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
     mapped.sort((a, b) => {
       if (a.isPinned && !b.isPinned) return -1;
       if (!a.isPinned && b.isPinned) return 1;
-      return (a.daysAway ?? 9999) - (b.daysAway ?? 9999);
+      return (a.daysAway ?? NO_UPCOMING_DAYS) - (b.daysAway ?? NO_UPCOMING_DAYS);
     });
 
     setPeople(mapped);
@@ -200,25 +120,10 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      const { data, error } = await supabase
-        .from('people')
-        .select(`
-          id,
-          name,
-          role,
-          avatar_url,
-          is_pinned,
-          special_days (id, title, date, icon, accent, nudges, repeat_unit, repeat_interval, is_birthday, created_at),
-          notes (id, kind, body, created_at, special_day_id, occurred_on, photo_url)
-        `);
-
-      if (error) throw error;
-
-      if (data) {
-        applyRows(data);
-        setLoadError(null);
-        writeCache(cacheKey('people', user.id), data);
-      }
+      const rows = await api.fetchPeopleRows();
+      applyRows(rows);
+      setLoadError(null);
+      writeCache(cacheKey('people', user.id), rows);
     } catch (err) {
       console.error('Error fetching people:', err);
       // Whatever is already on screen stays — a cached or stale list beats a
@@ -248,26 +153,29 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
-  const addPerson = async (data: {
-    name: string;
-    role: Relationship;
-    avatarUrl?: string | null;
-  }) => {
+  // Every mutation below is the same shape: do the write, then reload. This
+  // wraps that up so the individual methods say what they do and nothing else.
+  const mutate = async (what: string, run: () => Promise<void>, showsSpinner = false) => {
     if (!user) return;
+    if (showsSpinner) setLoading(true);
+    try {
+      await run();
+      await refreshPeople();
+    } catch (err) {
+      console.error(`Error ${what}:`, err);
+      throw err;
+    } finally {
+      if (showsSpinner) setLoading(false);
+    }
+  };
+
+  const addPerson = async (data: { name: string; role: Relationship; avatarUrl?: string | null }) => {
+    if (!user) return undefined;
     setLoading(true);
     try {
-      const { error: personError } = await supabase
-        .from('people')
-        .insert({
-          user_id: user.id,
-          name: data.name,
-          role: data.role,
-          avatar_url: data.avatarUrl ?? null,
-        });
-
-      if (personError) throw personError;
-
+      const id = await api.insertPerson(user.id, data);
       await refreshPeople();
+      return id;
     } catch (err) {
       console.error('Error adding person:', err);
       throw err;
@@ -276,391 +184,63 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updatePerson = async (id: string, data: {
-    name: string;
-    role: Relationship;
-    avatarUrl?: string | null;
-  }) => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      const updates: Record<string, unknown> = {
-        name: data.name,
-        role: data.role,
-      };
-      // Left untouched unless the caller actually supplied one, so saving the
-      // name doesn't wipe an existing picture.
-      if (data.avatarUrl !== undefined) updates.avatar_url = data.avatarUrl;
+  const updatePerson = (id: string, data: { name: string; role: Relationship; avatarUrl?: string | null }) =>
+    mutate('updating person', () => api.updatePersonRow(id, data), true);
 
-      const { error: personError } = await supabase
-        .from('people')
-        .update(updates)
-        .eq('id', id);
+  const removePerson = (id: string) =>
+    mutate('removing person', () => api.deletePersonRow(id), true);
 
-      if (personError) throw personError;
-
-      await refreshPeople();
-    } catch (err) {
-      console.error('Error updating person:', err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const addSpecialDay = async (personId: string, data: {
+  const addSpecialDay = (personId: string, data: {
     title: string;
     date: string;
     nudges?: string[];
     recurrence?: Recurrence;
     notes?: NoteDraft[];
-  }) => {
-    try {
-      if (!user) throw new Error('Not logged in');
-      const { data: inserted, error } = await supabase
-        .from('special_days')
-        .insert({
-          person_id: personId,
-          title: data.title,
-          date: data.date,
-          nudges: data.nudges || [],
-          icon: data.title.toLowerCase().includes('birthday') ? 'cake' : 'event',
-          accent: 'primary',
-          ...serializeRecurrence(data.recurrence ?? YEARLY),
-        })
-        .select('id')
-        .single();
-      if (error) throw error;
+  }) => mutate('adding special day', () => api.insertSpecialDay(personId, data));
 
-      // Notes are written against the row that was just created, so they can
-      // only go in once its id exists.
-      if (data.notes?.length && inserted) {
-        const { error: notesError } = await supabase.from('notes').insert(
-          data.notes.map((n) => ({
-            person_id: personId,
-            special_day_id: inserted.id,
-            kind: n.kind,
-            body: n.body,
-          })),
-        );
-        // The day itself saved fine; losing the notes shouldn't read as a
-        // failed save, so this is reported rather than thrown.
-        if (notesError) console.error('Special day saved, but its notes failed:', notesError);
-      }
-
-      await refreshPeople();
-    } catch (err) {
-      console.error('Error adding special day:', err);
-      throw err;
-    }
-  };
-
-  const updateSpecialDay = async (dayId: string, data: {
+  const updateSpecialDay = (dayId: string, data: {
     title?: string;
     date?: string;
     nudges?: string[];
     recurrence?: Recurrence;
-  }) => {
-    try {
-      const updates: any = {};
-      if (data.title) {
-        updates.title = data.title;
-        updates.icon = data.title.toLowerCase().includes('birthday') ? 'cake' : 'event';
-      }
-      if (data.date) updates.date = data.date;
-      if (data.nudges) updates.nudges = data.nudges;
-      if (data.recurrence !== undefined) Object.assign(updates, serializeRecurrence(data.recurrence));
-      const { error } = await supabase
-        .from('special_days')
-        .update(updates)
-        .eq('id', dayId);
-      if (error) throw error;
-      await refreshPeople();
-    } catch (err) {
-      console.error('Error updating special day:', err);
-      throw err;
-    }
-  };
+  }) => mutate('updating special day', () => api.updateSpecialDayRow(dayId, data));
 
-  const deleteSpecialDay = async (dayId: string) => {
-    if (!user) return;
-    try {
-      const { error } = await supabase
-        .from('special_days')
-        .delete()
-        .eq('id', dayId);
-      if (error) throw error;
-      await refreshPeople();
-    } catch (err) {
-      console.error('Error deleting special day:', err);
-      throw err;
-    }
-  };
+  const deleteSpecialDay = (dayId: string) =>
+    mutate('deleting special day', () => api.deleteSpecialDayRow(dayId));
 
-  // A birthday is a special day with its title, icon and cycle fixed. The
-  // one-per-person rule is enforced by a partial unique index on the table.
-  const addBirthday = async (personId: string, data: { date: string; nudges?: string[]; notes?: NoteDraft[] }) => {
-    if (!user) return;
-    try {
-      const { data: inserted, error } = await supabase
-        .from('special_days')
-        .insert({
-          person_id: personId,
-          title: 'Birthday',
-          date: data.date,
-          nudges: data.nudges || [],
-          icon: 'cake',
-          accent: 'tertiary',
-          repeat_unit: 'year',
-          repeat_interval: 1,
-          is_birthday: true,
-        })
-        .select('id')
-        .single();
-      if (error) throw error;
+  const addBirthday = (personId: string, data: { date: string; nudges?: string[]; notes?: NoteDraft[] }) =>
+    mutate('adding birthday', () => api.insertBirthday(personId, data));
 
-      if (data.notes?.length && inserted) {
-        const { error: notesError } = await supabase.from('notes').insert(
-          data.notes.map((n) => ({
-            person_id: personId,
-            special_day_id: inserted.id,
-            kind: n.kind,
-            body: n.body,
-          })),
-        );
-        if (notesError) console.error('Birthday saved, but its notes failed:', notesError);
-      }
+  const updateBirthday = (birthdayId: string, data: { date?: string; nudges?: string[] }) =>
+    mutate('updating birthday', () => api.updateBirthdayRow(birthdayId, data));
 
-      await refreshPeople();
-    } catch (err) {
-      console.error('Error adding birthday:', err);
-      throw err;
-    }
-  };
+  const deleteBirthday = (birthdayId: string) =>
+    mutate('deleting birthday', () => api.deleteSpecialDayRow(birthdayId));
 
-  const updateBirthday = async (birthdayId: string, data: { date?: string; nudges?: string[] }) => {
-    if (!user) return;
-    try {
-      const { error } = await supabase
-        .from('special_days')
-        .update(data)
-        .eq('id', birthdayId);
-      if (error) throw error;
-      await refreshPeople();
-    } catch (err) {
-      console.error('Error updating birthday:', err);
-      throw err;
-    }
-  };
+  const addNoteToPerson = (personId: string, kind: string, body: string, target?: NoteTarget, photoUrl?: string) =>
+    mutate('adding note', () => api.insertNote(personId, kind, body, target, photoUrl));
 
-  const deleteBirthday = async (birthdayId: string) => {
-    if (!user) return;
-    try {
-      const { error } = await supabase
-        .from('special_days')
-        .delete()
-        .eq('id', birthdayId);
-      if (error) throw error;
-      await refreshPeople();
-    } catch (err) {
-      console.error('Error deleting birthday:', err);
-      throw err;
-    }
-  };
+  const updateNote = (noteId: string, data: { kind?: string; body?: string }) =>
+    mutate('updating note', () => api.updateNoteRow(noteId, data));
 
-  const addNoteToPerson = async (
-    personId: string,
-    kind: string,
-    body: string,
-    target?: NoteTarget,
-    photoUrl?: string,
-  ) => {
-    if (!user) return;
-    try {
-      const { error } = await supabase
-        .from('notes')
-        .insert({
-          person_id: personId,
-          kind,
-          body,
-          special_day_id: target?.specialDayId ?? null,
-          photo_url: photoUrl ?? null,
-        });
-      if (error) throw error;
-      await refreshPeople();
-    } catch (err) {
-      console.error('Error adding note:', err);
-      throw err;
-    }
-  };
+  const setNoteDone = (noteId: string, done: boolean) =>
+    mutate('marking note done', () => api.setNoteDone(noteId, done));
 
-  // One notebook per person. An empty body deletes it rather than leaving a
-  // blank row behind.
-  const saveNotebook = async (personId: string, body: string, existingNoteId?: string) => {
-    if (!user) return;
-    try {
-      if (existingNoteId) {
-        if (!body.trim()) {
-          const { error } = await supabase.from('notes').delete().eq('id', existingNoteId);
-          if (error) throw error;
-        } else {
-          const { error } = await supabase.from('notes').update({ body }).eq('id', existingNoteId);
-          if (error) throw error;
-        }
-      } else if (body.trim()) {
-        const { error } = await supabase
-          .from('notes')
-          .insert({ person_id: personId, kind: NOTEBOOK, body });
-        if (error) throw error;
-      }
-      await refreshPeople();
-    } catch (err) {
-      console.error('Error saving notebook:', err);
-      throw err;
-    }
-  };
+  const deleteNote = (noteId: string) =>
+    mutate('deleting note', () => api.deleteNoteRow(noteId));
 
-  // A memory is a note pinned to one occurrence of a day. It deliberately does
-  // not go through syncNotes — the day's editor only knows about standing notes
-  // and would treat a memory it has never seen as deleted.
-  const saveMemory = async (
-    personId: string,
-    specialDayId: string,
-    occurredOn: string,
-    body: string,
-    existingNoteId?: string,
-  ) => {
-    if (!user) return;
-    try {
-      if (existingNoteId) {
-        const { error } = await supabase.from('notes').update({ body }).eq('id', existingNoteId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('notes').insert({
-          person_id: personId,
-          special_day_id: specialDayId,
-          occurred_on: occurredOn,
-          kind: 'Memory',
-          body,
-        });
-        if (error) throw error;
-      }
-      await refreshPeople();
-    } catch (err) {
-      console.error('Error saving memory:', err);
-      throw err;
-    }
-  };
+  const saveNotebook = (personId: string, body: string, existingNoteId?: string) =>
+    mutate('saving notebook', () => api.saveNotebookRow(personId, body, existingNoteId));
 
-  const updateNote = async (noteId: string, data: { kind?: string; body?: string }) => {
-    if (!user) return;
-    try {
-      const { error } = await supabase
-        .from('notes')
-        .update(data)
-        .eq('id', noteId);
-      if (error) throw error;
-      await refreshPeople();
-    } catch (err) {
-      console.error('Error updating note:', err);
-      throw err;
-    }
-  };
+  const saveMemory = (personId: string, specialDayId: string, occurredOn: string, body: string, existingNoteId?: string) =>
+    mutate('saving memory', () => api.saveMemoryRow(personId, specialDayId, occurredOn, body, existingNoteId));
 
-  const deleteNote = async (noteId: string) => {
-    if (!user) return;
-    try {
-      // Read the photo first: once the row is gone there's nothing left
-      // pointing at the file, and it would sit in storage forever.
-      const { data: existing } = await supabase
-        .from('notes')
-        .select('photo_url')
-        .eq('id', noteId)
-        .maybeSingle();
-
-      const { error } = await supabase
-        .from('notes')
-        .delete()
-        .eq('id', noteId);
-      if (error) throw error;
-
-      if (existing?.photo_url) await removeAvatarByUrl(existing.photo_url);
-      await refreshPeople();
-    } catch (err) {
-      console.error('Error deleting note:', err);
-      throw err;
-    }
-  };
-
-  // Reconciles the notes attached to one occasion against what the editor is
-  // holding: anything gone from `next` is deleted, anything with an id is
-  // updated if its text changed, and the rest are created.
-  const syncNotes = async (
+  const syncNotes = (
     personId: string,
     target: NoteTarget,
     existing: Note[],
     next: { id?: string; kind: string; body: string }[],
-  ) => {
-    if (!user) return;
-
-    const keptIds = new Set(next.map((n) => n.id).filter(Boolean) as string[]);
-    const removedIds = existing.filter((n) => !keptIds.has(n.id)).map((n) => n.id);
-
-    const toInsert = next.filter((n) => !n.id);
-    const toUpdate = next.filter((n) => {
-      if (!n.id) return false;
-      const before = existing.find((e) => e.id === n.id);
-      return before && (before.body !== n.body || before.kind !== n.kind);
-    });
-
-    try {
-      if (removedIds.length > 0) {
-        const { error } = await supabase.from('notes').delete().in('id', removedIds);
-        if (error) throw error;
-      }
-
-      if (toInsert.length > 0) {
-        const { error } = await supabase.from('notes').insert(
-          toInsert.map((n) => ({
-            person_id: personId,
-            special_day_id: target.specialDayId,
-            kind: n.kind,
-            body: n.body,
-          })),
-        );
-        if (error) throw error;
-      }
-
-      for (const n of toUpdate) {
-        const { error } = await supabase
-          .from('notes')
-          .update({ kind: n.kind, body: n.body })
-          .eq('id', n.id as string);
-        if (error) throw error;
-      }
-    } catch (err) {
-      console.error('Error syncing notes:', err);
-      throw err;
-    }
-  };
-
-  const removePerson = async (id: string) => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      const { error } = await supabase
-        .from('people')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
-      await refreshPeople();
-    } catch (err) {
-      console.error('Error removing person:', err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+  ) => mutate('syncing notes', () => api.syncNoteRows(personId, target, existing, next));
 
   // Deleting a person takes their days and notes with it, so it gets a grace
   // period. The row stays in the database until the window closes — nothing is
@@ -753,30 +333,24 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
       };
     });
 
-  const getPerson = (id: string) => {
-    return visiblePeople.find((p) => p.id === id);
-  };
+  const getPerson = (id: string) => visiblePeople.find((p) => p.id === id);
 
   const togglePin = async (id: string, isPinned: boolean) => {
     if (!user) return;
     try {
-      // Optimistic UI update
+      // Optimistic: pinning should reorder the list under your thumb, not after
+      // a round trip.
       setPeople((prev) => {
-        const next = prev.map(p => p.id === id ? { ...p, isPinned } : p);
+        const next = prev.map((p) => (p.id === id ? { ...p, isPinned } : p));
         next.sort((a, b) => {
           if (a.isPinned && !b.isPinned) return -1;
           if (!a.isPinned && b.isPinned) return 1;
-          return (a.daysAway ?? 9999) - (b.daysAway ?? 9999);
+          return (a.daysAway ?? NO_UPCOMING_DAYS) - (b.daysAway ?? NO_UPCOMING_DAYS);
         });
         return next;
       });
 
-      const { error } = await supabase
-        .from('people')
-        .update({ is_pinned: isPinned })
-        .eq('id', id);
-
-      if (error) throw error;
+      await api.setPinned(id, isPinned);
     } catch (err) {
       console.error('Error toggling pin:', err);
       await refreshPeople(); // Revert on failure
@@ -801,6 +375,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
         saveNotebook,
         syncNotes,
         updateNote,
+        setNoteDone,
         saveMemory,
         deleteNote,
         deleteNoteWithUndo,

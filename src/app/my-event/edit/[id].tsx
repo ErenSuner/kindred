@@ -9,6 +9,8 @@ import { useEvents } from '@/context/EventsContext';
 import { colors, radius, softShadow, spacing } from '@/theme/tokens';
 import { Nudge, parseNudges, serializeNudges } from '@/utils/nudges';
 import { Recurrence, YEARLY } from '@/utils/recurrence';
+import { TimeField } from '@/components/TimeField';
+import { TimeOfDay } from '@/utils/eventTime';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
@@ -32,6 +34,7 @@ export default function EditMyEvent() {
 
   const [title, setTitle] = useState('');
   const [recurrence, setRecurrence] = useState<Recurrence>(YEARLY);
+  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay | null>(null);
   const [date, setDate] = useState<DateValue>({ day: null, month: null, year: null });
   const { day, month, year } = date;
   const [reminders, setReminders] = useState<Nudge[]>([]);
@@ -44,6 +47,7 @@ export default function EditMyEvent() {
     if (!event || hydrated) return;
     setTitle(event.title);
     setRecurrence(event.recurrence);
+    setTimeOfDay(event.timeOfDay ?? null);
     setReminders(parseNudges(event.nudges));
 
     const [y, m, d] = event.originalDate.split('-').map(Number);
@@ -86,6 +90,7 @@ export default function EditMyEvent() {
         date: formattedDate,
         nudges: serializeNudges(reminders),
         recurrence,
+        timeOfDay,
       });
       router.back();
     } catch (e) {
@@ -167,6 +172,8 @@ export default function EditMyEvent() {
             </View>
 
             <RecurrencePicker value={recurrence} onChange={setRecurrence} />
+
+            <TimeField value={timeOfDay} onChange={setTimeOfDay} />
 
             <ReminderEditor reminders={reminders} onChange={setReminders} eventDate={eventDate()} />
           </Animated.View>

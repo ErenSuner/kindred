@@ -91,6 +91,7 @@ function RootLayoutNav() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="person/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="new-connection" options={{ animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="import-contacts" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="my-event/add" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="my-event/edit/[id]" options={{ animation: 'slide_from_right' }} />
     </Stack>

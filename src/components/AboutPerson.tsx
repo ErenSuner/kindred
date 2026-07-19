@@ -75,6 +75,7 @@ function GiftIdeas({ person, gifts, onDelete }: { person: Person; gifts: Note[];
   const { addNoteToPerson } = usePeople();
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showBought, setShowBought] = useState(false);
 
   const trimmed = body.trim();
 
@@ -91,26 +92,24 @@ function GiftIdeas({ person, gifts, onDelete }: { person: Person; gifts: Note[];
     }
   };
 
+  // Bought ideas leave the list rather than sitting in it forever, but they
+  // aren't deleted — "what did I get them last year" is worth being able to
+  // answer.
+  const open = gifts.filter((g) => !g.doneAt);
+  const bought = gifts.filter((g) => !!g.doneAt);
+
   return (
     <View style={{ gap: spacing.stackSm }}>
-      {gifts.length === 0 ? (
+      {open.length === 0 ? (
         <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={styles.empty}>
-          Nothing yet. Anything they mention wanting, jot it here — a line is enough.
+          {bought.length > 0
+            ? 'All caught up — everything on the list has been bought.'
+            : 'Nothing yet. Anything they mention wanting, jot it here — a line is enough.'}
         </Txt>
       ) : (
         <View style={{ gap: 8 }}>
-          {gifts.map((gift) => (
-            <View key={gift.id} style={styles.giftRow}>
-              <Icon name="card-giftcard" size={16} color={colors.tertiary} style={{ marginTop: 2 }} />
-              {/* minWidth 0 is what actually lets the row shrink — without it a
-                  single long unbroken word pushes straight out of the card. */}
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Txt variant="bodyMd" color={colors.onSurface}>{gift.body}</Txt>
-              </View>
-              <Pressable onPress={() => onDelete(gift.id)} hitSlop={8}>
-                <Icon name="close" size={16} color={colors.onSurfaceVariant} />
-              </Pressable>
-            </View>
+          {open.map((gift) => (
+            <GiftRow key={gift.id} gift={gift} onDelete={onDelete} />
           ))}
         </View>
       )}
@@ -135,6 +134,71 @@ function GiftIdeas({ person, gifts, onDelete }: { person: Person; gifts: Note[];
           <Icon name="add" size={20} color={colors.onPrimary} />
         </Pressable>
       </View>
+
+      {bought.length > 0 && (
+        <View style={{ gap: 8, marginTop: 4 }}>
+          <Pressable
+            onPress={() => setShowBought((v) => !v)}
+            style={({ pressed }) => [styles.boughtToggle, pressed && { opacity: 0.7 }]}
+          >
+            <Icon name={showBought ? 'expand-less' : 'expand-more'} size={16} color={colors.onSurfaceVariant} />
+            <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ letterSpacing: 1 }}>
+              BOUGHT ({bought.length})
+            </Txt>
+          </Pressable>
+
+          {showBought &&
+            bought.map((gift) => <GiftRow key={gift.id} gift={gift} onDelete={onDelete} />)}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// One row of the gift list. Ticking the box is the whole interaction — it moves
+// between the open list and the bought one, and untick puts it back.
+function GiftRow({ gift, onDelete }: { gift: Note; onDelete: (id: string) => void }) {
+  const { setNoteDone } = usePeople();
+  const [busy, setBusy] = useState(false);
+  const done = !!gift.doneAt;
+
+  const toggle = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await setNoteDone(gift.id, !done);
+    } catch (e) {
+      console.error('Failed to update gift idea:', e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <View style={[styles.giftRow, done && styles.giftRowDone]}>
+      <Pressable onPress={toggle} disabled={busy} hitSlop={8} style={{ marginTop: 1 }}>
+        <Icon
+          name={done ? 'check-circle' : 'radio-button-unchecked'}
+          size={20}
+          color={done ? colors.secondary : colors.outline}
+        />
+      </Pressable>
+
+      {/* minWidth 0 is what actually lets the row shrink — without it a single
+          long unbroken word pushes straight out of the card. */}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Txt
+          variant="bodyMd"
+          color={done ? colors.onSurfaceVariant : colors.onSurface}
+          style={done ? styles.giftTextDone : undefined}
+        >
+          {gift.body}
+        </Txt>
+      </View>
+
+      <Pressable onPress={() => onDelete(gift.id)} hitSlop={8}>
+        <Icon name="close" size={16} color={colors.onSurfaceVariant} />
+      </Pressable>
     </View>
   );
 }
@@ -360,6 +424,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
+  giftRowDone: { opacity: 0.6 },
+  giftTextDone: { textDecorationLine: 'line-through' },
+  boughtToggle: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4 },
   giftInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   giftInput: {
     flex: 1,

@@ -8,6 +8,7 @@ import { describeLoadError } from '@/utils/loadError';
 import { useUndo } from './UndoContext';
 import { cacheKey, readCache, writeCache } from '@/utils/cache';
 import { Weekday, isRoutine, nextRoutineDate, parseWeekdays, sortWeekdays } from '@/utils/routines';
+import { TimeOfDay, parseTimeOfDay, serializeTimeOfDay } from '@/utils/eventTime';
 
 type EventInput = {
   title: string;
@@ -17,6 +18,8 @@ type EventInput = {
   icon?: string;
   // Non-empty makes this a weekly routine rather than a dated reminder.
   weekdays?: Weekday[];
+  // null clears an existing time; undefined leaves it alone.
+  timeOfDay?: TimeOfDay | null;
 };
 
 type EventsContextValue = {
@@ -54,6 +57,7 @@ function iconForTitle(title: string): string {
 function mapDbEvent(row: any): MyEvent {
   const recurrence = parseRecurrence(row);
   const weekdays = parseWeekdays(row.weekdays);
+  const timeOfDay = parseTimeOfDay(row.time_of_day);
 
   // A routine's next date comes from its weekdays, not from the stored date —
   // that date is only the day the routine was set up.
@@ -76,6 +80,7 @@ function mapDbEvent(row: any): MyEvent {
       nudges: row.nudges || [],
       recurrence,
       weekdays,
+      timeOfDay,
       isExpired: false,
     };
   }
@@ -93,6 +98,7 @@ function mapDbEvent(row: any): MyEvent {
     nudges: row.nudges || [],
     recurrence,
     weekdays,
+    timeOfDay,
     isExpired: recurrence.unit === 'none' && daysAway < 0,
   };
 }
@@ -145,7 +151,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('my_events')
-        .select('id, title, date, icon, accent, nudges, repeat_unit, repeat_interval, weekdays');
+        .select('id, title, date, icon, accent, nudges, repeat_unit, repeat_interval, weekdays, time_of_day');
 
       if (error) throw error;
       if (!data) return;
@@ -186,6 +192,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
         icon: data.icon || (routine ? 'repeat' : iconForTitle(data.title)),
         accent: routine ? 'secondary' : 'primary',
         weekdays: sortWeekdays(data.weekdays ?? []),
+        time_of_day: serializeTimeOfDay(data.timeOfDay ?? null),
         ...serializeRecurrence(routine ? { unit: 'week', interval: 1 } : data.recurrence ?? YEARLY),
       });
       if (error) throw error;
@@ -212,6 +219,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
       if (data.nudges !== undefined) updates.nudges = data.nudges;
       if (data.recurrence !== undefined) Object.assign(updates, serializeRecurrence(data.recurrence));
       if (data.weekdays !== undefined) updates.weekdays = sortWeekdays(data.weekdays);
+      if (data.timeOfDay !== undefined) updates.time_of_day = serializeTimeOfDay(data.timeOfDay);
 
       const { error } = await supabase.from('my_events').update(updates).eq('id', id);
       if (error) throw error;

@@ -2,6 +2,7 @@
 
 import type { Recurrence } from '@/utils/recurrence';
 import type { Weekday } from '@/utils/routines';
+import type { TimeOfDay } from '@/utils/eventTime';
 
 export type Relationship = 'Family' | 'Friend' | 'Partner' | 'Colleague' | 'Acquaintance';
 
@@ -41,6 +42,9 @@ export type Note = {
   // Set when the note is a photo. A memory is a picture with an optional
   // caption in `body`.
   photoUrl?: string;
+  // Set when a gift idea has been bought. Kept rather than deleted so last
+  // year's presents are still answerable.
+  doneAt?: string;
 };
 
 // An event the user keeps for themselves — no person attached.
@@ -59,6 +63,9 @@ export type MyEvent = {
   // A routine happens on the same weekdays every week rather than on a date.
   // When this is non-empty the event is a routine and `recurrence` is ignored.
   weekdays?: Weekday[];
+  // The time the event itself happens, as opposed to when its reminders arrive.
+  // Absent for anything that is a day rather than a moment.
+  timeOfDay?: TimeOfDay | null;
 };
 
 export type Person = {

@@ -37,6 +37,7 @@ export function mapDbNote(row: any, now?: number): Note {
     specialDayId: row.special_day_id || undefined,
     occurredOn: row.occurred_on || undefined,
     photoUrl: row.photo_url || undefined,
+    doneAt: row.done_at || undefined,
   };
 }
 
