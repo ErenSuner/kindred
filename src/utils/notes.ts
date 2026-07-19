@@ -1,5 +1,21 @@
 import type { Note } from '@/data/mock';
 
+// `kind` used to be a label the user picked from four chips. It isn't a label
+// any more — it says which part of the app the note belongs to, and the user
+// never sees it.
+export const GIFT_IDEA = 'Gift Idea';
+export const MEMORY = 'Memory';
+// The person's free-form notebook. At most one row per person, edited in place.
+export const NOTEBOOK = 'Notebook';
+// A plain note attached to one occasion.
+export const NOTE = 'Note';
+
+// Anything written under the old chips that isn't a gift idea, a photo or the
+// notebook. Still shown, just not in a tab of its own.
+export function isLegacyNote(note: Note): boolean {
+  return !note.photoUrl && note.kind !== GIFT_IDEA && note.kind !== NOTEBOOK;
+}
+
 export function relativeWhen(createdAt: string, now: number = Date.now()): string {
   const diffMs = now - new Date(createdAt).getTime();
   const diffMins = Math.floor(diffMs / 60000);
@@ -20,6 +36,7 @@ export function mapDbNote(row: any, now?: number): Note {
     body: row.body,
     specialDayId: row.special_day_id || undefined,
     occurredOn: row.occurred_on || undefined,
+    photoUrl: row.photo_url || undefined,
   };
 }
 

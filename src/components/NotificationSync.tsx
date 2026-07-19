@@ -11,17 +11,20 @@ import { syncNotifications } from '@/utils/notifications';
 // from data changes.
 export function NotificationSync() {
   const { people } = usePeople();
-  const { events } = useEvents();
+  const { events, routines } = useEvents();
   const { enabledIds, loading } = useHolidays();
 
   const enabledHolidays = useMemo(() => HOLIDAYS.filter((h) => enabledIds.includes(h.id)), [enabledIds]);
+  // Routines are kept in their own list for display, but they schedule through
+  // the same path as everything else.
+  const ownEvents = useMemo(() => [...events, ...routines], [events, routines]);
 
   useEffect(() => {
     // Holding off until the stored selection has loaded avoids scheduling the
     // defaults and then immediately cancelling them.
     if (loading) return;
-    syncNotifications(people, events, enabledHolidays);
-  }, [people, events, enabledHolidays, loading]);
+    syncNotifications(people, ownEvents, enabledHolidays);
+  }, [people, ownEvents, enabledHolidays, loading]);
 
   return null;
 }

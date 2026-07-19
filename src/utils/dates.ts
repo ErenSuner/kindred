@@ -45,9 +45,11 @@ function occurrenceAt(anchor: Anchor, recurrence: Recurrence, k: number): Date {
   switch (recurrence.unit) {
     case 'none':
       return new Date(anchor.year, anchor.month - 1, anchor.day);
+    case 'day':
     case 'week': {
+      const daysPerStep = recurrence.unit === 'week' ? 7 : 1;
       const d = new Date(anchor.year, anchor.month - 1, anchor.day);
-      d.setDate(d.getDate() + 7 * recurrence.interval * k);
+      d.setDate(d.getDate() + daysPerStep * recurrence.interval * k);
       return d;
     }
     case 'month':
@@ -71,8 +73,9 @@ function firstIndexOnOrAfter(anchor: Anchor, recurrence: Recurrence, from: Date)
   const anchorDate = new Date(anchor.year, anchor.month - 1, anchor.day);
   let k = 0;
 
-  if (recurrence.unit === 'week') {
-    const stepMs = 7 * recurrence.interval * 24 * 60 * 60 * 1000;
+  if (recurrence.unit === 'week' || recurrence.unit === 'day') {
+    const daysPerStep = recurrence.unit === 'week' ? 7 : 1;
+    const stepMs = daysPerStep * recurrence.interval * 24 * 60 * 60 * 1000;
     k = Math.floor((from.getTime() - anchorDate.getTime()) / stepMs);
   } else {
     const monthsPerStep = recurrence.unit === 'year' ? 12 * recurrence.interval : recurrence.interval;
@@ -100,27 +103,29 @@ function resolveAnchor(dateStr: string, recurrence: Recurrence): Anchor {
   return anchor;
 }
 
-function describe(date: Date, anchorYear: number, recurrence: Recurrence): Occurrence {
+function describe(date: Date, anchorYear: number, recurrence: Recurrence, countsAge: boolean): Occurrence {
   const today = startOfToday();
   const daysAway = Math.ceil((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   const formattedDate = `${MONTHS_FULL[date.getMonth()]} ${getOrdinal(date.getDate())}, ${date.getFullYear()}`;
 
-  // Only a yearly cycle has an age to count.
+  // Only a birthday has an age to count. Every other yearly day used to get one
+  // too, which is where "Anniversary (Turning 1)" came from.
   let turningAge: number | undefined = undefined;
-  if (recurrence.unit === 'year' && anchorYear > SKIPPED_YEAR && !isNaN(anchorYear)) {
+  if (countsAge && recurrence.unit === 'year' && anchorYear > SKIPPED_YEAR && !isNaN(anchorYear)) {
     turningAge = date.getFullYear() - anchorYear;
   }
 
   return { date, daysAway, formattedDate, turningAge };
 }
 
-// dateStr is 'YYYY-MM-DD'.
-export function getNextOccurrence(dateStr: string, recurrence: Recurrence = YEARLY): Occurrence {
+// dateStr is 'YYYY-MM-DD'. `countsAge` is for birthdays — nothing else counts
+// years since the anchor.
+export function getNextOccurrence(dateStr: string, recurrence: Recurrence = YEARLY, countsAge = false): Occurrence {
   const originalYear = parseAnchor(dateStr).year;
   const anchor = resolveAnchor(dateStr, recurrence);
   const today = startOfToday();
   const k = firstIndexOnOrAfter(anchor, recurrence, today);
-  return describe(occurrenceAt(anchor, recurrence, k), originalYear, recurrence);
+  return describe(occurrenceAt(anchor, recurrence, k), originalYear, recurrence, countsAge);
 }
 
 // The next `count` occurrences on or after `from`. A one-time event yields at

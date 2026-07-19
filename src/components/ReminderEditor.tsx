@@ -9,7 +9,7 @@ import {
   DAY_OF,
   LEAD_UNITS,
   LeadUnit,
-  MAX_LEAD_AMOUNT,
+  MAX_LEAD_PICK,
   Nudge,
   PRESET_REMINDERS,
   leadLabel,
@@ -215,7 +215,7 @@ export function ReminderEditor({ reminders, onChange }: Props) {
         visible={amountPickerVisible}
         onClose={() => setAmountPickerVisible(false)}
         title="How many?"
-        options={Array.from({ length: MAX_LEAD_AMOUNT }, (_, i) => ({ label: String(i + 1), value: i + 1 }))}
+        options={Array.from({ length: MAX_LEAD_PICK }, (_, i) => ({ label: String(i + 1), value: i + 1 }))}
         selectedValue={leadAmount}
         onSelect={(v) => {
           setLeadAmount(v as number);

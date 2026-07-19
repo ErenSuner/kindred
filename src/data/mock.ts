@@ -1,6 +1,7 @@
 // Mock data standing in for a backend. Shapes match the Kindred screens.
 
 import type { Recurrence } from '@/utils/recurrence';
+import type { Weekday } from '@/utils/routines';
 
 export type Relationship = 'Family' | 'Friend' | 'Partner' | 'Colleague' | 'Acquaintance';
 
@@ -37,6 +38,9 @@ export type Note = {
   // Set when the note records what happened on one particular occurrence
   // rather than being a standing note. Stored as YYYY-MM-DD.
   occurredOn?: string;
+  // Set when the note is a photo. A memory is a picture with an optional
+  // caption in `body`.
+  photoUrl?: string;
 };
 
 // An event the user keeps for themselves — no person attached.
@@ -52,6 +56,9 @@ export type MyEvent = {
   nudges: string[];
   recurrence: Recurrence;
   isExpired?: boolean;
+  // A routine happens on the same weekdays every week rather than on a date.
+  // When this is non-empty the event is a routine and `recurrence` is ignored.
+  weekdays?: Weekday[];
 };
 
 export type Person = {

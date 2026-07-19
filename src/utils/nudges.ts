@@ -45,6 +45,13 @@ export const LEAD_UNITS: { label: string; plural: string; value: LeadUnit; days:
   { label: 'month', plural: 'months', value: 'month', days: 30 },
 ];
 
+// What the picker offers. Six is as far as it's worth going: beyond six months
+// you'd pick a bigger unit, and a week is only ever seven days.
+export const MAX_LEAD_PICK = 6;
+
+// What a stored value is allowed to be. Kept wide so a reminder saved back when
+// the picker went to 60 still reads back as itself instead of being silently
+// clamped down to six.
 export const MAX_LEAD_AMOUNT = 60;
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;

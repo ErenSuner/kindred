@@ -4,9 +4,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { colors, radius, spacing } from '@/theme/tokens';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
-import { SelectableChip } from '@/components/Chip';
-
-export const NOTE_KINDS = ['Gift Idea', 'Memory', 'Reminder', 'Other'];
+import { NOTE } from '@/utils/notes';
 
 // Kept generous — the cap is about stopping a note from becoming an essay, not
 // about being stingy. Cards only ever preview the first couple of lines.
@@ -33,9 +31,8 @@ type Props = {
   blurb?: string;
 };
 
-export function NotesEditor({ notes, onChange, title = 'Notes & Ideas', blurb }: Props) {
+export function NotesEditor({ notes, onChange, title = 'Notes', blurb }: Props) {
   const [body, setBody] = useState('');
-  const [kind, setKind] = useState(NOTE_KINDS[0]);
   const [editingKey, setEditingKey] = useState<string | null>(null);
 
   const trimmed = body.trim();
@@ -45,26 +42,23 @@ export function NotesEditor({ notes, onChange, title = 'Notes & Ideas', blurb }:
     if (!trimmed) return;
 
     if (editingKey) {
-      onChange(notes.map((n) => (n.key === editingKey ? { ...n, kind, body: trimmed } : n)));
+      onChange(notes.map((n) => (n.key === editingKey ? { ...n, body: trimmed } : n)));
       setEditingKey(null);
     } else {
-      onChange([...notes, { key: `draft_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, kind, body: trimmed }]);
+      onChange([...notes, { key: `draft_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, kind: NOTE, body: trimmed }]);
     }
 
     setBody('');
-    setKind(NOTE_KINDS[0]);
   };
 
   const startEdit = (note: DraftNote) => {
     setEditingKey(note.key);
-    setKind(note.kind);
     setBody(note.body);
   };
 
   const cancelEdit = () => {
     setEditingKey(null);
     setBody('');
-    setKind(NOTE_KINDS[0]);
   };
 
   const remove = (key: string) => {
@@ -79,15 +73,14 @@ export function NotesEditor({ notes, onChange, title = 'Notes & Ideas', blurb }:
         <Txt variant="labelMd" color={colors.onSurface}>{title}</Txt>
       </View>
       <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 4, marginBottom: 12 }}>
-        {blurb ?? 'Gift ideas, plans, anything you want to remember for this day.'}
+        {blurb ?? 'Plans, details, anything you want to remember for this day.'}
       </Txt>
 
       {notes.length > 0 && (
         <View style={{ gap: 8, marginBottom: 12 }}>
           {notes.map((note) => (
             <View key={note.key} style={[styles.noteRow, editingKey === note.key && styles.noteRowEditing]}>
-              <View style={{ flex: 1, gap: 2 }}>
-                <Txt variant="labelSm" color={colors.tertiary}>{note.kind}</Txt>
+              <View style={{ flex: 1 }}>
                 <Txt variant="bodyMd" color={colors.onSurface}>{note.body}</Txt>
               </View>
               <View style={{ flexDirection: 'row', gap: 12, paddingLeft: 8 }}>
@@ -102,12 +95,6 @@ export function NotesEditor({ notes, onChange, title = 'Notes & Ideas', blurb }:
           ))}
         </View>
       )}
-
-      <View style={styles.chipWrap}>
-        {NOTE_KINDS.map((k) => (
-          <SelectableChip key={k} label={k} active={kind === k} onPress={() => setKind(k)} />
-        ))}
-      </View>
 
       <TextInput
         multiline
@@ -169,7 +156,6 @@ const styles = StyleSheet.create({
     padding: 16,
     marginTop: spacing.stackSm,
   },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   input: {
     backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radius.DEFAULT,

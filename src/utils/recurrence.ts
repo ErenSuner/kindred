@@ -3,7 +3,7 @@
 // Stored as two columns rather than a boolean so "every 3 weeks" is expressible
 // alongside the common yearly case. A unit of 'none' is a one-time event.
 
-export type RepeatUnit = 'none' | 'week' | 'month' | 'year';
+export type RepeatUnit = 'none' | 'day' | 'week' | 'month' | 'year';
 
 export type Recurrence = {
   unit: RepeatUnit;
@@ -14,10 +14,12 @@ export const ONE_TIME: Recurrence = { unit: 'none', interval: 1 };
 export const YEARLY: Recurrence = { unit: 'year', interval: 1 };
 export const MONTHLY: Recurrence = { unit: 'month', interval: 1 };
 export const WEEKLY: Recurrence = { unit: 'week', interval: 1 };
+export const DAILY: Recurrence = { unit: 'day', interval: 1 };
 
 export const MAX_INTERVAL = 30;
 
 const UNIT_NAMES: Record<Exclude<RepeatUnit, 'none'>, [string, string]> = {
+  day: ['day', 'days'],
   week: ['week', 'weeks'],
   month: ['month', 'months'],
   year: ['year', 'years'],
@@ -38,7 +40,7 @@ export function recurrenceLabel(r: Recurrence): string {
 export function recurrenceShortLabel(r: Recurrence): string {
   if (r.unit === 'none') return 'One-time';
   if (r.interval === 1) {
-    return { week: 'Weekly', month: 'Monthly', year: 'Annual' }[r.unit];
+    return { day: 'Daily', week: 'Weekly', month: 'Monthly', year: 'Annual' }[r.unit];
   }
   const [, plural] = UNIT_NAMES[r.unit];
   return `Every ${r.interval} ${plural}`;
@@ -52,6 +54,8 @@ export function recurrenceDescription(r: Recurrence): string {
   switch (r.unit) {
     case 'none':
       return 'This event will happen only once.';
+    case 'day':
+      return r.interval === 1 ? 'This event repeats every day.' : `This event repeats every ${r.interval} days.`;
     case 'week':
       return r.interval === 1 ? 'This event repeats every week.' : `This event repeats every ${r.interval} weeks.`;
     case 'month':
@@ -71,7 +75,7 @@ function clampInterval(n: unknown): number {
 // recurrence existed only have is_annual, so fall back to that.
 export function parseRecurrence(row: { repeat_unit?: unknown; repeat_interval?: unknown; is_annual?: unknown }): Recurrence {
   const unit = row.repeat_unit;
-  if (unit === 'none' || unit === 'week' || unit === 'month' || unit === 'year') {
+  if (unit === 'none' || unit === 'day' || unit === 'week' || unit === 'month' || unit === 'year') {
     return { unit, interval: unit === 'none' ? 1 : clampInterval(row.repeat_interval) };
   }
   if (row.is_annual === false) return ONE_TIME;

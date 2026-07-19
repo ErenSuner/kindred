@@ -12,6 +12,7 @@ import { FormError } from '@/components/FormError';
 import { useEvents } from '@/context/EventsContext';
 import { parseNudges } from '@/utils/nudges';
 import { recurrenceIcon, recurrenceShortLabel } from '@/utils/recurrence';
+import { weekdaysLabel } from '@/utils/routines';
 import type { MyEvent } from '@/data/mock';
 
 function daysLabel(daysAway: number) {
@@ -39,7 +40,7 @@ function NudgeSummary({ event }: { event: MyEvent }) {
 export default function MyEvents() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { events, pastEvents, loadError, refreshEvents } = useEvents();
+  const { events, routines, pastEvents, loadError, refreshEvents } = useEvents();
   const { user } = useAuth();
   const userName = user?.user_metadata?.name || (user?.email ? user.email.split('@')[0] : 'You');
   const ownAvatarUrl: string | undefined = user?.user_metadata?.avatar_url ?? undefined;
@@ -69,7 +70,7 @@ export default function MyEvents() {
 
         {/* The empty card is suppressed on a failed load — an empty list there
             means "couldn't fetch", not "you have nothing". */}
-        {events.length === 0 && !loadError ? (
+        {events.length === 0 && routines.length === 0 && !loadError ? (
           <Animated.View entering={FadeInDown.duration(500).delay(100)}>
             <Card style={styles.emptyCard}>
               <View style={styles.emptyAccent} />
@@ -105,6 +106,7 @@ export default function MyEvents() {
             </Animated.View>
 
             {/* Nearest event, given room to breathe */}
+            {featured && (
             <Animated.View entering={FadeInDown.duration(500).delay(120)} style={{ marginBottom: spacing.gutter }}>
               <Card pressable onPress={() => router.push(`/my-event/edit/${featured.id}` as any)} style={styles.featured}>
                 <View style={[styles.blur, { pointerEvents: 'none' } as any]} />
@@ -143,6 +145,7 @@ export default function MyEvents() {
                 </View>
               </Card>
             </Animated.View>
+            )}
 
             {rest.length > 0 && (
               <Animated.View entering={FadeInDown.duration(500).delay(200)} style={{ gap: spacing.gutter }}>
@@ -184,6 +187,48 @@ export default function MyEvents() {
             </Animated.View>
           </>
         )}
+
+        {/* Weekly routines — no countdown, because there's always another one */}
+        <Animated.View entering={FadeInDown.duration(500).delay(300)} style={{ marginTop: spacing.stackLg, gap: spacing.stackSm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 2 }}>
+            <Icon name="repeat" size={18} color={colors.onSurfaceVariant} />
+            <Txt variant="labelSm" color={colors.onSurfaceVariant}>EVERY WEEK</Txt>
+          </View>
+
+          {routines.map((routine) => (
+            <Card
+              key={routine.id}
+              pressable
+              onPress={() => router.push({ pathname: '/my-event/routine', params: { id: routine.id } } as any)}
+              style={styles.rowCard}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flex: 1 }}>
+                <View style={styles.routineIcon}>
+                  <Icon name="repeat" size={22} color={colors.secondary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Txt variant="bodyLg" color={colors.onSurface} style={{ fontFamily: 'Inter_500Medium' }}>
+                    {routine.title}
+                  </Txt>
+                  <Txt variant="bodyMd" color={colors.onSurfaceVariant}>
+                    {weekdaysLabel(routine.weekdays ?? [])}
+                  </Txt>
+                </View>
+              </View>
+              <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                {routine.daysAway === 0 ? 'Today' : routine.daysAway === 1 ? 'Tomorrow' : `in ${routine.daysAway}d`}
+              </Txt>
+            </Card>
+          ))}
+
+          <Pressable
+            onPress={() => router.push('/my-event/routine' as any)}
+            style={({ pressed }) => [styles.addBtn, { marginTop: spacing.stackSm, paddingVertical: 16 }, pressed && { backgroundColor: colors.surfaceContainerHigh }]}
+          >
+            <Icon name="add" size={20} color={colors.primary} />
+            <Txt variant="labelMd" color={colors.primary}>Add a weekly routine</Txt>
+          </Pressable>
+        </Animated.View>
 
         {/* Reminders that have already happened, kept rather than deleted */}
         {pastEvents.length > 0 && (
@@ -274,6 +319,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceContainer,
   },
   pastCard: { opacity: 0.75 },
+  routineIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(206,234,207,0.5)',
+  },
   emptyCard: {
     overflow: 'hidden',
     paddingVertical: 40,

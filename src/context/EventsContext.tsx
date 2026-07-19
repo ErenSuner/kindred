@@ -2,11 +2,12 @@ import type { MyEvent } from '@/data/mock';
 import { supabase } from '@/lib/supabase';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
-import { getNextOccurrence } from '@/utils/dates';
+import { formatOccurrenceDate, getNextOccurrence, toISODate } from '@/utils/dates';
 import { Recurrence, YEARLY, parseRecurrence, serializeRecurrence } from '@/utils/recurrence';
 import { describeLoadError } from '@/utils/loadError';
 import { useUndo } from './UndoContext';
 import { cacheKey, readCache, writeCache } from '@/utils/cache';
+import { Weekday, isRoutine, nextRoutineDate, parseWeekdays, sortWeekdays } from '@/utils/routines';
 
 type EventInput = {
   title: string;
@@ -14,10 +15,14 @@ type EventInput = {
   nudges?: string[];
   recurrence?: Recurrence;
   icon?: string;
+  // Non-empty makes this a weekly routine rather than a dated reminder.
+  weekdays?: Weekday[];
 };
 
 type EventsContextValue = {
   events: MyEvent[];
+  // Weekly routines — the same weekdays every week, no end date.
+  routines: MyEvent[];
   // Reminders that have already happened, most recent first.
   pastEvents: MyEvent[];
   loading: boolean;
@@ -48,6 +53,33 @@ function iconForTitle(title: string): string {
 
 function mapDbEvent(row: any): MyEvent {
   const recurrence = parseRecurrence(row);
+  const weekdays = parseWeekdays(row.weekdays);
+
+  // A routine's next date comes from its weekdays, not from the stored date —
+  // that date is only the day the routine was set up.
+  if (isRoutine(weekdays)) {
+    const next = nextRoutineDate(weekdays);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const daysAway = next
+      ? Math.round((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
+
+    return {
+      id: row.id,
+      title: row.title,
+      date: next ? formatOccurrenceDate(next) : '',
+      originalDate: row.date,
+      icon: row.icon || 'repeat',
+      accent: (row.accent || 'secondary') as MyEvent['accent'],
+      daysAway,
+      nudges: row.nudges || [],
+      recurrence,
+      weekdays,
+      isExpired: false,
+    };
+  }
+
   const { formattedDate, daysAway, turningAge } = getNextOccurrence(row.date, recurrence);
   return {
     id: row.id,
@@ -60,6 +92,7 @@ function mapDbEvent(row: any): MyEvent {
     turningAge,
     nudges: row.nudges || [],
     recurrence,
+    weekdays,
     isExpired: recurrence.unit === 'none' && daysAway < 0,
   };
 }
@@ -72,6 +105,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   // One-off reminders whose date has passed. Kept so they can be looked back on.
   const [pastEvents, setPastEvents] = useState<MyEvent[]>([]);
+  const [routines, setRoutines] = useState<MyEvent[]>([]);
   const { stage } = useUndo();
   const eventsRef = useRef<MyEvent[]>([]);
 
@@ -80,14 +114,19 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   const applyRows = (rows: any[]) => {
     const mapped = rows.map(mapDbEvent);
 
+    // Routines are a list of their own — a countdown to "the next Tuesday" next
+    // to a passport renewal would be noise in the same list.
+    const dated = mapped.filter((e) => !isRoutine(e.weekdays));
+
     // A passed one-off used to be deleted here. It's kept now and simply moved
     // out of the upcoming list — deleting the user's own record of something
     // that happened was never the app's call to make.
-    const live = mapped.filter((e) => !e.isExpired);
+    const live = dated.filter((e) => !e.isExpired);
     live.sort((a, b) => a.daysAway - b.daysAway);
 
     setEvents(live);
-    setPastEvents(mapped.filter((e) => e.isExpired).sort((a, b) => b.daysAway - a.daysAway));
+    setRoutines(mapped.filter((e) => isRoutine(e.weekdays)).sort((a, b) => a.daysAway - b.daysAway));
+    setPastEvents(dated.filter((e) => e.isExpired).sort((a, b) => b.daysAway - a.daysAway));
     eventsRef.current = live;
   };
 
@@ -106,7 +145,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('my_events')
-        .select('id, title, date, icon, accent, nudges, repeat_unit, repeat_interval');
+        .select('id, title, date, icon, accent, nudges, repeat_unit, repeat_interval, weekdays');
 
       if (error) throw error;
       if (!data) return;
@@ -137,14 +176,17 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     setLoading(true);
     try {
+      const routine = isRoutine(data.weekdays);
       const { error } = await supabase.from('my_events').insert({
         user_id: user.id,
         title: data.title,
-        date: data.date,
+        // A routine has no date of its own; today is only where it starts.
+        date: data.date || toISODate(new Date()),
         nudges: data.nudges || [],
-        icon: data.icon || iconForTitle(data.title),
-        accent: 'primary',
-        ...serializeRecurrence(data.recurrence ?? YEARLY),
+        icon: data.icon || (routine ? 'repeat' : iconForTitle(data.title)),
+        accent: routine ? 'secondary' : 'primary',
+        weekdays: sortWeekdays(data.weekdays ?? []),
+        ...serializeRecurrence(routine ? { unit: 'week', interval: 1 } : data.recurrence ?? YEARLY),
       });
       if (error) throw error;
       await refreshEvents();
@@ -169,6 +211,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
       if (data.date !== undefined) updates.date = data.date;
       if (data.nudges !== undefined) updates.nudges = data.nudges;
       if (data.recurrence !== undefined) Object.assign(updates, serializeRecurrence(data.recurrence));
+      if (data.weekdays !== undefined) updates.weekdays = sortWeekdays(data.weekdays);
 
       const { error } = await supabase.from('my_events').update(updates).eq('id', id);
       if (error) throw error;
@@ -193,6 +236,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
 
   // Staged deletions read as gone everywhere while the undo window is open.
   const visibleEvents = events.filter((e) => !hiddenIds.includes(e.id));
+  const visibleRoutines = routines.filter((e) => !hiddenIds.includes(e.id));
 
   const deleteEventWithUndo = (event: MyEvent) => {
     setHiddenIds((prev) => [...prev, event.id]);
@@ -209,11 +253,16 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const getEvent = (id: string) => visibleEvents.find((e) => e.id === id);
+  // Routines and past reminders are editable too, so this looks beyond the
+  // upcoming list.
+  const getEvent = (id: string) =>
+    visibleEvents.find((e) => e.id === id) ??
+    visibleRoutines.find((e) => e.id === id) ??
+    pastEvents.find((e) => e.id === id);
 
   return (
     <EventsContext.Provider
-      value={{ events: visibleEvents, pastEvents, loading, loadError, addEvent, updateEvent, deleteEvent, deleteEventWithUndo, refreshEvents, getEvent }}
+      value={{ events: visibleEvents, routines: visibleRoutines, pastEvents, loading, loadError, addEvent, updateEvent, deleteEvent, deleteEventWithUndo, refreshEvents, getEvent }}
     >
       {children}
     </EventsContext.Provider>

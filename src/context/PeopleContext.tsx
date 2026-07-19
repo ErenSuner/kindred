@@ -1,9 +1,10 @@
 import type { Note, Person, Relationship } from '@/data/mock';
 import { supabase } from '@/lib/supabase';
 import { cacheKey, readCache, writeCache } from '@/utils/cache';
+import { removeAvatarByUrl } from '@/utils/avatars';
 import { getNextOccurrence } from '@/utils/dates';
 import { describeLoadError } from '@/utils/loadError';
-import { distributeNotes, mapDbNote } from '@/utils/notes';
+import { NOTEBOOK, distributeNotes, mapDbNote } from '@/utils/notes';
 import { Recurrence, YEARLY, parseRecurrence, serializeRecurrence } from '@/utils/recurrence';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
@@ -44,7 +45,10 @@ type PeopleContextValue = {
   addBirthday: (personId: string, data: { date: string; nudges?: string[]; notes?: NoteDraft[] }) => Promise<void>;
   updateBirthday: (birthdayId: string, data: { date?: string; nudges?: string[] }) => Promise<void>;
   deleteBirthday: (birthdayId: string) => Promise<void>;
-  addNoteToPerson: (personId: string, kind: string, body: string, target?: NoteTarget) => Promise<void>;
+  addNoteToPerson: (personId: string, kind: string, body: string, target?: NoteTarget, photoUrl?: string) => Promise<void>;
+  // The person's notebook is a single row edited in place, so it is written
+  // through here rather than through addNoteToPerson.
+  saveNotebook: (personId: string, body: string, existingNoteId?: string) => Promise<void>;
   syncNotes: (
     personId: string,
     target: NoteTarget,
@@ -84,7 +88,7 @@ export function mapDbPersonToPerson(dbPerson: any): Person {
   const specialDays: any[] = (dbPerson.special_days || []).map((sd: any) => {
     const isBirthday = sd.is_birthday === true;
     const recurrence = isBirthday ? YEARLY : parseRecurrence(sd);
-    const { formattedDate, daysAway, turningAge } = getNextOccurrence(sd.date, recurrence);
+    const { formattedDate, daysAway, turningAge } = getNextOccurrence(sd.date, recurrence, isBirthday);
     return {
       id: sd.id,
       title: isBirthday ? 'Birthday' : sd.title,
@@ -205,7 +209,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
           avatar_url,
           is_pinned,
           special_days (id, title, date, icon, accent, nudges, repeat_unit, repeat_interval, is_birthday, created_at),
-          notes (id, kind, body, created_at, special_day_id, occurred_on)
+          notes (id, kind, body, created_at, special_day_id, occurred_on, photo_url)
         `);
 
       if (error) throw error;
@@ -464,7 +468,13 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addNoteToPerson = async (personId: string, kind: string, body: string, target?: NoteTarget) => {
+  const addNoteToPerson = async (
+    personId: string,
+    kind: string,
+    body: string,
+    target?: NoteTarget,
+    photoUrl?: string,
+  ) => {
     if (!user) return;
     try {
       const { error } = await supabase
@@ -474,11 +484,38 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
           kind,
           body,
           special_day_id: target?.specialDayId ?? null,
+          photo_url: photoUrl ?? null,
         });
       if (error) throw error;
       await refreshPeople();
     } catch (err) {
       console.error('Error adding note:', err);
+      throw err;
+    }
+  };
+
+  // One notebook per person. An empty body deletes it rather than leaving a
+  // blank row behind.
+  const saveNotebook = async (personId: string, body: string, existingNoteId?: string) => {
+    if (!user) return;
+    try {
+      if (existingNoteId) {
+        if (!body.trim()) {
+          const { error } = await supabase.from('notes').delete().eq('id', existingNoteId);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from('notes').update({ body }).eq('id', existingNoteId);
+          if (error) throw error;
+        }
+      } else if (body.trim()) {
+        const { error } = await supabase
+          .from('notes')
+          .insert({ person_id: personId, kind: NOTEBOOK, body });
+        if (error) throw error;
+      }
+      await refreshPeople();
+    } catch (err) {
+      console.error('Error saving notebook:', err);
       throw err;
     }
   };
@@ -533,11 +570,21 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
   const deleteNote = async (noteId: string) => {
     if (!user) return;
     try {
+      // Read the photo first: once the row is gone there's nothing left
+      // pointing at the file, and it would sit in storage forever.
+      const { data: existing } = await supabase
+        .from('notes')
+        .select('photo_url')
+        .eq('id', noteId)
+        .maybeSingle();
+
       const { error } = await supabase
         .from('notes')
         .delete()
         .eq('id', noteId);
       if (error) throw error;
+
+      if (existing?.photo_url) await removeAvatarByUrl(existing.photo_url);
       await refreshPeople();
     } catch (err) {
       console.error('Error deleting note:', err);
@@ -751,6 +798,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
         refreshPeople,
         getPerson,
         addNoteToPerson,
+        saveNotebook,
         syncNotes,
         updateNote,
         saveMemory,

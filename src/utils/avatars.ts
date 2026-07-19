@@ -38,13 +38,22 @@ export type PickResult =
 // Opens the photo library, cropped square because every avatar is rendered in a
 // circle.
 export async function pickAvatarImage(): Promise<PickResult> {
+  return pickImage({ square: true });
+}
+
+// A memory is shown as it was taken, so it isn't forced into a square.
+export async function pickPhoto(): Promise<PickResult> {
+  return pickImage({ square: false });
+}
+
+async function pickImage({ square }: { square: boolean }): Promise<PickResult> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) return { status: 'denied' };
 
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
-    allowsEditing: true,
-    aspect: [1, 1],
+    allowsEditing: square,
+    ...(square ? { aspect: [1, 1] as [number, number] } : {}),
     quality: 0.7,
     base64: true,
   });
@@ -60,6 +69,10 @@ export async function pickAvatarImage(): Promise<PickResult> {
     mimeType: asset.mimeType ?? 'image/jpeg',
   };
 }
+
+// Memories share the avatars bucket — same owner, same per-user folder, same
+// policies. Nothing about the bucket is avatar-specific except its name.
+export const uploadPhoto = uploadAvatar;
 
 // Uploads under the signed-in user's folder, which is what the storage policies
 // key on. Returns a public URL ready to store on the row.

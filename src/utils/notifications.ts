@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DAY_OF, Nudge, offsetDaysFor, parseNudge, parseNudges } from '@/utils/nudges';
 import { Recurrence, YEARLY } from '@/utils/recurrence';
 import { getUpcomingOccurrences } from '@/utils/dates';
+import { isRoutine, upcomingRoutineDates } from '@/utils/routines';
 import { Holiday } from '@/data/holidays';
 import { formatHolidayDate, nextHolidayDates } from '@/utils/holidays';
 
@@ -117,6 +118,31 @@ function collectMyEventNotifications(myEvents: MyEvent[], hour: number): Pending
   const pending: PendingNotification[] = [];
 
   for (const event of myEvents) {
+    // A routine's dates come from its weekdays, not from a recurrence anchored
+    // to the day it was created.
+    if (isRoutine(event.weekdays)) {
+      const now = new Date();
+      for (const nudge of nudgesFor(event.nudges)) {
+        const offsetDays = offsetDaysFor(nudge) ?? 0;
+        upcomingRoutineDates(event.weekdays ?? [], MAX_OCCURRENCES_PER_NUDGE)
+          .map((occurrence) => {
+            const at = new Date(occurrence.getFullYear(), occurrence.getMonth(), occurrence.getDate(), hour, 0, 0, 0);
+            at.setDate(at.getDate() - offsetDays);
+            return at;
+          })
+          .filter((at) => at.getTime() > now.getTime())
+          .forEach((date, i) => {
+            pending.push({
+              id: `rt_${event.id}_${nudge.value}_${i}`,
+              title: 'Your Routine',
+              body: nudge.value === DAY_OF ? `${event.title} is today.` : `${event.title} is coming up.`,
+              date,
+            });
+          });
+      }
+      continue;
+    }
+
     for (const nudge of nudgesFor(event.nudges)) {
       const dates = notificationDatesFor(event.originalDate, event.recurrence, nudge, hour);
       dates.forEach((date, i) => {

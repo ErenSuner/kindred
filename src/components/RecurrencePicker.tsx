@@ -10,7 +10,6 @@ import {
   MONTHLY,
   ONE_TIME,
   Recurrence,
-  RepeatUnit,
   WEEKLY,
   YEARLY,
   recurrenceDescription,
@@ -26,10 +25,15 @@ const QUICK_OPTIONS: Quick[] = [
   { label: 'Yearly', value: YEARLY },
 ];
 
-const UNIT_OPTIONS: { label: string; value: RepeatUnit }[] = [
+// Custom is for the short cycles the quick chips don't cover. "Every N years"
+// was dropped — a yearly day is the Yearly chip, and nothing sensibly repeats
+// on a multi-year cycle.
+type CustomUnit = 'day' | 'week' | 'month';
+
+const UNIT_OPTIONS: { label: string; value: CustomUnit }[] = [
+  { label: 'Days', value: 'day' },
   { label: 'Weeks', value: 'week' },
   { label: 'Months', value: 'month' },
-  { label: 'Years', value: 'year' },
 ];
 
 function matchesQuick(r: Recurrence, quick: Recurrence) {
@@ -37,10 +41,13 @@ function matchesQuick(r: Recurrence, quick: Recurrence) {
   return r.unit === quick.unit && r.interval === 1;
 }
 
-// Custom mode covers anything the four quick chips don't: every 3 weeks, every
-// 2 years, and so on.
+// Custom mode covers anything the four quick chips don't: every day, every 3
+// weeks, and so on. An "every N years" value from an older row matches nothing
+// here — the description above still spells it out, and picking anything
+// replaces it.
 function isCustom(r: Recurrence) {
-  return r.unit !== 'none' && r.interval !== 1;
+  if (r.unit === 'day') return true;
+  return r.unit === 'week' || r.unit === 'month' ? r.interval !== 1 : false;
 }
 
 type Props = {
@@ -53,9 +60,11 @@ export function RecurrencePicker({ value, onChange }: Props) {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerType, setPickerType] = useState<'interval' | 'unit'>('interval');
 
-  // Falling back to weeks keeps a one-time event from becoming "every 2 nothings".
-  const customUnit: Exclude<RepeatUnit, 'none'> = value.unit === 'none' ? 'week' : value.unit;
-  const customInterval = value.interval > 1 ? value.interval : 2;
+  // Falling back to weeks keeps a one-time (or legacy yearly) event from
+  // becoming "every 2 nothings".
+  const customUnit: CustomUnit =
+    value.unit === 'day' || value.unit === 'week' || value.unit === 'month' ? value.unit : 'week';
+  const customInterval = isCustom(value) ? value.interval : 2;
 
   const selectQuick = (quick: Recurrence) => {
     setCustomMode(false);
@@ -134,7 +143,7 @@ export function RecurrencePicker({ value, onChange }: Props) {
         title={pickerType === 'interval' ? 'Repeat Every' : 'Repeat Unit'}
         options={
           pickerType === 'interval'
-            ? Array.from({ length: MAX_INTERVAL - 1 }, (_, i) => ({ label: String(i + 2), value: i + 2 }))
+            ? Array.from({ length: MAX_INTERVAL }, (_, i) => ({ label: String(i + 1), value: i + 1 }))
             : UNIT_OPTIONS
         }
         selectedValue={pickerType === 'interval' ? customInterval : customUnit}
@@ -142,7 +151,7 @@ export function RecurrencePicker({ value, onChange }: Props) {
           if (pickerType === 'interval') {
             onChange({ unit: customUnit, interval: val as number });
           } else {
-            onChange({ unit: val as Exclude<RepeatUnit, 'none'>, interval: customInterval });
+            onChange({ unit: val as CustomUnit, interval: customInterval });
           }
           setPickerVisible(false);
         }}
