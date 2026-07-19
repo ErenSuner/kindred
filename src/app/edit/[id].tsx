@@ -4,6 +4,7 @@ import { SelectableChip } from '@/components/Chip';
 import { Icon } from '@/components/Icon';
 import { Txt } from '@/components/Txt';
 import { usePeople } from '@/context/PeopleContext';
+import { describeWriteError } from '@/utils/loadError';
 import type { Relationship } from '@/data/mock';
 import { ambientShadow, colors, radius, softShadow, spacing } from '@/theme/tokens';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -74,7 +75,10 @@ export default function EditConnection() {
 
       router.back();
     } catch (e) {
+      // This used to fail silently: the button did nothing and the screen
+      // stayed put with no explanation.
       console.error('Failed to update connection:', e);
+      setNameError(describeWriteError(e));
     }
   };
 

@@ -1,3 +1,4 @@
+import { describeWriteError } from '@/utils/loadError';
 import { AvatarPicker } from '@/components/AvatarPicker';
 import { Button } from '@/components/Button';
 import { SelectableChip } from '@/components/Chip';
@@ -63,7 +64,7 @@ export default function NewConnection() {
       router.back();
     } catch (e) {
       console.error(e);
-      setNameError('Could not save. Check your connection and try again.');
+      setNameError(describeWriteError(e));
     }
   };
 

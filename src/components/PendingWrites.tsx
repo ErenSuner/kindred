@@ -7,15 +7,20 @@ import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { usePeople } from '@/context/PeopleContext';
 
-// Says what the app is holding on to. Writes made without a connection are
-// already on screen, which is the right behaviour but would otherwise be a lie
-// — this is the part that admits they haven't left the phone yet.
+// Says what the app is holding on to, and what it dropped.
+//
+// Notes queue and send themselves later, which is the right behaviour but would
+// otherwise be a lie — this is the part that admits they haven't left the phone
+// yet. It also carries the failures nobody was watching: a staged delete
+// finishing in the background, or a pin that quietly slid back.
 export function PendingWrites() {
-  const { pendingWrites, retryPendingWrites } = usePeople();
+  const { pendingWrites, retryPendingWrites, writeError, clearWriteError } = usePeople();
   const insets = useSafeAreaInsets();
   const [retrying, setRetrying] = useState(false);
 
-  if (pendingWrites === 0) return null;
+  // An outright failure is the more urgent of the two, so it wins the one slot.
+  const showingError = !!writeError;
+  if (!showingError && pendingWrites === 0) return null;
 
   const retry = async () => {
     if (retrying) return;
@@ -34,19 +39,38 @@ export function PendingWrites() {
       style={[styles.wrap, { paddingTop: insets.top + 6 }]}
       pointerEvents="box-none"
     >
-      <View style={styles.bar}>
-        <Icon name="cloud-off" size={16} color={colors.onSurfaceVariant} />
-        <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.text}>
-          {pendingWrites === 1 ? '1 change waiting to sync' : `${pendingWrites} changes waiting to sync`}
+      <View style={[styles.bar, showingError && styles.barError]}>
+        <Icon
+          name={showingError ? 'error-outline' : 'cloud-off'}
+          size={16}
+          color={showingError ? colors.onErrorContainer : colors.onSurfaceVariant}
+        />
+
+        <Txt
+          variant="labelSm"
+          color={showingError ? colors.onErrorContainer : colors.onSurfaceVariant}
+          style={styles.text}
+        >
+          {showingError
+            ? writeError
+            : pendingWrites === 1
+            ? '1 change waiting to sync'
+            : `${pendingWrites} changes waiting to sync`}
         </Txt>
 
-        <Pressable onPress={retry} disabled={retrying} hitSlop={8}>
-          {retrying ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : (
-            <Txt variant="labelSm" color={colors.primary}>Retry</Txt>
-          )}
-        </Pressable>
+        {showingError ? (
+          <Pressable onPress={clearWriteError} hitSlop={8}>
+            <Icon name="close" size={16} color={colors.onErrorContainer} />
+          </Pressable>
+        ) : (
+          <Pressable onPress={retry} disabled={retrying} hitSlop={8}>
+            {retrying ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Txt variant="labelSm" color={colors.primary}>Retry</Txt>
+            )}
+          </Pressable>
+        )}
       </View>
     </Animated.View>
   );
@@ -71,6 +95,10 @@ const styles = StyleSheet.create({
     borderColor: colors.outlineVariant,
     paddingHorizontal: 14,
     paddingVertical: 8,
+  },
+  barError: {
+    backgroundColor: colors.errorContainer,
+    borderColor: colors.error,
   },
   text: { flex: 1, fontWeight: 'normal' },
 });

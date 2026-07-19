@@ -1,3 +1,4 @@
+import { describeWriteError } from '@/utils/loadError';
 import { useState, useEffect, useRef } from 'react';
 import { View, ScrollView, StyleSheet, Pressable, KeyboardAvoidingView, Platform, Modal } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -111,7 +112,7 @@ export default function EditBirthday() {
       router.back();
     } catch (e) {
       console.error(e);
-      setError('Could not save. Check your connection and try again.');
+      setError(describeWriteError(e));
     } finally {
       setSaving(false);
     }

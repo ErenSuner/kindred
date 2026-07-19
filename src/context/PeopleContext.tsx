@@ -1,6 +1,6 @@
 import type { Note, Person, Relationship } from '@/data/mock';
 import { cacheKey, readCache, writeCache } from '@/utils/cache';
-import { describeLoadError } from '@/utils/loadError';
+import { describeLoadError, describeWriteError } from '@/utils/loadError';
 import { Recurrence } from '@/utils/recurrence';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
@@ -82,6 +82,11 @@ type PeopleContextValue = {
   // How many writes are waiting for a connection, and a way to try them now.
   pendingWrites: number;
   retryPendingWrites: () => Promise<void>;
+  // Set when a write that can't be queued failed with nobody watching — a
+  // staged delete finishing in the background, or a pin toggle. Cleared by the
+  // banner that shows it.
+  writeError: string | null;
+  clearWriteError: () => void;
 };
 
 const PeopleContext = createContext<PeopleContextValue | null>(null);
@@ -93,6 +98,7 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
   // A failed load used to leave an empty list behind with nothing to explain it,
   // which reads exactly like "all your data is gone". Screens show this instead.
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [writeError, setWriteError] = useState<string | null>(null);
   // People staged for deletion. They're kept out of `people` so the UI reads as
   // deleted, but the rows are untouched until the undo window closes.
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
@@ -459,6 +465,11 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
       commit: async () => {
         try {
           await removePerson(person.id);
+        } catch (err) {
+          // The row is still there, so un-hiding puts them back where they
+          // were. Saying so matters — otherwise they vanish and then quietly
+          // reappear at the next refresh.
+          setWriteError(describeWriteError(err, 'delete'));
         } finally {
           setHiddenIds((prev) => prev.filter((id) => id !== person.id));
         }
@@ -474,7 +485,10 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
       message: 'Note deleted',
       commit: async () => {
         try {
+          // Note deletions queue, so this only throws for a real rejection.
           await deleteNote(noteId);
+        } catch (err) {
+          setWriteError(describeWriteError(err, 'delete'));
         } finally {
           setHiddenNoteIds((prev) => prev.filter((id) => id !== noteId));
         }
@@ -493,6 +507,8 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
       commit: async () => {
         try {
           await deleteSpecialDay(dayId);
+        } catch (err) {
+          setWriteError(describeWriteError(err, 'delete'));
         } finally {
           setHiddenDayIds((prev) => prev.filter((id) => id !== dayId));
         }
@@ -560,7 +576,9 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.error('Error toggling pin:', err);
       await refreshPeople(); // Revert on failure
-      throw err;
+      // Nothing is watching this call, so without a banner the pin would just
+      // slide back on its own.
+      setWriteError(describeWriteError(err, 'pin'));
     }
   };
 
@@ -595,6 +613,8 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
         deleteBirthday,
         pendingWrites: pending.length,
         retryPendingWrites: flushOutbox,
+        writeError,
+        clearWriteError: () => setWriteError(null),
       }}
     >
       {children}

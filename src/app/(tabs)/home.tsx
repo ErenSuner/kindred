@@ -57,6 +57,18 @@ export default function Home() {
   const total = groups.reduce((n, g) => n + g.entries.length, 0);
   const nothingAtAll = people.length === 0 && events.length === 0 && routines.length === 0;
 
+  // The very next thing gets a card of its own. A wall of identically sized
+  // rows is honest about the order but says nothing about weight, and the one
+  // thing you actually need to know is what's next.
+  const hero = groups[0]?.entries[0];
+  const heroLabel = groups[0]?.label;
+
+  // The timeline below picks up where the hero left off, so it isn't shown
+  // twice. A group emptied by that is dropped entirely.
+  const restGroups = groups
+    .map((g, i) => (i === 0 ? { ...g, entries: g.entries.slice(1) } : g))
+    .filter((g) => g.entries.length > 0);
+
   const openEntry = (entry: TimelineEntry) => {
     if (entry.personId) router.push(`/person/${entry.personId}` as any);
     else if (entry.source === 'routine' && entry.eventId) {
@@ -131,7 +143,69 @@ export default function Home() {
           </Animated.View>
         )}
 
-        {groups.map((group, groupIndex) => (
+        {hero && (
+          <Animated.View entering={FadeInDown.duration(500).delay(60)} style={{ marginBottom: spacing.stackLg }}>
+            <Card
+              pressable={!!(hero.personId || hero.eventId)}
+              onPress={() => openEntry(hero)}
+              style={styles.hero}
+            >
+              <View style={[styles.heroGlow, { pointerEvents: 'none' } as any]} />
+
+              <View style={styles.heroTop}>
+                {hero.personId ? (
+                  <Avatar uri={hero.avatar} initials={hero.initials} size={64} />
+                ) : hero.source === 'event' ? (
+                  <Avatar uri={ownAvatar} initials={userName?.charAt(0)?.toUpperCase()} size={64} />
+                ) : (
+                  <View style={[styles.heroIconWrap, hero.source === 'holiday' && styles.iconWrapHoliday]}>
+                    <Icon
+                      name={hero.icon as any}
+                      size={28}
+                      color={hero.source === 'holiday' ? colors.tertiary : colors.secondary}
+                    />
+                  </View>
+                )}
+
+                <View style={{ flex: 1, gap: 8, minWidth: 0 }}>
+                  <View style={styles.heroChip}>
+                    <Txt variant="labelSm" color={colors.onSecondaryContainer}>
+                      {heroLabel === 'Today' ? 'Today' : `Next up · ${heroLabel}`}
+                    </Txt>
+                  </View>
+                  <Txt variant="headlineMd" color={colors.onSurface}>{hero.title}</Txt>
+                </View>
+              </View>
+
+              <View style={{ marginTop: spacing.stackLg }}>
+                <View style={styles.heroDays}>
+                  <Txt variant="headlineXl" color={colors.primary}>
+                    {hero.daysAway === 0 ? 'Today!' : hero.daysAway}
+                  </Txt>
+                  {hero.daysAway > 0 && (
+                    <Txt variant="bodyLg" color={colors.onSurfaceVariant} style={{ marginBottom: 6 }}>
+                      {hero.daysAway === 1 ? 'day away' : 'days away'}
+                    </Txt>
+                  )}
+                </View>
+
+                <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 4 }}>
+                  {hero.date}
+                  {hero.timeOfDay ? ` · ${formatTimeOfDay(hero.timeOfDay)}` : ''}
+                  {hero.subtitle ? ` · ${hero.subtitle}` : ''}
+                </Txt>
+
+                {hero.notes && hero.notes.length > 0 && (
+                  <View style={{ marginTop: 12 }}>
+                    <NotePreview notes={hero.notes} lines={2} />
+                  </View>
+                )}
+              </View>
+            </Card>
+          </Animated.View>
+        )}
+
+        {restGroups.map((group, groupIndex) => (
           <Animated.View
             key={group.key}
             entering={FadeInDown.duration(500).delay(80 + groupIndex * 60)}
@@ -226,6 +300,33 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     marginTop: 4,
   },
+  hero: { overflow: 'hidden', minHeight: 220, justifyContent: 'space-between' },
+  heroGlow: {
+    position: 'absolute',
+    bottom: -80,
+    right: -80,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: 'rgba(217,142,142,0.18)',
+  },
+  heroTop: { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
+  heroIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(206,234,207,0.5)',
+  },
+  heroChip: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.secondaryContainer,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+  },
+  heroDays: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   groupHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: spacing.stackSm, marginLeft: 2 },
   groupRule: { flex: 1, height: 1, backgroundColor: colors.surfaceVariant },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },

@@ -1,3 +1,5 @@
+import { isOffline } from '@/utils/outbox';
+
 // Turning a failed fetch into something worth reading.
 //
 // The codes below are the ones that mean "the app is ahead of its database",
@@ -24,4 +26,20 @@ export function describeLoadError(err: unknown, fallback: string): string {
   return isSchemaMismatch(err)
     ? 'This app is ahead of its database — a migration still needs to be run.'
     : fallback;
+}
+
+// What to say when a write didn't land.
+//
+// Notes queue up and send themselves later, but people, days and events don't —
+// they carry photos, ids and relationships that can't be replayed safely. So
+// the user has to be told plainly, and told which kind of problem it is: no
+// connection is worth waiting out, a rejection is not.
+export function describeWriteError(err: unknown, what = 'save'): string {
+  if (isSchemaMismatch(err)) {
+    return 'This app is ahead of its database — a migration still needs to be run.';
+  }
+  if (isOffline(err)) {
+    return `You're offline, so this couldn't ${what}. Your changes are still here — try again once you're back online.`;
+  }
+  return `Could not ${what}. Please try again.`;
 }

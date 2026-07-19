@@ -1,3 +1,4 @@
+import { describeWriteError } from '@/utils/loadError';
 import { Button } from '@/components/Button';
 import { FormError } from '@/components/FormError';
 import { Icon } from '@/components/Icon';
@@ -91,7 +92,7 @@ export default function RoutineForm() {
       router.back();
     } catch (e) {
       console.error(e);
-      setError('Could not save. Check your connection and try again.');
+      setError(describeWriteError(e));
     } finally {
       setSaving(false);
     }

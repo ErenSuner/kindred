@@ -1,3 +1,4 @@
+import { describeWriteError } from '@/utils/loadError';
 import { Button } from '@/components/Button';
 import { DateFields, DateValue } from '@/components/DateFields';
 import { FormError } from '@/components/FormError';
@@ -80,7 +81,7 @@ export default function AddSpecialDay() {
       router.back();
     } catch (e) {
       console.error(e);
-      setError('Could not save. Check your connection and try again.');
+      setError(describeWriteError(e));
     } finally {
       setSaving(false);
     }

@@ -1,3 +1,4 @@
+import { describeWriteError } from '@/utils/loadError';
 import { useMemo, useState } from 'react';
 import { View, StyleSheet, Pressable, TextInput, Modal } from 'react-native';
 import Animated, { FadeInDown, SlideInDown } from 'react-native-reanimated';
@@ -50,7 +51,7 @@ export function LookingBack({ person }: { person: Person }) {
       setEditing(null);
     } catch (e) {
       console.error(e);
-      setError('Could not save. Check your connection and try again.');
+      setError(describeWriteError(e));
     } finally {
       setSaving(false);
     }
