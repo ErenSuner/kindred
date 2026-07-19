@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { View, Pressable, StyleSheet } from 'react-native';
+import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius } from '@/theme/tokens';
 import { useTheme } from '@/theme/ThemeContext';
@@ -15,44 +16,60 @@ const TABS: TabDef[] = [
   { name: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
-// The floating ink bar — the app's dark anchor, present on every tab. Active
-// tab glows candle-amber.
+// How the active pill and its neighbours resize when the tab changes. One
+// unhurried spring — the small delight the whole bar is built around.
+const SLIDE = LinearTransition.springify().damping(20).stiffness(180);
+
+// The floating ink bar — the app's dark anchor, present on every tab. Only the
+// active tab carries a label: it expands into an amber pill, the others stay
+// quiet icons. That keeps the bar from being a row of cramped micro-captions,
+// and gives switching tabs something that moves.
 function TabBar({ state, navigation }: any) {
   const insets = useSafeAreaInsets();
   const { c, floatShadow } = useTheme();
+
   return (
-    <View pointerEvents="box-none" style={[styles.host, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-      <View style={[styles.bar, { backgroundColor: c.ink }, floatShadow]}>
+    <View pointerEvents="box-none" style={[styles.host, { paddingBottom: Math.max(insets.bottom, 14) }]}>
+      <Animated.View layout={SLIDE} style={[styles.bar, { backgroundColor: c.ink }, floatShadow]}>
         {state.routes.map((route: any, i: number) => {
           const def = TABS.find((t) => t.name === route.name);
           if (!def) return null;
+
           const focused = state.index === i;
           const onPress = () => {
             const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
             if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
           };
+
           return (
             <Pressable
               key={route.key}
               onPress={onPress}
-              style={({ pressed }) => [
-                styles.item,
-                focused && { backgroundColor: c.inkSoft },
-                pressed && { transform: [{ scale: 0.94 }] },
-              ]}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: focused }}
+              accessibilityLabel={def.label}
+              hitSlop={6}
             >
-              <Icon name={def.icon} size={22} color={focused ? c.flame : c.onInkFaint} />
-              <Txt
-                variant="eyebrow"
-                color={focused ? c.onInk : c.onInkFaint}
-                style={{ marginTop: 3 }}
+              <Animated.View
+                layout={SLIDE}
+                style={[
+                  styles.item,
+                  focused ? { backgroundColor: c.flame } : styles.itemIdle,
+                ]}
               >
-                {def.label}
-              </Txt>
+                <Icon name={def.icon} size={23} color={focused ? c.onFlame : c.onInkFaint} />
+                {focused && (
+                  <Animated.View entering={FadeIn.duration(160)}>
+                    <Txt variant="label" color={c.onFlame} numberOfLines={1}>
+                      {def.label}
+                    </Txt>
+                  </Animated.View>
+                )}
+              </Animated.View>
             </Pressable>
           );
         })}
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -78,26 +95,26 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 16,
     alignItems: 'center',
   },
+  // Content-sized and centred, so the active pill genuinely expands and nudges
+  // the others aside rather than lighting up a fixed cell.
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    alignSelf: 'stretch',
-    maxWidth: 560,
-    marginHorizontal: 'auto',
-    borderRadius: radius.xl,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 2,
+    gap: 6,
+    borderRadius: radius.full,
+    padding: 7,
   },
   item: {
-    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: radius.lg,
+    gap: 8,
+    height: 48,
+    paddingHorizontal: 18,
+    borderRadius: radius.full,
   },
+  // An idle tab is a plain icon — no background, tighter width.
+  itemIdle: { paddingHorizontal: 16 },
 });
