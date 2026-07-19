@@ -1,9 +1,18 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { View, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { colors, spacing, radius } from '@/theme/tokens';
+import Animated, {
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
+import { spacing, radius } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
+import { fonts } from '@/theme/type';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Avatar } from '@/components/Avatar';
@@ -17,10 +26,37 @@ import { useAuth } from '@/context/AuthContext';
 import { formatTimeOfDay } from '@/utils/eventTime';
 import { TimelineEntry, buildTimeline } from '@/utils/timeline';
 
+// A countdown is anticipation, not a deadline.
 function countdown(daysAway: number): string {
   if (daysAway === 0) return 'Today';
   if (daysAway === 1) return 'Tomorrow';
-  return `${daysAway}d`;
+  return `${daysAway} days`;
+}
+
+// The candle mark: a small amber dot that breathes gently when something is
+// happening today. The same mark the Held notice uses — the lamp is lit.
+function FlameDot({ today }: { today: boolean }) {
+  const { c } = useTheme();
+  const glow = useSharedValue(1);
+
+  useEffect(() => {
+    if (today) {
+      glow.value = withRepeat(
+        withSequence(withTiming(0.55, { duration: 1200 }), withTiming(1, { duration: 1200 })),
+        -1,
+      );
+    } else {
+      glow.value = 1;
+    }
+  }, [today, glow]);
+
+  const style = useAnimatedStyle(() => ({ opacity: glow.value }));
+
+  return (
+    <Animated.View
+      style={[{ width: 10, height: 10, borderRadius: 5, backgroundColor: c.flame }, style]}
+    />
+  );
 }
 
 // Home answers one question: what is coming up, and when. It deliberately does
@@ -29,6 +65,7 @@ function countdown(daysAway: number): string {
 export default function Home() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { c } = useTheme();
   const { people, loadError, refreshPeople } = usePeople();
   const { events, routines } = useEvents();
   const { imminent } = useHolidays();
@@ -57,9 +94,9 @@ export default function Home() {
   const total = groups.reduce((n, g) => n + g.entries.length, 0);
   const nothingAtAll = people.length === 0 && events.length === 0 && routines.length === 0;
 
-  // The very next thing gets a card of its own. A wall of identically sized
-  // rows is honest about the order but says nothing about weight, and the one
-  // thing you actually need to know is what's next.
+  // The very next thing gets the one dark card on the screen. A wall of
+  // identically sized rows is honest about the order but says nothing about
+  // weight, and the one thing you actually need to know is what's next.
   const hero = groups[0]?.entries[0];
   const heroLabel = groups[0]?.label;
 
@@ -77,38 +114,38 @@ export default function Home() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Txt variant="headlineMd" color={colors.primary} style={styles.wordmark}>
-          Kindred
-        </Txt>
-      </View>
-
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: spacing.containerMobile,
-          paddingTop: spacing.stackMd,
-          paddingBottom: insets.bottom + 120,
+          paddingTop: insets.top + 18,
+          paddingBottom: insets.bottom + 130,
         }}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View entering={FadeInDown.duration(500)} style={styles.welcome}>
-          <View style={{ flex: 1 }}>
-            <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginBottom: 4, textTransform: 'capitalize' }}>
-              Welcome back, {userName}
-            </Txt>
-            <Txt variant="headlineLgMobile" color={colors.onSurface}>
-              {total === 0 ? 'Nothing coming up.' : "Here's what's coming up."}
-            </Txt>
-          </View>
-
+        {/* Wordmark row: identity left, birthdays shortcut right. */}
+        <View style={styles.topRow}>
+          <Txt style={[styles.wordmark, { color: c.text }]}>Kindred</Txt>
           <Pressable
             onPress={() => router.push('/birthdays')}
-            style={({ pressed }) => [styles.birthdaysBtn, pressed && { opacity: 0.8 }]}
+            style={({ pressed }) => [
+              styles.birthdaysBtn,
+              { backgroundColor: c.flameWash },
+              pressed && { opacity: 0.8 },
+            ]}
           >
-            <Icon name="cake" size={20} color={colors.onPrimaryContainer} />
-            <Txt variant="labelMd" color={colors.onPrimaryContainer}>Birthdays</Txt>
+            <Icon name="cake" size={18} color={c.flameDeep} />
+            <Txt variant="label" color={c.flameDeep}>Birthdays</Txt>
           </Pressable>
+        </View>
+
+        <Animated.View entering={FadeInDown.duration(500)} style={styles.welcome}>
+          <Txt variant="sub" color={c.muted} style={{ marginBottom: 6, textTransform: 'capitalize' }}>
+            Welcome back, {userName}
+          </Txt>
+          <Txt variant="display">
+            {total === 0 ? 'All quiet for now.' : 'Coming up.'}
+          </Txt>
         </Animated.View>
 
         <FormError message={loadError} onRetry={refreshPeople} retryLabel="Retry" />
@@ -118,25 +155,28 @@ export default function Home() {
         {total === 0 && !loadError && (
           <Animated.View entering={FadeInDown.duration(500).delay(120)}>
             <Card style={styles.emptyCard}>
-              <View style={styles.emptyAccent} />
               <View style={{ alignItems: 'center' }}>
-                <View style={styles.emptyIconWrap}>
-                  <Icon name={nothingAtAll ? 'people' : 'event'} size={32} color={colors.primary} />
+                <View style={[styles.emptyIconWrap, { backgroundColor: c.flameWash }]}>
+                  <Icon name={nothingAtAll ? 'people' : 'event'} size={30} color={c.flameDeep} />
                 </View>
-                <Txt variant="headlineMd" color={colors.onSurface} style={{ textAlign: 'center', marginTop: 20 }}>
+                <Txt variant="heading" style={{ textAlign: 'center', marginTop: 20 }}>
                   {nothingAtAll ? 'Nobody here yet' : 'No dates yet'}
                 </Txt>
-                <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={styles.emptyBlurb}>
+                <Txt variant="body" color={c.muted} style={styles.emptyBlurb}>
                   {nothingAtAll
                     ? 'Add the people you care about and their days will show up here, soonest first.'
                     : 'Add a birthday or a special day to someone, and it will appear here.'}
                 </Txt>
                 <Pressable
                   onPress={() => router.push('/add')}
-                  style={({ pressed }) => [styles.emptyBtn, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] }]}
+                  style={({ pressed }) => [
+                    styles.emptyBtn,
+                    { backgroundColor: c.flame },
+                    pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
+                  ]}
                 >
-                  <Icon name="arrow-forward" size={18} color={colors.onPrimary} />
-                  <Txt variant="labelMd" color={colors.onPrimary}>Go to your people</Txt>
+                  <Txt variant="bodySemi" color={c.onFlame}>Go to your people</Txt>
+                  <Icon name="arrow-forward" size={18} color={c.onFlame} />
                 </Pressable>
               </View>
             </Card>
@@ -146,61 +186,57 @@ export default function Home() {
         {hero && (
           <Animated.View entering={FadeInDown.duration(500).delay(60)} style={{ marginBottom: spacing.stackLg }}>
             <Card
+              ink
               pressable={!!(hero.personId || hero.eventId)}
               onPress={() => openEntry(hero)}
               style={styles.hero}
             >
-              <View style={[styles.heroGlow, { pointerEvents: 'none' } as any]} />
+              <View style={styles.heroEyebrowRow}>
+                <FlameDot today={hero.daysAway === 0} />
+                <Txt variant="eyebrow" color={c.flame}>
+                  {heroLabel === 'Today' ? 'Today' : `Next up · ${heroLabel}`}
+                </Txt>
+              </View>
 
               <View style={styles.heroTop}>
                 {hero.personId ? (
-                  <Avatar uri={hero.avatar} initials={hero.initials} size={64} />
+                  <Avatar uri={hero.avatar} initials={hero.initials} size={64} ring={false} />
                 ) : hero.source === 'event' ? (
-                  <Avatar uri={ownAvatar} initials={userName?.charAt(0)?.toUpperCase()} size={64} />
+                  <Avatar uri={ownAvatar} initials={userName?.charAt(0)?.toUpperCase()} size={64} ring={false} />
                 ) : (
-                  <View style={[styles.heroIconWrap, hero.source === 'holiday' && styles.iconWrapHoliday]}>
-                    <Icon
-                      name={hero.icon as any}
-                      size={28}
-                      color={hero.source === 'holiday' ? colors.tertiary : colors.secondary}
-                    />
+                  <View style={[styles.heroIconWrap, { backgroundColor: c.inkSoft }]}>
+                    <Icon name={hero.icon as any} size={26} color={c.flame} />
                   </View>
                 )}
 
-                <View style={{ flex: 1, gap: 8, minWidth: 0 }}>
-                  <View style={styles.heroChip}>
-                    <Txt variant="labelSm" color={colors.onSecondaryContainer}>
-                      {heroLabel === 'Today' ? 'Today' : `Next up · ${heroLabel}`}
-                    </Txt>
-                  </View>
-                  <Txt variant="headlineMd" color={colors.onSurface}>{hero.title}</Txt>
-                </View>
-              </View>
-
-              <View style={{ marginTop: spacing.stackLg }}>
-                <View style={styles.heroDays}>
-                  <Txt variant="headlineXl" color={colors.primary}>
-                    {hero.daysAway === 0 ? 'Today!' : hero.daysAway}
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Txt variant="title" color={c.onInk}>{hero.title}</Txt>
+                  <Txt variant="sub" color={c.onInkMuted} style={{ marginTop: 6 }}>
+                    {hero.date}
+                    {hero.timeOfDay ? ` · ${formatTimeOfDay(hero.timeOfDay)}` : ''}
+                    {hero.subtitle ? ` · ${hero.subtitle}` : ''}
                   </Txt>
-                  {hero.daysAway > 0 && (
-                    <Txt variant="bodyLg" color={colors.onSurfaceVariant} style={{ marginBottom: 6 }}>
-                      {hero.daysAway === 1 ? 'day away' : 'days away'}
-                    </Txt>
-                  )}
                 </View>
-
-                <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 4 }}>
-                  {hero.date}
-                  {hero.timeOfDay ? ` · ${formatTimeOfDay(hero.timeOfDay)}` : ''}
-                  {hero.subtitle ? ` · ${hero.subtitle}` : ''}
-                </Txt>
-
-                {hero.notes && hero.notes.length > 0 && (
-                  <View style={{ marginTop: 12 }}>
-                    <NotePreview notes={hero.notes} lines={2} />
-                  </View>
-                )}
               </View>
+
+              <View style={styles.heroDays}>
+                <Txt
+                  color={c.flame}
+                  style={{ fontFamily: fonts.frauncesSemiBold, fontSize: 30, lineHeight: 36 }}
+                >
+                  {hero.daysAway === 0
+                    ? 'Today'
+                    : hero.daysAway === 1
+                    ? 'Tomorrow'
+                    : `in ${hero.daysAway} days`}
+                </Txt>
+              </View>
+
+              {hero.notes && hero.notes.length > 0 && (
+                <View style={{ marginTop: 12 }}>
+                  <NotePreview notes={hero.notes} lines={2} onInk />
+                </View>
+              )}
             </Card>
           </Animated.View>
         )}
@@ -212,10 +248,8 @@ export default function Home() {
             style={{ marginBottom: spacing.stackLg }}
           >
             <View style={styles.groupHead}>
-              <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ letterSpacing: 1 }}>
-                {group.label.toUpperCase()}
-              </Txt>
-              <View style={styles.groupRule} />
+              <Txt variant="eyebrow" color={c.faint}>{group.label}</Txt>
+              <View style={[styles.groupRule, { backgroundColor: c.line }]} />
             </View>
 
             <View style={{ gap: spacing.stackSm }}>
@@ -232,20 +266,14 @@ export default function Home() {
                     ) : entry.source === 'event' ? (
                       <Avatar uri={ownAvatar} initials={userName?.charAt(0)?.toUpperCase()} size={44} />
                     ) : (
-                      <View style={[styles.iconWrap, entry.source === 'holiday' && styles.iconWrapHoliday]}>
-                        <Icon
-                          name={entry.icon as any}
-                          size={20}
-                          color={entry.source === 'holiday' ? colors.tertiary : colors.secondary}
-                        />
+                      <View style={[styles.iconWrap, { backgroundColor: c.surfaceAlt }]}>
+                        <Icon name={entry.icon as any} size={20} color={c.muted} />
                       </View>
                     )}
 
                     <View style={{ flex: 1, minWidth: 0 }}>
-                      <Txt variant="bodyLg" color={colors.onSurface} style={{ fontFamily: 'Inter_500Medium' }}>
-                        {entry.title}
-                      </Txt>
-                      <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.rowMeta}>
+                      <Txt variant="bodyMed">{entry.title}</Txt>
+                      <Txt variant="sub" color={c.muted} style={{ marginTop: 2 }}>
                         {entry.date}
                         {entry.timeOfDay ? ` · ${formatTimeOfDay(entry.timeOfDay)}` : ''}
                         {entry.subtitle ? ` · ${entry.subtitle}` : ''}
@@ -259,10 +287,16 @@ export default function Home() {
                     </View>
                   </View>
 
-                  <View style={styles.countdown}>
+                  <View
+                    style={[
+                      styles.countdown,
+                      { backgroundColor: entry.daysAway === 0 ? c.flameWash : c.surfaceAlt },
+                    ]}
+                  >
                     <Txt
-                      variant="labelMd"
-                      color={entry.daysAway === 0 ? colors.primary : colors.onSurfaceVariant}
+                      variant="num"
+                      color={entry.daysAway === 0 ? c.flameDeep : c.muted}
+                      style={{ fontSize: 13, lineHeight: 17 }}
                     >
                       {countdown(entry.daysAway)}
                     </Txt>
@@ -278,100 +312,63 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    alignItems: 'center',
-    paddingBottom: spacing.stackMd,
-    backgroundColor: colors.background,
-  },
-  wordmark: { fontFamily: 'Literata_700Bold', fontSize: 28, letterSpacing: -0.5 },
-  welcome: {
-    marginBottom: spacing.stackXl,
+  topRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    marginBottom: spacing.stackLg,
   },
+  wordmark: { fontFamily: fonts.frauncesSemiBold, fontSize: 22, lineHeight: 28, letterSpacing: -0.3 },
   birthdaysBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: colors.primaryContainer,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     borderRadius: radius.full,
-    marginTop: 4,
   },
-  hero: { overflow: 'hidden', minHeight: 220, justifyContent: 'space-between' },
-  heroGlow: {
-    position: 'absolute',
-    bottom: -80,
-    right: -80,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: 'rgba(217,142,142,0.18)',
-  },
-  heroTop: { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
+  welcome: { marginBottom: spacing.stackLg },
+  hero: { overflow: 'hidden' },
+  heroEyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 18 },
+  heroTop: { flexDirection: 'row', gap: 16, alignItems: 'center' },
   heroIconWrap: {
     width: 64,
     height: 64,
     borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(206,234,207,0.5)',
   },
-  heroChip: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.secondaryContainer,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radius.full,
-  },
-  heroDays: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+  heroDays: { marginTop: 20 },
   groupHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: spacing.stackSm, marginLeft: 2 },
-  groupRule: { flex: 1, height: 1, backgroundColor: colors.surfaceVariant },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  groupRule: { flex: 1, height: 1 },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: 16 },
   rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1, minWidth: 0 },
-  rowMeta: { fontWeight: 'normal', marginTop: 2 },
   iconWrap: {
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(206,234,207,0.5)',
   },
-  iconWrapHoliday: { backgroundColor: 'rgba(207,151,83,0.25)' },
   countdown: {
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: radius.full,
-    backgroundColor: colors.surfaceContainerLow,
   },
-  emptyCard: { overflow: 'hidden', paddingVertical: 40, paddingHorizontal: 24, marginBottom: spacing.stackLg },
-  emptyAccent: {
-    position: 'absolute',
-    top: -40,
-    left: -40,
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: 'rgba(217,142,142,0.12)',
-  },
+  emptyCard: { paddingVertical: 40, paddingHorizontal: 24, marginBottom: spacing.stackLg },
   emptyIconWrap: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.primaryFixed,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emptyBlurb: { textAlign: 'center', marginTop: 8, maxWidth: 280, lineHeight: 22 },
+  emptyBlurb: { textAlign: 'center', marginTop: 8, maxWidth: 280 },
   emptyBtn: {
     marginTop: 24,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: radius.full,

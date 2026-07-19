@@ -1,5 +1,6 @@
 import { describeWriteError } from '@/utils/loadError';
 import { Button } from '@/components/Button';
+import { Card } from '@/components/Card';
 import { DateFields, DateValue } from '@/components/DateFields';
 import { FormError } from '@/components/FormError';
 import { Icon } from '@/components/Icon';
@@ -7,8 +8,11 @@ import { DraftNote, NotesEditor } from '@/components/NotesEditor';
 import { RecurrencePicker } from '@/components/RecurrencePicker';
 import { ReminderEditor } from '@/components/ReminderEditor';
 import { Txt } from '@/components/Txt';
+import { showHeld } from '@/components/HeldNotice';
 import { usePeople } from '@/context/PeopleContext';
-import { colors, radius, softShadow, spacing } from '@/theme/tokens';
+import { radius, spacing } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
+import { fonts } from '@/theme/type';
 import { SKIPPED_YEAR } from '@/utils/dates';
 import { Nudge, serializeNudges } from '@/utils/nudges';
 import { Recurrence, YEARLY } from '@/utils/recurrence';
@@ -19,9 +23,10 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
+  const { c } = useTheme();
   return (
-    <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.fieldLabel}>
-      {typeof children === 'string' ? children.toUpperCase() : children}
+    <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>
+      {children}
     </Txt>
   );
 }
@@ -29,6 +34,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 export default function AddSpecialDay() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { c } = useTheme();
   const { personId } = useLocalSearchParams<{ personId: string }>();
   const { addSpecialDay } = usePeople();
 
@@ -79,6 +85,12 @@ export default function AddSpecialDay() {
         notes: notes.map((n) => ({ kind: n.kind, body: n.body })),
       });
       router.back();
+      showHeld(
+        `${occasion.trim()} is remembered`,
+        reminders.length > 0
+          ? `On the day, plus ${reminders.length} earlier ${reminders.length === 1 ? 'reminder' : 'reminders'}`
+          : "We'll remind you on the day",
+      );
     } catch (e) {
       console.error(e);
       setError(describeWriteError(e));
@@ -88,13 +100,13 @@ export default function AddSpecialDay() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} hitSlop={8}>
-          <Icon name="arrow-back" size={24} color={colors.primary} />
+          <Icon name="arrow-back" size={24} color={c.muted} />
         </Pressable>
-        <Txt variant="headlineMd" color={colors.primary} style={{ flex: 1, textAlign: 'center', marginRight: 24 }}>
-          New Special Day
+        <Txt variant="title" style={{ flex: 1, textAlign: 'center', marginRight: 24 }}>
+          New special day
         </Txt>
       </View>
 
@@ -104,48 +116,39 @@ export default function AddSpecialDay() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <Animated.View entering={FadeInDown.duration(500).delay(200)} style={[styles.card, { gap: spacing.stackMd }]}>
-            <View style={styles.cardHeader}>
-              <Txt variant="headlineMd" color={colors.onSurface}>
-                An Important Date
-              </Txt>
-            </View>
+          <Animated.View entering={FadeInDown.duration(500).delay(200)}>
+            <Card style={{ gap: spacing.stackMd }}>
+              <View style={{ gap: spacing.stackMd }}>
+                <View style={{ gap: 6 }}>
+                  <FieldLabel>Title</FieldLabel>
+                  <TextInput
+                    value={occasion}
+                    onChangeText={setOccasion}
+                    placeholder="e.g., Anniversary, Graduation"
+                    placeholderTextColor={c.faint}
+                    style={[styles.input, { backgroundColor: c.surfaceAlt, color: c.text }]}
+                  />
+                </View>
 
-            <View style={{ gap: spacing.stackMd }}>
-              <View style={{ gap: 4 }}>
-                <FieldLabel>Title</FieldLabel>
-                <TextInput
-                  value={occasion}
-                  onChangeText={setOccasion}
-                  placeholder="e.g., Anniversary, Graduation"
-                  placeholderTextColor={colors.outline}
-                  style={styles.input}
-                />
+                <View style={{ gap: 6 }}>
+                  <FieldLabel>Date · year optional</FieldLabel>
+                  <DateFields value={date} onChange={setDate} yearMode="future" />
+                </View>
               </View>
 
-              <View style={{ gap: 4 }}>
-                <FieldLabel>
-                  Date{' '}
-                  <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontWeight: 'normal' }}>
-                    (Year optional)
-                  </Txt>
-                </FieldLabel>
-                <DateFields value={date} onChange={setDate} yearMode="future" />
-              </View>
-            </View>
+              <RecurrencePicker value={recurrence} onChange={setRecurrence} />
 
-            <RecurrencePicker value={recurrence} onChange={setRecurrence} />
+              <ReminderEditor reminders={reminders} onChange={setReminders} eventDate={eventDate()} />
 
-            <ReminderEditor reminders={reminders} onChange={setReminders} eventDate={eventDate()} />
-
-            <NotesEditor notes={notes} onChange={setNotes} />
+              <NotesEditor notes={notes} onChange={setNotes} />
+            </Card>
           </Animated.View>
 
           <FormError message={error} />
 
           <Animated.View entering={FadeInDown.duration(500).delay(200)} style={{ alignItems: 'center' }}>
             <Button
-              label={saving ? 'Saving…' : 'Save Special Day'}
+              label={saving ? 'Saving…' : 'Save special day'}
               icon="check"
               onPress={handleSubmit}
               disabled={saving}
@@ -164,24 +167,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.containerMobile,
     paddingBottom: spacing.stackMd,
-    backgroundColor: colors.background,
   },
-  card: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radius.lg,
-    padding: spacing.stackMd,
-    ...softShadow,
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  fieldLabel: { letterSpacing: 1, marginLeft: 2 },
+  fieldLabel: { marginLeft: 2 },
   input: {
-    backgroundColor: 'rgba(228,226,225,0.4)',
     borderRadius: radius.DEFAULT,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: fonts.figtreeRegular,
     fontSize: 16,
-    color: colors.onSurface,
   },
-  inputCenter: { alignItems: 'center', justifyContent: 'center' },
 });

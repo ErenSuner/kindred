@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { View, StyleSheet, Pressable, Modal } from 'react-native';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
-import { colors, radius, spacing } from '@/theme/tokens';
+import { radius, spacing } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
@@ -36,6 +37,7 @@ type Props = {
 const ALL_PRESETS = PRESET_REMINDERS.filter((p) => p.value !== DAY_OF);
 
 export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
+  const { c, floatShadow } = useTheme();
   const [pickerVisible, setPickerVisible] = useState(false);
   const [leadAmount, setLeadAmount] = useState(4);
   const [leadUnit, setLeadUnit] = useState<LeadUnit>('day');
@@ -79,16 +81,16 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
   const sorted = [...chosen].sort((a, b) => (offsetDaysFor(b) ?? 0) - (offsetDaysFor(a) ?? 0));
 
   return (
-    <View style={styles.box}>
+    <View style={[styles.box, { backgroundColor: c.surface, borderColor: c.line }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Icon name="notifications-active" size={16} color={colors.primary} />
-        <Txt variant="labelMd" color={colors.onSurface}>Gentle Nudges</Txt>
+        <Icon name="notifications-active" size={16} color={c.flameDeep} />
+        <Txt variant="subMed">Gentle nudges</Txt>
       </View>
 
       {/* Stated, not offered — the day itself is not something to switch off. */}
       <View style={styles.guaranteed}>
-        <Icon name="check-circle" size={16} color={colors.secondary} />
-        <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ flex: 1, fontWeight: 'normal' }}>
+        <Icon name="check-circle" size={16} color={c.good} />
+        <Txt variant="sub" color={c.muted} style={{ flex: 1 }}>
           You&apos;ll always be reminded on the day itself.
         </Txt>
       </View>
@@ -99,10 +101,14 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
             <Pressable
               key={r.value}
               onPress={() => toggle(r)}
-              style={({ pressed }) => [styles.chosenChip, pressed && { opacity: 0.75 }]}
+              style={({ pressed }) => [
+                styles.chosenChip,
+                { backgroundColor: c.flameWash },
+                pressed && { opacity: 0.75 },
+              ]}
             >
-              <Txt variant="labelSm" color={colors.onSecondaryContainer}>{r.label}</Txt>
-              <Icon name="close" size={13} color={colors.onSecondaryContainer} />
+              <Txt variant="label" color={c.flameDeep}>{r.label}</Txt>
+              <Icon name="close" size={13} color={c.flameDeep} />
             </Pressable>
           ))}
         </View>
@@ -114,24 +120,31 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
           setCustomOpen(false);
           setPickerVisible(true);
         }}
-        style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.8 }]}
+        style={({ pressed }) => [
+          styles.addBtn,
+          { borderColor: c.lineStrong, backgroundColor: c.surfaceAlt },
+          pressed && { opacity: 0.8 },
+        ]}
       >
-        <Icon name="add" size={18} color={colors.primary} />
-        <Txt variant="labelMd" color={colors.primary}>
+        <Icon name="add" size={18} color={c.flameDeep} />
+        <Txt variant="label" color={c.flameDeep}>
           {sorted.length > 0 ? `Earlier reminders (${sorted.length}/${MAX_REMINDERS})` : 'Remind me earlier too'}
         </Txt>
       </Pressable>
 
       <Modal visible={pickerVisible} transparent animationType="fade" onRequestClose={() => setPickerVisible(false)}>
-        <Pressable style={styles.overlay} onPress={() => setPickerVisible(false)}>
-          <Animated.View entering={SlideInDown.duration(280)} style={styles.sheet}>
+        <Pressable style={[styles.overlay, { backgroundColor: c.overlay }]} onPress={() => setPickerVisible(false)}>
+          <Animated.View
+            entering={SlideInDown.duration(280)}
+            style={[styles.sheet, { backgroundColor: c.surface }, floatShadow]}
+          >
             <Pressable onPress={(e) => e.stopPropagation()}>
               <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                <View style={styles.handle} />
+                <View style={[styles.handle, { backgroundColor: c.lineStrong }]} />
               </View>
 
-              <Txt variant="headlineMd" color={colors.onSurface}>Remind me earlier</Txt>
-              <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 4, marginBottom: 20 }}>
+              <Txt variant="heading">Remind me earlier</Txt>
+              <Txt variant="sub" color={c.muted} style={{ marginTop: 4, marginBottom: 20 }}>
                 Tap to turn one on or off. Up to {MAX_REMINDERS}, on top of the day itself.
               </Txt>
 
@@ -146,15 +159,16 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
                       onPress={() => toggle({ type: 'preset', label: preset.label, value: preset.value })}
                       style={({ pressed }) => [
                         styles.option,
-                        on && styles.optionOn,
-                        disabled && styles.optionDisabled,
+                        {
+                          backgroundColor: on ? c.ink : c.surfaceAlt,
+                          borderColor: on ? c.ink : c.line,
+                          opacity: on ? 1 : 0.6,
+                        },
+                        disabled && { opacity: 0.28 },
                         pressed && { transform: [{ scale: 0.97 }] },
                       ]}
                     >
-                      <Txt
-                        variant="labelMd"
-                        color={on ? colors.onSecondaryContainer : colors.onSurfaceVariant}
-                      >
+                      <Txt variant="subMed" color={on ? c.onInk : c.muted}>
                         {preset.label}
                       </Txt>
                     </Pressable>
@@ -169,16 +183,16 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
                 onPress={() => setCustomOpen((open) => !open)}
                 style={({ pressed }) => [styles.divider, pressed && { opacity: 0.7 }]}
               >
-                <View style={styles.rule} />
+                <View style={[styles.rule, { backgroundColor: c.line }]} />
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Txt variant="labelSm" color={colors.onSurfaceVariant}>OR A SPECIFIC AMOUNT</Txt>
+                  <Txt variant="eyebrow" color={c.faint}>Or a specific amount</Txt>
                   <Icon
                     name={customOpen ? 'expand-less' : 'expand-more'}
                     size={16}
-                    color={colors.onSurfaceVariant}
+                    color={c.muted}
                   />
                 </View>
-                <View style={styles.rule} />
+                <View style={[styles.rule, { backgroundColor: c.line }]} />
               </Pressable>
 
               {customOpen && (
@@ -188,25 +202,33 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
               <View style={styles.leadRow}>
                 <Pressable
                   onPress={() => setAmountPickerVisible(true)}
-                  style={({ pressed }) => [styles.stepper, { minWidth: 72 }, pressed && { opacity: 0.8 }]}
+                  style={({ pressed }) => [
+                    styles.stepper,
+                    { minWidth: 72, backgroundColor: c.surfaceAlt, borderColor: c.line },
+                    pressed && { opacity: 0.8 },
+                  ]}
                 >
-                  <Txt variant="bodyMd" color={colors.onSurface}>{leadAmount}</Txt>
-                  <Icon name="expand-more" size={16} color={colors.onSurfaceVariant} />
+                  <Txt variant="body">{leadAmount}</Txt>
+                  <Icon name="expand-more" size={16} color={c.muted} />
                 </Pressable>
 
                 <Pressable
                   onPress={() => setUnitPickerVisible(true)}
-                  style={({ pressed }) => [styles.stepper, { flex: 1 }, pressed && { opacity: 0.8 }]}
+                  style={({ pressed }) => [
+                    styles.stepper,
+                    { flex: 1, backgroundColor: c.surfaceAlt, borderColor: c.line },
+                    pressed && { opacity: 0.8 },
+                  ]}
                 >
-                  <Txt variant="bodyMd" color={colors.onSurface}>
+                  <Txt variant="body">
                     {leadAmount === 1
                       ? LEAD_UNITS.find((u) => u.value === leadUnit)?.label
                       : LEAD_UNITS.find((u) => u.value === leadUnit)?.plural}
                   </Txt>
-                  <Icon name="expand-more" size={16} color={colors.onSurfaceVariant} />
+                  <Icon name="expand-more" size={16} color={c.muted} />
                 </Pressable>
 
-                <Txt variant="bodyMd" color={colors.onSurfaceVariant}>before</Txt>
+                <Txt variant="body" color={c.muted}>before</Txt>
               </View>
 
               <Pressable
@@ -214,12 +236,13 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
                 disabled={customChosen || atLimit || customMatchesPreset}
                 style={({ pressed }) => [
                   styles.confirmBtn,
+                  { backgroundColor: c.flame },
                   (customChosen || atLimit || customMatchesPreset) && { opacity: 0.4 },
                   pressed && { opacity: 0.85 },
                 ]}
               >
-                <Icon name={customChosen ? 'check' : 'add'} size={18} color={colors.onPrimary} />
-                <Txt variant="labelMd" color={colors.onPrimary}>
+                <Icon name={customChosen ? 'check' : 'add'} size={18} color={c.onFlame} />
+                <Txt variant="label" color={c.onFlame}>
                   {customChosen ? 'Already added' : customMatchesPreset ? 'Already an option above' : `Add ${leadLabel(leadAmount, leadUnit)}`}
                 </Txt>
               </Pressable>
@@ -228,14 +251,14 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
 
               {atLimit && (
                 <Animated.View entering={FadeIn.duration(180)}>
-                  <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.limitNote}>
+                  <Txt variant="sub" color={c.muted} style={styles.limitNote}>
                     That&apos;s {MAX_REMINDERS} — turn one off to add another.
                   </Txt>
                 </Animated.View>
               )}
 
               <Pressable onPress={() => setPickerVisible(false)} style={styles.doneBtn}>
-                <Txt variant="labelMd" color={colors.primary}>Done</Txt>
+                <Txt variant="label" color={c.flameDeep}>Done</Txt>
               </Pressable>
             </Pressable>
           </Animated.View>
@@ -271,10 +294,8 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
 
 const styles = StyleSheet.create({
   box: {
-    backgroundColor: colors.surfaceContainerLow,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.surfaceVariant,
     padding: 16,
     marginTop: spacing.stackSm,
   },
@@ -290,7 +311,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: colors.secondaryContainer,
     borderRadius: radius.full,
     paddingHorizontal: 12,
     paddingVertical: 7,
@@ -304,48 +324,33 @@ const styles = StyleSheet.create({
     borderRadius: radius.DEFAULT,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: colors.outlineVariant,
-    backgroundColor: 'rgba(255,255,255,0.5)',
   },
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: colors.surfaceContainerLowest,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     padding: 24,
     paddingBottom: 40,
     maxHeight: '88%',
   },
-  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.outlineVariant },
+  handle: { width: 40, height: 4, borderRadius: 2 },
   optionWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   option: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: radius.full,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    backgroundColor: colors.surfaceContainerLow,
-    // Unselected reads as faded rather than empty — no checkbox needed.
-    opacity: 0.55,
   },
-  optionOn: {
-    opacity: 1,
-    backgroundColor: colors.secondaryContainer,
-    borderColor: colors.secondary,
-  },
-  optionDisabled: { opacity: 0.28 },
   divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 20 },
-  rule: { flex: 1, height: 1, backgroundColor: colors.surfaceVariant },
+  rule: { flex: 1, height: 1 },
   leadRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
   stepper: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 4,
-    backgroundColor: colors.surfaceContainerLow,
     borderRadius: radius.DEFAULT,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
@@ -354,10 +359,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: colors.primary,
     paddingVertical: 14,
     borderRadius: radius.full,
   },
-  limitNote: { textAlign: 'center', marginTop: 12, fontWeight: 'normal', opacity: 0.8 },
+  limitNote: { textAlign: 'center', marginTop: 12, opacity: 0.9 },
   doneBtn: { alignItems: 'center', paddingVertical: 16, marginTop: 4 },
 });

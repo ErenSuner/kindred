@@ -1,5 +1,6 @@
 import { describeWriteError } from '@/utils/loadError';
 import { Button } from '@/components/Button';
+import { Card } from '@/components/Card';
 import { DateFields, DateValue } from '@/components/DateFields';
 import { FormError } from '@/components/FormError';
 import { Icon } from '@/components/Icon';
@@ -7,8 +8,11 @@ import { DraftNote, NotesEditor, draftFromNote } from '@/components/NotesEditor'
 import { RecurrencePicker } from '@/components/RecurrencePicker';
 import { ReminderEditor } from '@/components/ReminderEditor';
 import { Txt } from '@/components/Txt';
+import { showHeld } from '@/components/HeldNotice';
 import { usePeople } from '@/context/PeopleContext';
-import { ambientShadow, colors, radius, softShadow, spacing } from '@/theme/tokens';
+import { radius, spacing } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
+import { fonts } from '@/theme/type';
 import { SKIPPED_YEAR } from '@/utils/dates';
 import { Nudge, parseNudges, serializeNudges } from '@/utils/nudges';
 import { Recurrence, YEARLY } from '@/utils/recurrence';
@@ -19,9 +23,10 @@ import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
+  const { c } = useTheme();
   return (
-    <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.fieldLabel}>
-      {typeof children === 'string' ? children.toUpperCase() : children}
+    <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>
+      {children}
     </Txt>
   );
 }
@@ -29,6 +34,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 export default function EditSpecialDay() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { c, floatShadow } = useTheme();
   const { dayId, personId } = useLocalSearchParams<{ dayId: string; personId: string }>();
   const { people, updateSpecialDay, deleteSpecialDayWithUndo, syncNotes } = usePeople();
 
@@ -114,6 +120,7 @@ export default function EditSpecialDay() {
       });
 
       router.back();
+      showHeld(`${occasion.trim()} is remembered`, 'Reminders updated');
     } catch (e) {
       console.error(e);
       setError(describeWriteError(e));
@@ -131,16 +138,16 @@ export default function EditSpecialDay() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} hitSlop={8}>
-          <Icon name="arrow-back" size={24} color={colors.primary} />
+          <Icon name="arrow-back" size={24} color={c.muted} />
         </Pressable>
-        <Txt variant="headlineMd" color={colors.primary} style={{ flex: 1, textAlign: 'center' }}>
-          Edit Special Day
+        <Txt variant="title" style={{ flex: 1, textAlign: 'center' }}>
+          Edit special day
         </Txt>
         <Pressable onPress={() => setDeleteConfirmVisible(true)} hitSlop={8}>
-          <Icon name="delete" size={24} color={colors.error} />
+          <Icon name="delete-outline" size={24} color={c.danger} />
         </Pressable>
       </View>
 
@@ -150,48 +157,39 @@ export default function EditSpecialDay() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <Animated.View entering={FadeInDown.duration(500).delay(100)} style={[styles.card, { gap: spacing.stackMd }]}>
-            <View style={styles.cardHeader}>
-              <Txt variant="headlineMd" color={colors.onSurface}>
-                An Important Date
-              </Txt>
-            </View>
+          <Animated.View entering={FadeInDown.duration(500).delay(100)}>
+            <Card style={{ gap: spacing.stackMd }}>
+              <View style={{ gap: spacing.stackMd }}>
+                <View style={{ gap: 6 }}>
+                  <FieldLabel>Title</FieldLabel>
+                  <TextInput
+                    value={occasion}
+                    onChangeText={setOccasion}
+                    placeholder="e.g., Anniversary, Graduation"
+                    placeholderTextColor={c.faint}
+                    style={[styles.input, { backgroundColor: c.surfaceAlt, color: c.text }]}
+                  />
+                </View>
 
-            <View style={{ gap: spacing.stackMd }}>
-              <View style={{ gap: 4 }}>
-                <FieldLabel>Title</FieldLabel>
-                <TextInput
-                  value={occasion}
-                  onChangeText={setOccasion}
-                  placeholder="e.g., Anniversary, Graduation"
-                  placeholderTextColor={colors.outline}
-                  style={styles.input}
-                />
+                <View style={{ gap: 6 }}>
+                  <FieldLabel>Date · year optional</FieldLabel>
+                  <DateFields value={date} onChange={setDate} yearMode="future" />
+                </View>
               </View>
 
-              <View style={{ gap: 4 }}>
-                <FieldLabel>
-                  Date{' '}
-                  <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontWeight: 'normal' }}>
-                    (Year optional)
-                  </Txt>
-                </FieldLabel>
-                <DateFields value={date} onChange={setDate} yearMode="future" />
-              </View>
-            </View>
+              <RecurrencePicker value={recurrence} onChange={setRecurrence} />
 
-            <RecurrencePicker value={recurrence} onChange={setRecurrence} />
+              <ReminderEditor reminders={reminders} onChange={setReminders} eventDate={eventDate()} />
 
-            <ReminderEditor reminders={reminders} onChange={setReminders} eventDate={eventDate()} />
-
-            <NotesEditor notes={notes} onChange={setNotes} />
+              <NotesEditor notes={notes} onChange={setNotes} />
+            </Card>
           </Animated.View>
 
           <FormError message={error} />
 
           <Animated.View entering={FadeInDown.duration(500).delay(200)} style={{ alignItems: 'center' }}>
             <Button
-              label={saving ? 'Saving…' : 'Save Changes'}
+              label={saving ? 'Saving…' : 'Save changes'}
               icon="check"
               onPress={handleSubmit}
               disabled={saving}
@@ -201,20 +199,22 @@ export default function EditSpecialDay() {
       </KeyboardAvoidingView>
 
       <Modal visible={deleteConfirmVisible} transparent animationType="fade">
-        <View style={styles.deleteOverlay}>
-          <Animated.View entering={FadeInDown.duration(300)} exiting={FadeOut.duration(200)} style={styles.deleteContent}>
-            <View style={styles.deleteIconWrap}>
-              <Icon name="delete" size={32} color={colors.error} />
+        <View style={[styles.deleteOverlay, { backgroundColor: c.overlay }]}>
+          <Animated.View
+            entering={FadeInDown.duration(300)}
+            exiting={FadeOut.duration(200)}
+            style={[styles.deleteContent, { backgroundColor: c.surface }, floatShadow]}
+          >
+            <View style={[styles.deleteIconWrap, { backgroundColor: c.dangerWash }]}>
+              <Icon name="delete-outline" size={30} color={c.danger} />
             </View>
-            <Txt variant="headlineMd" color={colors.onSurface} style={{ marginTop: 16 }}>
-              Delete Special Day
-            </Txt>
-            <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 8, textAlign: 'center' }}>
+            <Txt variant="heading" style={{ marginTop: 16 }}>Delete special day</Txt>
+            <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center' }}>
               This removes the day and any notes kept with it. You&apos;ll have a moment to undo it.
             </Txt>
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, width: '100%' }}>
-              <Button label="Cancel" onPress={() => setDeleteConfirmVisible(false)} variant="tonal" style={{ flex: 1 }} />
-              <Button label="Delete" onPress={executeDelete} style={{ flex: 1, backgroundColor: colors.error }} />
+              <Button label="Cancel" onPress={() => setDeleteConfirmVisible(false)} variant="quiet" style={{ flex: 1 }} />
+              <Button label="Delete" onPress={executeDelete} variant="dangerSolid" style={{ flex: 1 }} />
             </View>
           </Animated.View>
         </View>
@@ -230,47 +230,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.containerMobile,
     paddingBottom: spacing.stackMd,
-    backgroundColor: colors.background,
   },
-  card: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radius.lg,
-    padding: spacing.stackMd,
-    ...softShadow,
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  fieldLabel: { letterSpacing: 1, marginLeft: 2 },
+  fieldLabel: { marginLeft: 2 },
   input: {
-    backgroundColor: 'rgba(228,226,225,0.4)',
     borderRadius: radius.DEFAULT,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: fonts.figtreeRegular,
     fontSize: 16,
-    color: colors.onSurface,
   },
-  inputCenter: { alignItems: 'center', justifyContent: 'center' },
   deleteOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
   },
   deleteContent: {
-    backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radius.xl,
     padding: 24,
     width: '100%',
     maxWidth: 400,
     alignItems: 'center',
-    ...ambientShadow,
   },
   deleteIconWrap: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.errorContainer,
     alignItems: 'center',
     justifyContent: 'center',
   },

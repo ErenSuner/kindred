@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
-import { colors, spacing, radius, softShadow } from '@/theme/tokens';
+import { spacing, radius } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
 import { FormError } from '@/components/FormError';
+import { showHeld } from '@/components/HeldNotice';
 import { DateFields, DateValue } from '@/components/DateFields';
 import { ReminderEditor } from '@/components/ReminderEditor';
 import { usePeople } from '@/context/PeopleContext';
@@ -14,9 +16,10 @@ import { SKIPPED_YEAR } from '@/utils/dates';
 import type { Person } from '@/data/mock';
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
+  const { c } = useTheme();
   return (
-    <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.fieldLabel}>
-      {typeof children === 'string' ? children.toUpperCase() : children}
+    <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>
+      {children}
     </Txt>
   );
 }
@@ -26,6 +29,7 @@ export type InlineBirthdayCardProps = {
 };
 
 export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
+  const { c, cardShadow } = useTheme();
   const { addBirthday, updateBirthday, deleteSpecialDayWithUndo } = usePeople();
   const birthday = person.birthday;
   const bdayEvent = person.specialDays?.find((d: any) => d.isBirthday);
@@ -87,6 +91,13 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
         await addBirthday(person.id, { date: formattedDate, nudges });
       }
       setIsExpanded(false);
+      // The reassurance is the product: say the job has been taken on.
+      showHeld(
+        `${person.name}'s birthday is remembered`,
+        reminders.length > 0
+          ? `On the day, plus ${reminders.length} earlier ${reminders.length === 1 ? 'reminder' : 'reminders'}`
+          : "We'll remind you on the day",
+      );
     } catch (e) {
       console.error(e);
       setError('Could not save. Check your connection and try again.');
@@ -114,33 +125,36 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
         !birthday ? (
           <Pressable
             onPress={() => setIsExpanded(true)}
-            style={({ pressed }) => [styles.collapsedCard, pressed && { backgroundColor: colors.surfaceContainerLow }]}
+            style={({ pressed }) => [
+              styles.collapsedCard,
+              { borderColor: c.lineStrong, backgroundColor: c.surface },
+              pressed && { backgroundColor: c.surfaceAlt },
+            ]}
           >
-            <Icon name="add-circle-outline" size={24} color={colors.primary} />
-            <Txt variant="bodyLg" color={colors.primary} style={{ fontFamily: 'Inter_500Medium' }}>
-              Add Birthday
-            </Txt>
+            <Icon name="add-circle-outline" size={22} color={c.flameDeep} />
+            <Txt variant="bodyMed" color={c.flameDeep}>Add birthday</Txt>
           </Pressable>
         ) : (
-          <View style={styles.savedCard}>
+          <View style={[styles.savedCard, { backgroundColor: c.surface, borderColor: c.line }, cardShadow]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flex: 1 }}>
-              <View style={[styles.dayIcon, { backgroundColor: 'rgba(207,151,83,0.3)' }]}>
-                <Icon name="cake" size={22} color={colors.tertiary} />
+              <View style={[styles.dayIcon, { backgroundColor: c.flameWash }]}>
+                <Icon name="cake" size={22} color={c.flameDeep} />
               </View>
-              <View style={{ flex: 1 }}>
-                <Txt variant="bodyMd" color={colors.onSurface} style={{ fontFamily: 'Inter_500Medium' }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Txt variant="bodyMed">
                   Birthday{bdayEvent?.turningAge ? ` (Turning ${bdayEvent.turningAge})` : ''}
                 </Txt>
-                <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontFamily: 'Inter_400Regular' }}>
+                <Txt variant="sub" color={c.muted} style={{ marginTop: 2 }}>
                   {bdayEvent?.date}
                 </Txt>
 
+                {/* The mechanism, quietly visible: which reminders are armed. */}
                 {reminders.length > 0 && (
                   <View style={{ marginTop: 8, gap: 4 }}>
                     {reminders.map((r, i) => (
                       <View key={`${r.value}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Icon name={r.type === 'date' ? 'calendar-today' : 'schedule'} size={12} color={colors.primary} />
-                        <Txt variant="labelSm" color={colors.outline}>{r.label}</Txt>
+                        <Icon name={r.type === 'date' ? 'notifications-none' : 'schedule'} size={12} color={c.flameDeep} />
+                        <Txt variant="sub" color={c.faint}>{r.label}</Txt>
                       </View>
                     ))}
                   </View>
@@ -148,30 +162,29 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
               </View>
             </View>
             <Pressable onPress={() => setIsExpanded(true)} hitSlop={8} style={{ padding: 8, alignSelf: 'flex-start' }}>
-              <Icon name="edit" size={22} color={colors.primary} />
+              <Icon name="edit" size={22} color={c.muted} />
             </Pressable>
           </View>
         )
       ) : (
-        <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.expandedCard}>
+        <Animated.View
+          entering={FadeIn}
+          exiting={FadeOut}
+          style={[styles.expandedCard, { backgroundColor: c.surface, borderColor: c.line }, cardShadow]}
+        >
           <View style={styles.cardHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Icon name="cake" size={24} color={colors.primary} />
-              <Txt variant="headlineMd" color={colors.onSurface}>{birthday ? 'Edit Birthday' : 'Add Birthday'}</Txt>
+              <Icon name="cake" size={22} color={c.flameDeep} />
+              <Txt variant="heading">{birthday ? 'Edit birthday' : 'Add birthday'}</Txt>
             </View>
             <Pressable onPress={() => setIsExpanded(false)} hitSlop={8}>
-              <Icon name="close" size={24} color={colors.onSurfaceVariant} />
+              <Icon name="close" size={24} color={c.muted} />
             </Pressable>
           </View>
 
           <View style={{ gap: spacing.stackMd }}>
             <View style={{ gap: 4 }}>
-              <FieldLabel>
-                Date{' '}
-                <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontWeight: 'normal' }}>
-                  (Year optional)
-                </Txt>
-              </FieldLabel>
+              <FieldLabel>Date · year optional</FieldLabel>
               <DateFields value={date} onChange={setDate} yearMode="past" />
             </View>
 
@@ -180,7 +193,7 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
             <FormError message={error} />
 
             <Button
-              label={isSaving ? 'Saving…' : 'Save Birthday'}
+              label={isSaving ? 'Saving…' : 'Save birthday'}
               icon="check"
               onPress={handleSave}
               disabled={isSaving}
@@ -194,8 +207,8 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
                 disabled={isSaving}
                 style={({ pressed }) => [styles.clearBtn, pressed && { opacity: 0.7 }]}
               >
-                <Icon name="delete-outline" size={16} color={colors.error} />
-                <Txt variant="labelMd" color={colors.error}>Clear birthday</Txt>
+                <Icon name="delete-outline" size={16} color={c.danger} />
+                <Txt variant="label" color={c.danger}>Clear birthday</Txt>
               </Pressable>
             )}
           </View>
@@ -216,24 +229,20 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: colors.outlineVariant,
-    backgroundColor: colors.surfaceContainerLowest,
   },
   savedCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radius.lg,
+    borderWidth: 1,
     padding: 16,
-    ...softShadow,
   },
   expandedCard: {
-    backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radius.lg,
+    borderWidth: 1,
     padding: spacing.stackMd,
     gap: spacing.stackMd,
-    ...softShadow,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   dayIcon: {
@@ -243,7 +252,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fieldLabel: { letterSpacing: 1, marginLeft: 2 },
+  fieldLabel: { marginLeft: 2 },
   clearBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -251,14 +260,4 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 12,
   },
-  input: {
-    backgroundColor: 'rgba(228,226,225,0.4)',
-    borderRadius: radius.DEFAULT,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 16,
-    color: colors.onSurface,
-  },
-  inputCenter: { alignItems: 'center', justifyContent: 'center' },
 });

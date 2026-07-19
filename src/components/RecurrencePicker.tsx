@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { colors, radius, spacing } from '@/theme/tokens';
+import { radius, spacing } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
@@ -56,6 +57,7 @@ type Props = {
 };
 
 export function RecurrencePicker({ value, onChange }: Props) {
+  const { c } = useTheme();
   const [customMode, setCustomMode] = useState(() => isCustom(value));
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerType, setPickerType] = useState<'interval' | 'unit'>('interval');
@@ -78,13 +80,18 @@ export function RecurrencePicker({ value, onChange }: Props) {
 
   const showCustom = customMode || isCustom(value);
 
+  const chipLook = (active: boolean) => ({
+    backgroundColor: active ? c.ink : c.surfaceAlt,
+    borderColor: active ? c.ink : c.line,
+  });
+
   return (
-    <View style={styles.box}>
+    <View style={[styles.box, { backgroundColor: c.surface, borderColor: c.line }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Icon name={recurrenceIcon(value)} size={16} color={colors.primary} />
-        <Txt variant="labelMd" color={colors.onSurface}>Repeats</Txt>
+        <Icon name={recurrenceIcon(value)} size={16} color={c.flameDeep} />
+        <Txt variant="subMed">Repeats</Txt>
       </View>
-      <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 4, marginBottom: 12 }}>
+      <Txt variant="sub" color={c.muted} style={{ marginTop: 4, marginBottom: 12 }}>
         {recurrenceDescription(value)}
       </Txt>
 
@@ -95,9 +102,9 @@ export function RecurrencePicker({ value, onChange }: Props) {
             <Pressable
               key={option.label}
               onPress={() => selectQuick(option.value)}
-              style={({ pressed }) => [styles.chip, active && styles.chipActive, pressed && { opacity: 0.8 }]}
+              style={({ pressed }) => [styles.chip, chipLook(active), pressed && { opacity: 0.8 }]}
             >
-              <Txt variant="labelSm" color={active ? colors.onSecondaryContainer : colors.onSurfaceVariant}>
+              <Txt variant="label" color={active ? c.onInk : c.muted}>
                 {option.label}
               </Txt>
             </Pressable>
@@ -106,10 +113,10 @@ export function RecurrencePicker({ value, onChange }: Props) {
 
         <Pressable
           onPress={enterCustom}
-          style={({ pressed }) => [styles.chip, showCustom && styles.chipActive, pressed && { opacity: 0.8 }]}
+          style={({ pressed }) => [styles.chip, chipLook(showCustom), pressed && { opacity: 0.8 }]}
         >
-          <Icon name="tune" size={12} color={showCustom ? colors.onSecondaryContainer : colors.onSurfaceVariant} />
-          <Txt variant="labelSm" color={showCustom ? colors.onSecondaryContainer : colors.onSurfaceVariant}>
+          <Icon name="tune" size={12} color={showCustom ? c.onInk : c.muted} />
+          <Txt variant="label" color={showCustom ? c.onInk : c.muted}>
             Custom
           </Txt>
         </Pressable>
@@ -117,22 +124,22 @@ export function RecurrencePicker({ value, onChange }: Props) {
 
       {showCustom && (
         <Animated.View entering={FadeIn.duration(200)} style={styles.customRow}>
-          <Txt variant="bodyMd" color={colors.onSurfaceVariant}>Every</Txt>
+          <Txt variant="body" color={c.muted}>Every</Txt>
           <Pressable
             onPress={() => { setPickerType('interval'); setPickerVisible(true); }}
-            style={[styles.stepper, { minWidth: 64 }]}
+            style={[styles.stepper, { minWidth: 64, backgroundColor: c.surfaceAlt, borderColor: c.line }]}
           >
-            <Txt variant="bodyMd" color={colors.onSurface}>{customInterval}</Txt>
-            <Icon name="expand-more" size={16} color={colors.onSurfaceVariant} />
+            <Txt variant="body">{customInterval}</Txt>
+            <Icon name="expand-more" size={16} color={c.muted} />
           </Pressable>
           <Pressable
             onPress={() => { setPickerType('unit'); setPickerVisible(true); }}
-            style={[styles.stepper, { flex: 1 }]}
+            style={[styles.stepper, { flex: 1, backgroundColor: c.surfaceAlt, borderColor: c.line }]}
           >
-            <Txt variant="bodyMd" color={colors.onSurface}>
+            <Txt variant="body">
               {UNIT_OPTIONS.find((u) => u.value === customUnit)?.label}
             </Txt>
-            <Icon name="expand-more" size={16} color={colors.onSurfaceVariant} />
+            <Icon name="expand-more" size={16} color={c.muted} />
           </Pressable>
         </Animated.View>
       )}
@@ -162,10 +169,8 @@ export function RecurrencePicker({ value, onChange }: Props) {
 
 const styles = StyleSheet.create({
   box: {
-    backgroundColor: colors.surfaceContainerLow,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.surfaceVariant,
     padding: 16,
     marginTop: spacing.stackSm,
   },
@@ -178,12 +183,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: radius.full,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    backgroundColor: colors.surfaceContainerLowest,
-  },
-  chipActive: {
-    backgroundColor: colors.secondaryContainer,
-    borderColor: colors.secondary,
   },
   customRow: {
     flexDirection: 'row',
@@ -196,10 +195,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 4,
-    backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radius.DEFAULT,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },

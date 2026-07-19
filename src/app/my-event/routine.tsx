@@ -1,15 +1,19 @@
 import { describeWriteError } from '@/utils/loadError';
 import { Button } from '@/components/Button';
+import { Card } from '@/components/Card';
 import { FormError } from '@/components/FormError';
 import { Icon } from '@/components/Icon';
 import { ReminderEditor } from '@/components/ReminderEditor';
 import { Txt } from '@/components/Txt';
+import { showHeld } from '@/components/HeldNotice';
 import { WeekdayPicker } from '@/components/WeekdayPicker';
 import { useEvents } from '@/context/EventsContext';
-import { colors, radius, softShadow, spacing } from '@/theme/tokens';
+import { radius, spacing } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
+import { fonts } from '@/theme/type';
 import { toISODate } from '@/utils/dates';
 import { DAY_OF, Nudge, parseNudges, serializeNudges } from '@/utils/nudges';
-import { Weekday } from '@/utils/routines';
+import { Weekday, weekdaysLabel } from '@/utils/routines';
 import { TimeField } from '@/components/TimeField';
 import { TimeOfDay } from '@/utils/eventTime';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -21,9 +25,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const SUGGESTIONS = ['Class', 'Gym', 'Therapy', 'Football', 'Language course'];
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
+  const { c } = useTheme();
   return (
-    <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.fieldLabel}>
-      {typeof children === 'string' ? children.toUpperCase() : children}
+    <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>
+      {children}
     </Txt>
   );
 }
@@ -34,6 +39,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 export default function RoutineForm() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { c } = useTheme();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { addEvent, updateEvent, getEvent, deleteEventWithUndo } = useEvents();
 
@@ -90,6 +96,7 @@ export default function RoutineForm() {
         await addEvent({ ...payload, date: toISODate(new Date()) });
       }
       router.back();
+      showHeld(`${title.trim()} is remembered`, `${weekdaysLabel(weekdays)}, every week`);
     } catch (e) {
       console.error(e);
       setError(describeWriteError(e));
@@ -99,13 +106,13 @@ export default function RoutineForm() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} hitSlop={8}>
-          <Icon name="arrow-back" size={24} color={colors.primary} />
+          <Icon name="arrow-back" size={24} color={c.muted} />
         </Pressable>
-        <Txt variant="headlineMd" color={colors.primary} style={{ flex: 1, textAlign: 'center', marginRight: 24 }}>
-          {id ? 'Edit Routine' : 'New Routine'}
+        <Txt variant="title" style={{ flex: 1, textAlign: 'center', marginRight: 24 }}>
+          {id ? 'Edit routine' : 'New routine'}
         </Txt>
       </View>
 
@@ -115,53 +122,55 @@ export default function RoutineForm() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <Animated.View entering={FadeInDown.duration(500).delay(100)} style={[styles.card, { gap: spacing.stackMd }]}>
-            <View style={styles.cardHeader}>
-              <Txt variant="headlineMd" color={colors.onSurface}>Every week</Txt>
-              <Icon name="repeat" size={24} color={colors.primary} />
-            </View>
+          <Animated.View entering={FadeInDown.duration(500).delay(100)}>
+            <Card style={{ gap: spacing.stackMd }}>
+              <View style={styles.cardHeader}>
+                <Txt variant="heading">Every week</Txt>
+                <Icon name="repeat" size={22} color={c.flameDeep} />
+              </View>
 
-            <Txt variant="bodyMd" color={colors.onSurfaceVariant}>
-              For the things that come round on the same days — a course, a class, a standing appointment.
-            </Txt>
+              <View style={{ gap: 6 }}>
+                <FieldLabel>Name</FieldLabel>
+                <TextInput
+                  value={title}
+                  onChangeText={setTitle}
+                  placeholder="e.g., Guitar lesson"
+                  placeholderTextColor={c.faint}
+                  style={[styles.input, { backgroundColor: c.surfaceAlt, color: c.text }]}
+                />
+              </View>
 
-            <View style={{ gap: 4 }}>
-              <FieldLabel>Name</FieldLabel>
-              <TextInput
-                value={title}
-                onChangeText={setTitle}
-                placeholder="e.g., Guitar lesson"
-                placeholderTextColor={colors.outline}
-                style={styles.input}
-              />
-            </View>
+              <View style={styles.chipWrap}>
+                {SUGGESTIONS.map((s) => (
+                  <Pressable
+                    key={s}
+                    onPress={() => setTitle(s)}
+                    style={({ pressed }) => [
+                      styles.suggestChip,
+                      { borderColor: c.lineStrong },
+                      pressed && { opacity: 0.7 },
+                    ]}
+                  >
+                    <Txt variant="sub" color={c.muted}>{s}</Txt>
+                  </Pressable>
+                ))}
+              </View>
 
-            <View style={styles.chipWrap}>
-              {SUGGESTIONS.map((s) => (
-                <Pressable
-                  key={s}
-                  onPress={() => setTitle(s)}
-                  style={({ pressed }) => [styles.suggestChip, pressed && { opacity: 0.7 }]}
-                >
-                  <Txt variant="labelSm" color={colors.onSurfaceVariant}>{s}</Txt>
-                </Pressable>
-              ))}
-            </View>
+              <WeekdayPicker value={weekdays} onChange={setWeekdays} />
 
-            <WeekdayPicker value={weekdays} onChange={setWeekdays} />
+              <TimeField value={timeOfDay} onChange={setTimeOfDay} />
 
-            <TimeField value={timeOfDay} onChange={setTimeOfDay} />
-
-            {/* A routine comes round weekly, so anything further out than six
-                days would fire every week and mean nothing. */}
-            <ReminderEditor reminders={reminders} onChange={setReminders} maxLeadDays={6} />
+              {/* A routine comes round weekly, so anything further out than six
+                  days would fire every week and mean nothing. */}
+              <ReminderEditor reminders={reminders} onChange={setReminders} maxLeadDays={6} />
+            </Card>
           </Animated.View>
 
           <FormError message={error} />
 
           <Animated.View entering={FadeInDown.duration(500).delay(200)} style={{ alignItems: 'center', gap: spacing.stackMd }}>
             <Button
-              label={saving ? 'Saving…' : id ? 'Save Routine' : 'Add Routine'}
+              label={saving ? 'Saving…' : id ? 'Save routine' : 'Add routine'}
               icon="check"
               onPress={handleSubmit}
               disabled={saving}
@@ -174,8 +183,8 @@ export default function RoutineForm() {
                 }}
                 style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.7 }]}
               >
-                <Icon name="delete" size={18} color={colors.error} />
-                <Txt variant="labelMd" color={colors.error}>Delete routine</Txt>
+                <Icon name="delete-outline" size={18} color={c.danger} />
+                <Txt variant="label" color={c.danger}>Delete routine</Txt>
               </Pressable>
             )}
           </Animated.View>
@@ -191,24 +200,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.containerMobile,
     paddingBottom: spacing.stackMd,
-    backgroundColor: colors.background,
-  },
-  card: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radius.lg,
-    padding: spacing.stackMd,
-    ...softShadow,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  fieldLabel: { letterSpacing: 1, marginLeft: 2 },
+  fieldLabel: { marginLeft: 2 },
   input: {
-    backgroundColor: 'rgba(228,226,225,0.4)',
     borderRadius: radius.DEFAULT,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: fonts.figtreeRegular,
     fontSize: 16,
-    color: colors.onSurface,
   },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   suggestChip: {
@@ -216,7 +216,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: radius.full,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
   },
   deleteBtn: {
     flexDirection: 'row',

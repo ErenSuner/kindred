@@ -3,10 +3,12 @@ import { View, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { colors, spacing, radius, softShadow } from '@/theme/tokens';
+import { spacing, radius } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Avatar } from '@/components/Avatar';
+import { Card } from '@/components/Card';
 import { usePeople } from '@/context/PeopleContext';
 import type { Person, SpecialDay } from '@/data/mock';
 
@@ -26,6 +28,7 @@ const MONTHS = [
 export default function Birthdays() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { c } = useTheme();
   const { people } = usePeople();
 
   const [activeFilter, setActiveFilter] = useState('Upcoming');
@@ -75,57 +78,57 @@ export default function Birthdays() {
     return birthdays.filter((b) => b.monthName === activeFilter);
   }, [activeFilter, birthdays]);
 
-  // Group by month ONLY if activeFilter === 'Upcoming' (to show the full list with dividers)
-  // If a specific month is selected, no dividers needed (or just one for that month)
-  
   const renderItem = (item: BirthdayItem, index: number) => {
-    const isVerySoon = (item.day.daysAway || 0) <= 7;
+    const soon = (item.day.daysAway || 0) <= 7;
     return (
       <Animated.View key={`${item.person.id}-${item.day.id}`} entering={FadeInDown.duration(400).delay(index * 50)}>
-        <Pressable
-          onPress={() => router.push(`/person/${item.person.id}`)}
-          style={({ pressed }) => [
-            styles.card,
-            pressed && { transform: [{ scale: 0.98 }], backgroundColor: colors.surfaceContainerHigh }
-          ]}
-        >
+        <Card onPress={() => router.push(`/person/${item.person.id}`)} style={styles.card}>
           <View style={{ position: 'relative' }}>
-            <Avatar uri={item.person.avatar} initials={item.person.initials} size={64} />
-            <View style={styles.cakeBadge}>
-              <Icon name="cake" size={14} color={colors.onPrimaryContainer} />
+            <Avatar uri={item.person.avatar} initials={item.person.initials} size={56} />
+            <View style={[styles.cakeBadge, { backgroundColor: c.flameWash, borderColor: c.surface }]}>
+              <Icon name="cake" size={13} color={c.flameDeep} />
             </View>
           </View>
-          <View style={{ flex: 1, marginLeft: 16 }}>
-            <Txt variant="headlineMd" color={colors.onSurface} style={{ fontSize: 20, lineHeight: 28 }}>
+          <View style={{ flex: 1, marginLeft: 16, minWidth: 0 }}>
+            <Txt variant="heading" style={{ fontSize: 18, lineHeight: 24 }}>
               {item.person.name}
             </Txt>
-            <Txt variant="bodyMd" color={colors.onSurfaceVariant} numberOfLines={1}>
-              {item.day.date.split(',')[0]} · {item.day.title}{item.day.turningAge ? ` (Turning ${item.day.turningAge})` : ''}
+            <Txt variant="sub" color={c.muted} numberOfLines={1} style={{ marginTop: 2 }}>
+              {item.day.date.split(',')[0]}
+              {item.day.turningAge ? ` · turning ${item.day.turningAge}` : ''}
             </Txt>
           </View>
-          <View style={{ alignItems: 'flex-end', opacity: isVerySoon ? 1 : 0.7 }}>
-            <Txt variant="labelMd" color={isVerySoon ? colors.primary : colors.onSurfaceVariant} style={isVerySoon && { fontWeight: 'bold' }}>
-              {item.day.daysAway === 0 ? 'Today!' : `${item.day.daysAway} Days`}
+          <View
+            style={[
+              styles.countChip,
+              { backgroundColor: item.day.daysAway === 0 ? c.flameWash : c.surfaceAlt },
+            ]}
+          >
+            <Txt
+              variant="num"
+              color={item.day.daysAway === 0 ? c.flameDeep : soon ? c.text : c.muted}
+              style={{ fontSize: 13, lineHeight: 17 }}
+            >
+              {item.day.daysAway === 0
+                ? 'Today'
+                : item.day.daysAway === 1
+                ? 'Tomorrow'
+                : `${item.day.daysAway} days`}
             </Txt>
-            {item.day.daysAway !== 0 && (
-              <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ textTransform: 'uppercase', letterSpacing: 1 }}>
-                Away
-              </Txt>
-            )}
           </View>
-        </Pressable>
+        </Card>
       </Animated.View>
     );
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} hitSlop={8} style={{ padding: 8, marginLeft: -8 }}>
-          <Icon name="arrow-back" size={24} color={colors.primary} />
+          <Icon name="arrow-back" size={24} />
         </Pressable>
-        <Txt variant="headlineMd" color={colors.primary} style={{ flex: 1, paddingHorizontal: 16 }}>
+        <Txt variant="title" style={{ flex: 1, paddingHorizontal: 12 }}>
           Birthdays
         </Txt>
         <View style={{ width: 40 }} />
@@ -137,25 +140,31 @@ export default function Birthdays() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Chips */}
+        {/* Month filter */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{
             paddingHorizontal: spacing.containerMobile,
-            gap: 12,
+            gap: 10,
             paddingBottom: 16,
           }}
         >
           {chips.map((chip, i) => {
             const active = activeFilter === chip;
             return (
-              <Animated.View key={chip} entering={FadeInDown.duration(400).delay(i * 50)}>
+              <Animated.View key={chip} entering={FadeInDown.duration(400).delay(i * 40)}>
                 <Pressable
                   onPress={() => setActiveFilter(chip)}
-                  style={[styles.chip, active && styles.chipActive]}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: active ? c.ink : 'transparent',
+                      borderColor: active ? c.ink : c.lineStrong,
+                    },
+                  ]}
                 >
-                  <Txt variant="labelMd" color={active ? colors.onPrimaryContainer : colors.onSurfaceVariant}>
+                  <Txt variant="subMed" color={active ? c.onInk : c.muted}>
                     {chip}
                   </Txt>
                 </Pressable>
@@ -164,12 +173,17 @@ export default function Birthdays() {
           })}
         </ScrollView>
 
-        <View style={{ paddingHorizontal: spacing.containerMobile, paddingTop: 8, gap: spacing.stackMd }}>
+        <View style={{ paddingHorizontal: spacing.containerMobile, paddingTop: 8, gap: spacing.stackSm }}>
           {filteredBirthdays.length === 0 ? (
             <Animated.View entering={FadeInDown.duration(400)} style={{ alignItems: 'center', marginTop: 40 }}>
-              <Icon name="cake" size={48} color={colors.outlineVariant} />
-              <Txt variant="headlineMd" color={colors.onSurface} style={{ marginTop: 16 }}>
-                No birthdays found
+              <Icon name="cake" size={44} color={c.lineStrong} />
+              <Txt variant="heading" style={{ marginTop: 16 }}>
+                {activeFilter === 'Upcoming' ? 'No birthdays saved yet' : `Nothing in ${activeFilter}`}
+              </Txt>
+              <Txt variant="sub" color={c.muted} style={{ marginTop: 6, textAlign: 'center', maxWidth: 260 }}>
+                {activeFilter === 'Upcoming'
+                  ? 'Add a birthday to someone and it will land here, sorted by how soon it is.'
+                  : 'A quiet month. Every saved birthday still shows under Upcoming.'}
               </Txt>
             </Animated.View>
           ) : (
@@ -181,7 +195,7 @@ export default function Birthdays() {
                   const laterItems = filteredBirthdays.filter((b) => !b.isUpcoming);
 
                   const elements: React.ReactElement[] = [];
-                  
+
                   // Render upcoming
                   upcomingItems.forEach((item, i) => elements.push(renderItem(item, i)));
 
@@ -191,12 +205,16 @@ export default function Birthdays() {
                     if (item.monthName !== currentMonthGroup) {
                       currentMonthGroup = item.monthName;
                       elements.push(
-                        <Animated.View key={`divider-${currentMonthGroup}`} entering={FadeInDown.duration(400).delay(upcomingItems.length * 50 + i * 50)} style={styles.dividerRow}>
-                          <View style={styles.dividerLine} />
-                          <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ textTransform: 'uppercase', letterSpacing: 2 }}>
+                        <Animated.View
+                          key={`divider-${currentMonthGroup}`}
+                          entering={FadeInDown.duration(400).delay(upcomingItems.length * 50 + i * 50)}
+                          style={styles.dividerRow}
+                        >
+                          <View style={[styles.dividerLine, { backgroundColor: c.line }]} />
+                          <Txt variant="eyebrow" color={c.faint}>
                             {currentMonthGroup}
                           </Txt>
-                          <View style={styles.dividerLine} />
+                          <View style={[styles.dividerLine, { backgroundColor: c.line }]} />
                         </Animated.View>
                       );
                     }
@@ -223,37 +241,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.containerMobile,
     paddingBottom: spacing.stackMd,
-    backgroundColor: colors.background,
     zIndex: 40,
   },
   chip: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: radius.full,
-    backgroundColor: colors.surfaceContainer,
-  },
-  chipActive: {
-    backgroundColor: colors.primaryContainer,
+    borderWidth: 1,
   },
   card: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radius.xl,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    ...softShadow,
   },
   cakeBadge: {
     position: 'absolute',
     bottom: -4,
     right: -4,
-    backgroundColor: colors.primaryContainer,
     borderRadius: 12,
     padding: 4,
     borderWidth: 2,
-    borderColor: colors.surfaceContainerLowest,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  countChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.full,
   },
   dividerRow: {
     flexDirection: 'row',
@@ -264,6 +278,5 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: colors.surfaceVariant,
-  }
+  },
 });

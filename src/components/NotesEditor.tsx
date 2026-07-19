@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { View, StyleSheet, Pressable, TextInput } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { colors, radius, spacing } from '@/theme/tokens';
+import { radius, spacing } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
+import { fonts } from '@/theme/type';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { NOTE } from '@/utils/notes';
@@ -32,6 +34,7 @@ type Props = {
 };
 
 export function NotesEditor({ notes, onChange, title = 'Notes', blurb }: Props) {
+  const { c } = useTheme();
   const [body, setBody] = useState('');
   const [editingKey, setEditingKey] = useState<string | null>(null);
 
@@ -67,28 +70,37 @@ export function NotesEditor({ notes, onChange, title = 'Notes', blurb }: Props) 
   };
 
   return (
-    <View style={styles.box}>
+    <View style={[styles.box, { backgroundColor: c.surface, borderColor: c.line }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Icon name="edit-note" size={18} color={colors.tertiary} />
-        <Txt variant="labelMd" color={colors.onSurface}>{title}</Txt>
+        <Icon name="edit-note" size={18} color={c.flameDeep} />
+        <Txt variant="subMed">{title}</Txt>
       </View>
-      <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 4, marginBottom: 12 }}>
+      <Txt variant="sub" color={c.muted} style={{ marginTop: 4, marginBottom: 12 }}>
         {blurb ?? 'Plans, details, anything you want to remember for this day.'}
       </Txt>
 
       {notes.length > 0 && (
         <View style={{ gap: 8, marginBottom: 12 }}>
           {notes.map((note) => (
-            <View key={note.key} style={[styles.noteRow, editingKey === note.key && styles.noteRowEditing]}>
-              <View style={{ flex: 1 }}>
-                <Txt variant="bodyMd" color={colors.onSurface}>{note.body}</Txt>
+            <View
+              key={note.key}
+              style={[
+                styles.noteRow,
+                { backgroundColor: c.surfaceAlt, borderColor: c.line },
+                editingKey === note.key && { borderColor: c.flame },
+              ]}
+            >
+              {/* minWidth 0 lets a long unbroken word wrap instead of pushing
+                  out of the card. */}
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Txt variant="body">{note.body}</Txt>
               </View>
               <View style={{ flexDirection: 'row', gap: 12, paddingLeft: 8 }}>
                 <Pressable onPress={() => startEdit(note)} hitSlop={8}>
-                  <Icon name="edit" size={16} color={colors.outline} />
+                  <Icon name="edit" size={16} color={c.faint} />
                 </Pressable>
                 <Pressable onPress={() => remove(note.key)} hitSlop={8}>
-                  <Icon name="close" size={16} color={colors.onSurfaceVariant} />
+                  <Icon name="close" size={16} color={c.muted} />
                 </Pressable>
               </View>
             </View>
@@ -102,23 +114,19 @@ export function NotesEditor({ notes, onChange, title = 'Notes', blurb }: Props) 
         onChangeText={setBody}
         maxLength={NOTE_MAX_LENGTH}
         placeholder="e.g., She mentioned wanting a new camera lens"
-        placeholderTextColor={colors.outline}
-        style={styles.input}
+        placeholderTextColor={c.faint}
+        style={[styles.input, { backgroundColor: c.surfaceAlt, borderColor: c.line, color: c.text }]}
       />
 
       <View style={styles.inputFooter}>
-        <Txt
-          variant="labelSm"
-          color={remaining <= 20 ? colors.error : colors.onSurfaceVariant}
-          style={{ fontWeight: 'normal' }}
-        >
+        <Txt variant="sub" color={remaining <= 20 ? c.danger : c.faint}>
           {remaining} left
         </Txt>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           {editingKey && (
             <Pressable onPress={cancelEdit} hitSlop={8} style={{ paddingHorizontal: 8, paddingVertical: 6 }}>
-              <Txt variant="labelMd" color={colors.onSurfaceVariant}>Cancel</Txt>
+              <Txt variant="label" color={c.muted}>Cancel</Txt>
             </Pressable>
           )}
           <Pressable
@@ -126,19 +134,20 @@ export function NotesEditor({ notes, onChange, title = 'Notes', blurb }: Props) 
             disabled={!trimmed}
             style={({ pressed }) => [
               styles.addBtn,
+              { backgroundColor: c.flame },
               !trimmed && { opacity: 0.4 },
               pressed && trimmed && { opacity: 0.85 },
             ]}
           >
-            <Icon name={editingKey ? 'check' : 'add'} size={16} color={colors.onPrimary} />
-            <Txt variant="labelMd" color={colors.onPrimary}>{editingKey ? 'Save note' : 'Add note'}</Txt>
+            <Icon name={editingKey ? 'check' : 'add'} size={16} color={c.onFlame} />
+            <Txt variant="label" color={c.onFlame}>{editingKey ? 'Save note' : 'Add note'}</Txt>
           </Pressable>
         </View>
       </View>
 
       {notes.length === 0 && !trimmed && (
         <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
-          <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.hint}>
+          <Txt variant="sub" color={c.faint} style={styles.hint}>
             Notes show up on this day&apos;s card, trimmed to a couple of lines.
           </Txt>
         </Animated.View>
@@ -149,25 +158,20 @@ export function NotesEditor({ notes, onChange, title = 'Notes', blurb }: Props) 
 
 const styles = StyleSheet.create({
   box: {
-    backgroundColor: colors.surfaceContainerLow,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.surfaceVariant,
     padding: 16,
     marginTop: spacing.stackSm,
   },
   input: {
-    backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radius.DEFAULT,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
     paddingHorizontal: 12,
     paddingVertical: 10,
     minHeight: 72,
     textAlignVertical: 'top',
-    fontFamily: 'Inter_400Regular',
+    fontFamily: fonts.figtreeRegular,
     fontSize: 15,
-    color: colors.onSurface,
   },
   inputFooter: {
     flexDirection: 'row',
@@ -179,7 +183,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: colors.primary,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: radius.full,
@@ -187,13 +190,10 @@ const styles = StyleSheet.create({
   noteRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radius.DEFAULT,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
   },
-  noteRowEditing: { borderColor: colors.primary },
-  hint: { fontWeight: 'normal', marginTop: 10, opacity: 0.8 },
+  hint: { marginTop: 10, opacity: 0.9 },
 });

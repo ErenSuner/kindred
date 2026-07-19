@@ -2,7 +2,7 @@ import { View, StyleSheet, Pressable, Modal, useWindowDimensions } from 'react-n
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { colors, radius } from '@/theme/tokens';
+import { radius } from '@/theme/tokens';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 
@@ -15,7 +15,8 @@ type Props = {
 
 // Full-bleed square view of a profile picture. Avatars are cropped to a circle
 // everywhere else, so this is the only place the original framing is visible —
-// which is the point of tapping it.
+// which is the point of tapping it. Always near-black, whatever the theme:
+// photographs read best against darkness.
 export function PhotoViewer({ visible, onClose, uri, title }: Props) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -30,12 +31,12 @@ export function PhotoViewer({ visible, onClose, uri, title }: Props) {
 
         <View style={[styles.top, { paddingTop: insets.top + 12 }]} pointerEvents="box-none">
           {title && (
-            <Txt variant="labelMd" color={colors.inverseOnSurface} style={{ flex: 1 }} numberOfLines={1}>
+            <Txt variant="subMed" color="#F5F2E8" style={{ flex: 1 }} numberOfLines={1}>
               {title}
             </Txt>
           )}
           <Pressable onPress={onClose} hitSlop={12} style={({ pressed }) => [styles.close, pressed && { opacity: 0.7 }]}>
-            <Icon name="close" size={24} color={colors.inverseOnSurface} />
+            <Icon name="close" size={24} color="#F5F2E8" />
           </Pressable>
         </View>
 
@@ -55,7 +56,7 @@ export function PhotoViewer({ visible, onClose, uri, title }: Props) {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.92)',
+    backgroundColor: 'rgba(6, 9, 7, 0.94)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -69,6 +70,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 20,
     paddingBottom: 12,
+    zIndex: 2,
   },
   close: {
     width: 40,

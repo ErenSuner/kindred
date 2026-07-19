@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { colors, radius } from '@/theme/tokens';
+import { radius } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
@@ -38,6 +39,7 @@ const now = () => {
 // field opens the shared scroll picker rather than a keyboard, which keeps the
 // input impossible to get into an invalid state.
 export function DateFields({ value, onChange, yearMode = 'past', allowSkipYear = true }: Props) {
+  const { c } = useTheme();
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerType, setPickerType] = useState<'day' | 'month' | 'year'>('day');
   // Set when a choice was quietly moved forward, so the change is at least
@@ -114,26 +116,28 @@ export function DateFields({ value, onChange, yearMode = 'past', allowSkipYear =
     setPickerVisible(false);
   };
 
+  const field = { backgroundColor: c.surfaceAlt };
+
   return (
     <>
       <View style={{ flexDirection: 'row', gap: 8 }}>
-        <Pressable onPress={() => open('day')} style={[styles.input, styles.center, { flex: 1 }]}>
-          <Txt variant="bodyMd" color={day ? colors.onSurface : colors.outline}>{day || 'Day'}</Txt>
+        <Pressable onPress={() => open('day')} style={[styles.input, styles.center, field, { flex: 1 }]}>
+          <Txt variant="body" color={day ? c.text : c.faint}>{day || 'Day'}</Txt>
         </Pressable>
-        <Pressable onPress={() => open('month')} style={[styles.input, styles.center, { flex: 1.5 }]}>
-          <Txt variant="bodyMd" color={month ? colors.onSurface : colors.outline}>
+        <Pressable onPress={() => open('month')} style={[styles.input, styles.center, field, { flex: 1.5 }]}>
+          <Txt variant="body" color={month ? c.text : c.faint}>
             {month ? MONTHS_SHORT[month - 1] : 'Month'}
           </Txt>
         </Pressable>
-        <Pressable onPress={() => open('year')} style={[styles.input, styles.center, { flex: 1.2 }]}>
-          <Txt variant="bodyMd" color={hasYear ? colors.onSurface : colors.outline}>{hasYear ? year : 'Year'}</Txt>
+        <Pressable onPress={() => open('year')} style={[styles.input, styles.center, field, { flex: 1.2 }]}>
+          <Txt variant="body" color={hasYear ? c.text : c.faint}>{hasYear ? year : 'Year'}</Txt>
         </Pressable>
       </View>
 
       {nudgedTo && (
         <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={styles.notice}>
-          <Icon name="info" size={13} color={colors.onSurfaceVariant} />
-          <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.noticeText}>
+          <Icon name="info" size={13} color={c.muted} />
+          <Txt variant="sub" color={c.muted} style={styles.noticeText}>
             {nudgedTo}
           </Txt>
         </Animated.View>
@@ -166,13 +170,9 @@ export function DateFields({ value, onChange, yearMode = 'past', allowSkipYear =
 
 const styles = StyleSheet.create({
   input: {
-    backgroundColor: 'rgba(228,226,225,0.4)',
     borderRadius: radius.DEFAULT,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 16,
-    color: colors.onSurface,
   },
   center: { alignItems: 'center', justifyContent: 'center' },
   notice: {
@@ -182,5 +182,5 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginLeft: 2,
   },
-  noticeText: { fontWeight: 'normal', opacity: 0.85, flex: 1 },
+  noticeText: { opacity: 0.85, flex: 1 },
 });

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { View, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radius, spacing } from '@/theme/tokens';
+import { radius, spacing } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { usePeople } from '@/context/PeopleContext';
@@ -16,6 +17,7 @@ import { usePeople } from '@/context/PeopleContext';
 export function PendingWrites() {
   const { pendingWrites, retryPendingWrites, writeError, clearWriteError } = usePeople();
   const insets = useSafeAreaInsets();
+  const { c } = useTheme();
   const [retrying, setRetrying] = useState(false);
 
   // An outright failure is the more urgent of the two, so it wins the one slot.
@@ -39,18 +41,20 @@ export function PendingWrites() {
       style={[styles.wrap, { paddingTop: insets.top + 6 }]}
       pointerEvents="box-none"
     >
-      <View style={[styles.bar, showingError && styles.barError]}>
+      <View
+        style={[
+          styles.bar,
+          { backgroundColor: c.surfaceAlt, borderColor: c.line },
+          showingError && { backgroundColor: c.dangerWash, borderColor: c.danger },
+        ]}
+      >
         <Icon
           name={showingError ? 'error-outline' : 'cloud-off'}
           size={16}
-          color={showingError ? colors.onErrorContainer : colors.onSurfaceVariant}
+          color={showingError ? c.danger : c.muted}
         />
 
-        <Txt
-          variant="labelSm"
-          color={showingError ? colors.onErrorContainer : colors.onSurfaceVariant}
-          style={styles.text}
-        >
+        <Txt variant="sub" color={showingError ? c.danger : c.muted} style={styles.text}>
           {showingError
             ? writeError
             : pendingWrites === 1
@@ -60,14 +64,14 @@ export function PendingWrites() {
 
         {showingError ? (
           <Pressable onPress={clearWriteError} hitSlop={8}>
-            <Icon name="close" size={16} color={colors.onErrorContainer} />
+            <Icon name="close" size={16} color={c.danger} />
           </Pressable>
         ) : (
           <Pressable onPress={retry} disabled={retrying} hitSlop={8}>
             {retrying ? (
-              <ActivityIndicator size="small" color={colors.primary} />
+              <ActivityIndicator size="small" color={c.flameDeep} />
             ) : (
-              <Txt variant="labelSm" color={colors.primary}>Retry</Txt>
+              <Txt variant="label" color={c.flameDeep}>Retry</Txt>
             )}
           </Pressable>
         )}
@@ -89,16 +93,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: colors.surfaceContainerHigh,
     borderRadius: radius.full,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  barError: {
-    backgroundColor: colors.errorContainer,
-    borderColor: colors.error,
-  },
-  text: { flex: 1, fontWeight: 'normal' },
+  text: { flex: 1 },
 });

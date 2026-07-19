@@ -1,5 +1,6 @@
 import { View, StyleSheet, Pressable } from 'react-native';
-import { colors, radius, spacing } from '@/theme/tokens';
+import { radius, spacing } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { WEEKDAYS, Weekday, sortWeekdays, weekdaysLabel } from '@/utils/routines';
@@ -11,6 +12,7 @@ type Props = {
 
 // The days a routine falls on. Monday first, so it reads like a timetable.
 export function WeekdayPicker({ value, onChange }: Props) {
+  const { c } = useTheme();
   const selected = new Set(value);
 
   const toggle = (day: Weekday) => {
@@ -19,12 +21,12 @@ export function WeekdayPicker({ value, onChange }: Props) {
   };
 
   return (
-    <View style={styles.box}>
+    <View style={[styles.box, { backgroundColor: c.surface, borderColor: c.line }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Icon name="repeat" size={16} color={colors.primary} />
-        <Txt variant="labelMd" color={colors.onSurface}>Which days</Txt>
+        <Icon name="repeat" size={16} color={c.flameDeep} />
+        <Txt variant="subMed">Which days</Txt>
       </View>
-      <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 4, marginBottom: 12 }}>
+      <Txt variant="sub" color={c.muted} style={{ marginTop: 4, marginBottom: 12 }}>
         {value.length === 0 ? 'Pick the days this happens on.' : `${weekdaysLabel(value)}, every week.`}
       </Txt>
 
@@ -35,9 +37,16 @@ export function WeekdayPicker({ value, onChange }: Props) {
             <Pressable
               key={day.value}
               onPress={() => toggle(day.value)}
-              style={({ pressed }) => [styles.day, on && styles.dayOn, pressed && { opacity: 0.8 }]}
+              style={({ pressed }) => [
+                styles.day,
+                {
+                  backgroundColor: on ? c.ink : c.surfaceAlt,
+                  borderColor: on ? c.ink : c.line,
+                },
+                pressed && { opacity: 0.8 },
+              ]}
             >
-              <Txt variant="labelSm" color={on ? colors.onSecondaryContainer : colors.onSurfaceVariant}>
+              <Txt variant="label" color={on ? c.onInk : c.muted}>
                 {day.short.charAt(0)}
               </Txt>
             </Pressable>
@@ -50,10 +59,8 @@ export function WeekdayPicker({ value, onChange }: Props) {
 
 const styles = StyleSheet.create({
   box: {
-    backgroundColor: colors.surfaceContainerLow,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.surfaceVariant,
     padding: 16,
     marginTop: spacing.stackSm,
   },
@@ -65,11 +72,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: radius.full,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    backgroundColor: colors.surfaceContainerLowest,
-  },
-  dayOn: {
-    backgroundColor: colors.secondaryContainer,
-    borderColor: colors.secondary,
   },
 });

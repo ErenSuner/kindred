@@ -7,15 +7,16 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Notifications from 'expo-notifications';
 import {
   useFonts,
-  Literata_500Medium,
-  Literata_600SemiBold,
-} from '@expo-google-fonts/literata';
+  Fraunces_500Medium,
+  Fraunces_600SemiBold,
+} from '@expo-google-fonts/fraunces';
 import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-} from '@expo-google-fonts/inter';
-import { colors } from '@/theme/tokens';
+  Figtree_400Regular,
+  Figtree_500Medium,
+  Figtree_600SemiBold,
+  Figtree_700Bold,
+} from '@expo-google-fonts/figtree';
+import { ThemeProvider, useTheme } from '@/theme/ThemeContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { PeopleProvider } from '@/context/PeopleContext';
 import { EventsProvider } from '@/context/EventsContext';
@@ -25,6 +26,7 @@ import { UndoProvider } from '@/context/UndoContext';
 import { UndoSnackbar } from '@/components/UndoSnackbar';
 import { AppErrorBoundary } from '@/components/AppErrorBoundary';
 import { PendingWrites } from '@/components/PendingWrites';
+import { HeldNotice } from '@/components/HeldNotice';
 
 import { Platform, LogBox } from 'react-native';
 
@@ -49,6 +51,7 @@ if (Platform.OS !== 'web') {
 
 function RootLayoutNav() {
   const { user, loading } = useAuth();
+  const { c } = useTheme();
   const router = useRouter();
   const segments = useSegments();
 
@@ -73,8 +76,8 @@ function RootLayoutNav() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.bg }}>
+        <ActivityIndicator size="large" color={c.flame} />
       </View>
     );
   }
@@ -83,7 +86,7 @@ function RootLayoutNav() {
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: colors.background },
+        contentStyle: { backgroundColor: c.bg },
         animation: 'fade',
       }}
     >
@@ -99,13 +102,28 @@ function RootLayoutNav() {
   );
 }
 
+function ThemedApp() {
+  const { mode } = useTheme();
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
+      <NotificationSync />
+      <RootLayoutNav />
+      <PendingWrites />
+      <HeldNotice />
+      <UndoSnackbar />
+    </GestureHandlerRootView>
+  );
+}
+
 export default function RootLayout() {
   const [loaded] = useFonts({
-    Literata_500Medium,
-    Literata_600SemiBold,
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
+    Fraunces_500Medium,
+    Fraunces_600SemiBold,
+    Figtree_400Regular,
+    Figtree_500Medium,
+    Figtree_600SemiBold,
+    Figtree_700Bold,
   });
 
   useEffect(() => {
@@ -132,23 +150,19 @@ export default function RootLayout() {
   return (
     // Outside the providers, so a crash in any of them is caught too.
     <AppErrorBoundary>
-      <AuthProvider>
-        <UndoProvider>
-        <PeopleProvider>
-          <EventsProvider>
-            <HolidaysProvider>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <StatusBar style="dark" />
-                <NotificationSync />
-                <RootLayoutNav />
-                <PendingWrites />
-                <UndoSnackbar />
-              </GestureHandlerRootView>
-            </HolidaysProvider>
-          </EventsProvider>
-        </PeopleProvider>
-        </UndoProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <UndoProvider>
+            <PeopleProvider>
+              <EventsProvider>
+                <HolidaysProvider>
+                  <ThemedApp />
+                </HolidaysProvider>
+              </EventsProvider>
+            </PeopleProvider>
+          </UndoProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </AppErrorBoundary>
   );
 }

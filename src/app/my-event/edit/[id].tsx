@@ -1,13 +1,17 @@
 import { describeWriteError } from '@/utils/loadError';
 import { Button } from '@/components/Button';
+import { Card } from '@/components/Card';
 import { DateFields, DateValue } from '@/components/DateFields';
 import { FormError } from '@/components/FormError';
 import { Icon } from '@/components/Icon';
 import { RecurrencePicker } from '@/components/RecurrencePicker';
 import { ReminderEditor } from '@/components/ReminderEditor';
 import { Txt } from '@/components/Txt';
+import { showHeld } from '@/components/HeldNotice';
 import { useEvents } from '@/context/EventsContext';
-import { colors, radius, softShadow, spacing } from '@/theme/tokens';
+import { radius, spacing } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
+import { fonts } from '@/theme/type';
 import { Nudge, parseNudges, serializeNudges } from '@/utils/nudges';
 import { Recurrence, YEARLY } from '@/utils/recurrence';
 import { TimeField } from '@/components/TimeField';
@@ -19,9 +23,10 @@ import Animated, { FadeInDown, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
+  const { c } = useTheme();
   return (
-    <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.fieldLabel}>
-      {typeof children === 'string' ? children.toUpperCase() : children}
+    <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>
+      {children}
     </Txt>
   );
 }
@@ -29,6 +34,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 export default function EditMyEvent() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { c, floatShadow } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getEvent, updateEvent, deleteEventWithUndo } = useEvents();
   const event = getEvent(id ?? '');
@@ -94,6 +100,7 @@ export default function EditMyEvent() {
         timeOfDay,
       });
       router.back();
+      showHeld(`${title.trim()} is remembered`, 'Reminders updated');
     } catch (e) {
       console.error(e);
       setError(describeWriteError(e));
@@ -111,18 +118,18 @@ export default function EditMyEvent() {
 
   if (!event) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <View style={{ flex: 1, backgroundColor: c.bg }}>
         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <Pressable onPress={() => router.back()} hitSlop={8}>
-            <Icon name="arrow-back" size={24} color={colors.primary} />
+            <Icon name="arrow-back" size={24} color={c.muted} />
           </Pressable>
         </View>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.containerMobile }}>
-          <Icon name="event-busy" size={48} color={colors.outlineVariant} />
-          <Txt variant="headlineMd" color={colors.onSurface} style={{ marginTop: 16, textAlign: 'center' }}>
+          <Icon name="event-busy" size={44} color={c.lineStrong} />
+          <Txt variant="heading" style={{ marginTop: 16, textAlign: 'center' }}>
             Reminder not found
           </Txt>
-          <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 8, textAlign: 'center' }}>
+          <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center' }}>
             It may have already passed or been deleted.
           </Txt>
         </View>
@@ -131,16 +138,16 @@ export default function EditMyEvent() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} hitSlop={8}>
-          <Icon name="arrow-back" size={24} color={colors.primary} />
+          <Icon name="arrow-back" size={24} color={c.muted} />
         </Pressable>
-        <Txt variant="headlineMd" color={colors.primary} style={{ flex: 1, textAlign: 'center' }}>
-          Edit Reminder
+        <Txt variant="title" style={{ flex: 1, textAlign: 'center' }}>
+          Edit reminder
         </Txt>
         <Pressable onPress={() => setDeleteConfirmVisible(true)} hitSlop={8}>
-          <Icon name="delete-outline" size={24} color={colors.error} />
+          <Icon name="delete-outline" size={24} color={c.danger} />
         </Pressable>
       </View>
 
@@ -150,57 +157,58 @@ export default function EditMyEvent() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <Animated.View entering={FadeInDown.duration(500).delay(100)} style={[styles.card, { gap: spacing.stackMd }]}>
-            <View style={{ gap: 4 }}>
-              <FieldLabel>Title</FieldLabel>
-              <TextInput
-                value={title}
-                onChangeText={setTitle}
-                placeholder="e.g., Dentist, Passport renewal"
-                placeholderTextColor={colors.outline}
-                style={styles.input}
-              />
-            </View>
+          <Animated.View entering={FadeInDown.duration(500).delay(100)}>
+            <Card style={{ gap: spacing.stackMd }}>
+              <View style={{ gap: 6 }}>
+                <FieldLabel>Title</FieldLabel>
+                <TextInput
+                  value={title}
+                  onChangeText={setTitle}
+                  placeholder="e.g., Dentist, Passport renewal"
+                  placeholderTextColor={c.faint}
+                  style={[styles.input, { backgroundColor: c.surfaceAlt, color: c.text }]}
+                />
+              </View>
 
-            <View style={{ gap: 4 }}>
-              <FieldLabel>
-                Date{' '}
-                <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontWeight: 'normal' }}>
-                  {needsYear ? '(Year required)' : '(Year optional)'}
-                </Txt>
-              </FieldLabel>
-              <DateFields value={date} onChange={setDate} yearMode="future" allowSkipYear={!needsYear} />
-            </View>
+              <View style={{ gap: 6 }}>
+                <FieldLabel>{needsYear ? 'Date · year required' : 'Date · year optional'}</FieldLabel>
+                <DateFields value={date} onChange={setDate} yearMode="future" allowSkipYear={!needsYear} />
+              </View>
 
-            <RecurrencePicker value={recurrence} onChange={setRecurrence} />
+              <RecurrencePicker value={recurrence} onChange={setRecurrence} />
 
-            <TimeField value={timeOfDay} onChange={setTimeOfDay} />
+              <TimeField value={timeOfDay} onChange={setTimeOfDay} />
 
-            <ReminderEditor reminders={reminders} onChange={setReminders} eventDate={eventDate()} />
+              <ReminderEditor reminders={reminders} onChange={setReminders} eventDate={eventDate()} />
+            </Card>
           </Animated.View>
 
           <FormError message={error} />
 
           <Animated.View entering={FadeInDown.duration(500).delay(200)} style={{ alignItems: 'center' }}>
-            <Button label={saving ? 'Saving…' : 'Save Changes'} icon="check" onPress={handleSave} disabled={saving} />
+            <Button label={saving ? 'Saving…' : 'Save changes'} icon="check" onPress={handleSave} disabled={saving} />
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
 
 
       <Modal visible={deleteConfirmVisible} transparent animationType="fade">
-        <Pressable style={styles.modalOverlay} onPress={() => setDeleteConfirmVisible(false)}>
-          <Animated.View entering={SlideInDown.duration(250)} style={styles.confirmSheet}>
+        <Pressable style={[styles.modalOverlay, { backgroundColor: c.overlay }]} onPress={() => setDeleteConfirmVisible(false)}>
+          <Animated.View
+            entering={SlideInDown.duration(250)}
+            style={[styles.confirmSheet, { backgroundColor: c.surface }, floatShadow]}
+          >
             <Pressable onPress={(e) => e.stopPropagation()}>
-              <Txt variant="headlineMd" color={colors.onSurface} style={{ marginBottom: 8 }}>
+              <Txt variant="heading" style={{ marginBottom: 8 }}>
                 Delete this reminder?
               </Txt>
-              <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginBottom: 24 }}>
-                &ldquo;{event.title}&rdquo; and its nudges will be removed. This can&apos;t be undone.
+              <Txt variant="body" color={c.muted} style={{ marginBottom: 24 }}>
+                &ldquo;{event.title}&rdquo; and its nudges will be removed. You&apos;ll have a moment
+                to undo it.
               </Txt>
               <View style={{ gap: 8 }}>
-                <Button label="Delete" icon="delete-outline" variant="error" fullWidth onPress={handleDelete} />
-                <Button label="Keep it" variant="tonal" fullWidth onPress={() => setDeleteConfirmVisible(false)} />
+                <Button label="Delete" icon="delete-outline" variant="dangerSolid" fullWidth onPress={handleDelete} />
+                <Button label="Keep it" variant="quiet" fullWidth onPress={() => setDeleteConfirmVisible(false)} />
               </View>
             </Pressable>
           </Animated.View>
@@ -216,50 +224,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.containerMobile,
     paddingBottom: spacing.stackMd,
-    backgroundColor: colors.background,
   },
-  card: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radius.lg,
-    padding: spacing.stackMd,
-    ...softShadow,
-  },
-  fieldLabel: { letterSpacing: 1, marginLeft: 2 },
+  fieldLabel: { marginLeft: 2 },
   input: {
-    backgroundColor: 'rgba(228,226,225,0.4)',
     borderRadius: radius.DEFAULT,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: fonts.figtreeRegular,
     fontSize: 16,
-    color: colors.onSurface,
-  },
-  inputCenter: { alignItems: 'center', justifyContent: 'center' },
-  nudgeBox: {
-    backgroundColor: colors.surfaceContainerLow,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.surfaceVariant,
-    padding: 16,
-    marginTop: spacing.stackSm,
-  },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16 },
-  errorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.errorContainer,
-    borderRadius: radius.DEFAULT,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   confirmSheet: {
-    backgroundColor: colors.surfaceContainerLowest,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     padding: 24,

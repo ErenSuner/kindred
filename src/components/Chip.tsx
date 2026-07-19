@@ -1,32 +1,32 @@
-import { colors, radius } from '@/theme/tokens';
 import { StyleSheet, View, Pressable } from 'react-native';
+import { radius } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
 import { Txt } from './Txt';
 
-type Tone = 'secondary' | 'tertiary' | 'primary' | 'primarySolid';
+type Tone = 'neutral' | 'flame' | 'good' | 'ink';
 
-const tones: Record<Tone, { bg: string; fg: string }> = {
-  secondary: { bg: 'rgba(206,234,207,0.5)', fg: colors.onSecondaryContainer },
-  tertiary: { bg: 'rgba(207,151,83,0.3)', fg: colors.onTertiaryContainer },
-  primary: { bg: colors.secondaryContainer, fg: colors.onSecondaryContainer },
-  primarySolid: { bg: colors.primary, fg: colors.onPrimary },
-};
-
-// Consistent colors for each relationship role across the whole app.
-const roleColors: Record<string, { bg: string; fg: string }> = {
-  Family: { bg: 'rgba(217,142,142,0.25)', fg: colors.primary },
-  Friend: { bg: 'rgba(206,234,207,0.5)', fg: colors.secondary },
-  Partner: { bg: 'rgba(207,151,83,0.25)', fg: colors.tertiary },
-  Colleague: { bg: 'rgba(139,76,77,0.12)', fg: colors.onSurfaceVariant },
-  Acquaintance: { bg: 'rgba(228,226,225,0.6)', fg: colors.outline },
-};
-
-// Pill-shaped tag used to categorize dates and relationships.
-export function Chip({ label, tone = 'secondary', role }: { label: string; tone?: Tone; role?: string }) {
-  // Role-based color takes priority when provided
-  const c = role && roleColors[role] ? roleColors[role] : tones[tone];
+// Small pill tag. Roles and metadata stay neutral; flame is reserved for the
+// things that are actually near (today, this week, pinned).
+export function Chip({
+  label,
+  tone = 'neutral',
+  role: _role,
+}: {
+  label: string;
+  tone?: Tone;
+  role?: string;
+}) {
+  const { c } = useTheme();
+  const tones: Record<Tone, { bg: string; fg: string }> = {
+    neutral: { bg: c.surfaceAlt, fg: c.muted },
+    flame: { bg: c.flameWash, fg: c.flameDeep },
+    good: { bg: c.goodWash, fg: c.good },
+    ink: { bg: c.ink, fg: c.onInk },
+  };
+  const look = tones[tone];
   return (
-    <View style={[styles.chip, { backgroundColor: c.bg }]}>
-      <Txt variant="labelSm" color={c.fg}>
+    <View style={[styles.chip, { backgroundColor: look.bg }]}>
+      <Txt variant="label" color={look.fg}>
         {label}
       </Txt>
     </View>
@@ -36,48 +36,48 @@ export function Chip({ label, tone = 'secondary', role }: { label: string; tone?
 const styles = StyleSheet.create({
   chip: {
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: radius.full,
     alignSelf: 'flex-start',
   },
 });
 
-export function SelectableChip({ 
-  label, 
-  active, 
+// Choice pill for forms and filters. Active = ink, unmistakable.
+export function SelectableChip({
+  label,
+  active,
   onPress,
-  isRole = false 
-}: { 
-  label: string; 
-  active: boolean; 
+}: {
+  label: string;
+  active: boolean;
   onPress: () => void;
   isRole?: boolean;
 }) {
-  let activeBg: string = 'rgba(217,142,142,0.2)'; // soft rose fallback
-  let activeBorder: string = colors.primary;
-  let activeFg: string = colors.primary;
-
-  if (isRole && roleColors[label]) {
-    activeBg = roleColors[label].bg;
-    activeBorder = roleColors[label].fg;
-    activeFg = roleColors[label].fg;
-  }
-
+  const { c } = useTheme();
   return (
     <Pressable
       onPress={onPress}
-      style={{
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: radius.full,
-        borderWidth: 1,
-        borderColor: active ? activeBorder : colors.outlineVariant,
-        backgroundColor: active ? activeBg : 'transparent',
-      }}
+      style={({ pressed }) => [
+        styles2.pill,
+        {
+          borderColor: active ? c.ink : c.lineStrong,
+          backgroundColor: active ? c.ink : 'transparent',
+        },
+        pressed && { opacity: 0.85 },
+      ]}
     >
-      <Txt variant="labelMd" color={active ? activeFg : colors.onSurfaceVariant}>
+      <Txt variant="subMed" color={active ? c.onInk : c.muted}>
         {label}
       </Txt>
     </Pressable>
   );
 }
+
+const styles2 = StyleSheet.create({
+  pill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: radius.full,
+    borderWidth: 1,
+  },
+});

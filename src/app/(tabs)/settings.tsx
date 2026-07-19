@@ -3,7 +3,8 @@ import { View, ScrollView, StyleSheet, Pressable, Modal, Alert } from 'react-nat
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
-import { colors, spacing, radius, softShadow, ambientShadow } from '@/theme/tokens';
+import { spacing, radius } from '@/theme/tokens';
+import { useTheme, type ThemePref } from '@/theme/ThemeContext';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
@@ -36,23 +37,26 @@ type RowProps = {
 };
 
 function Row({ icon, label, sublabel, value, trailingIcon = 'chevron-right', right, last, onPress, soon }: RowProps) {
+  const { c } = useTheme();
   return (
     <>
       <Pressable
         onPress={soon ? undefined : onPress}
         disabled={soon}
-        style={({ pressed }) => [styles.row, soon && styles.rowSoon, !soon && pressed && { backgroundColor: colors.surface }]}
+        style={({ pressed }) => [
+          styles.row,
+          soon && { opacity: 0.45 },
+          !soon && pressed && { backgroundColor: c.surfaceAlt },
+        ]}
       >
         <View style={styles.rowLeft}>
-          <View style={styles.rowIcon}>
-            <Icon name={icon} size={22} color={colors.primary} />
+          <View style={[styles.rowIcon, { backgroundColor: c.surfaceAlt }]}>
+            <Icon name={icon} size={20} color={c.flameDeep} />
           </View>
           <View style={{ flex: 1 }}>
-            <Txt variant="bodyMd" color={colors.onSurface}>
-              {label}
-            </Txt>
+            <Txt variant="bodyMed">{label}</Txt>
             {sublabel && (
-              <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.sublabel}>
+              <Txt variant="sub" color={c.muted} style={{ marginTop: 1 }}>
                 {sublabel}
               </Txt>
             )}
@@ -61,20 +65,20 @@ function Row({ icon, label, sublabel, value, trailingIcon = 'chevron-right', rig
         <View style={styles.rowRight}>
           {right}
           {value && !soon && (
-            <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.sublabel}>
+            <Txt variant="sub" color={c.muted}>
               {value}
             </Txt>
           )}
           {soon ? (
-            <View style={styles.soonBadge}>
-              <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.soonText}>SOON</Txt>
+            <View style={[styles.soonBadge, { borderColor: c.lineStrong }]}>
+              <Txt variant="eyebrow" color={c.faint} style={{ fontSize: 9 }}>Soon</Txt>
             </View>
           ) : (
-            !right && <Icon name={trailingIcon} size={20} color={colors.onSurfaceVariant} style={{ opacity: 0.6 }} />
+            !right && <Icon name={trailingIcon} size={20} color={c.faint} />
           )}
         </View>
       </Pressable>
-      {!last && <View style={styles.divider} />}
+      {!last && <View style={[styles.divider, { backgroundColor: c.line }]} />}
     </>
   );
 }
@@ -87,20 +91,29 @@ function formatHour(hour: number): string {
 }
 
 function SectionTitle({ children }: { children: string }) {
+  const { c } = useTheme();
   return (
-    <Txt variant="labelSm" color={colors.primary} style={styles.sectionTitle}>
+    <Txt variant="eyebrow" color={c.faint} style={styles.sectionTitle}>
       {children}
     </Txt>
   );
 }
 
+const THEME_LABELS: Record<ThemePref, string> = {
+  system: 'Match phone',
+  light: 'Light',
+  dark: 'Dark',
+};
+
 export default function Settings() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { c, cardShadow, floatShadow, pref, setPref } = useTheme();
   const [nudges, setNudges] = useState(true);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [reminderHour, setReminderHour] = useState(DEFAULT_REMINDER_HOUR);
   const [hourPickerVisible, setHourPickerVisible] = useState(false);
+  const [themePickerVisible, setThemePickerVisible] = useState(false);
   const permission = useNotificationPermission();
   const { user, signOut } = useAuth();
   const { people } = usePeople();
@@ -147,9 +160,9 @@ export default function Settings() {
   const executeDelete = async () => {
     setIsDeleting(true);
     try {
-      const { error } = await supabase.rpc('delete_user'); 
+      const { error } = await supabase.rpc('delete_user');
       if (error) throw error;
-      
+
       // If successful, log out
       await signOut();
     } catch (e: any) {
@@ -183,20 +196,12 @@ export default function Settings() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Icon name="menu" size={28} color={colors.primary} />
-        <Txt variant="headlineMd" color={colors.primary}>
-          Kindred
-        </Txt>
-        <View style={{ width: 28 }} />
-      </View>
-
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: spacing.containerMobile,
-          paddingTop: spacing.stackMd,
-          paddingBottom: insets.bottom + 120,
+          paddingTop: insets.top + 18,
+          paddingBottom: insets.bottom + 130,
           gap: spacing.stackLg,
         }}
         showsVerticalScrollIndicator={false}
@@ -211,21 +216,21 @@ export default function Settings() {
             onUploaded={saveOwnAvatar}
             onError={setAvatarError}
           />
-          <Txt variant="headlineLgMobile" color={colors.onSurface} style={{ marginTop: 8, textTransform: 'capitalize' }}>
+          <Txt variant="title" style={{ marginTop: 12, textTransform: 'capitalize' }}>
             {userName}
+          </Txt>
+          <Txt variant="sub" color={c.muted} style={{ marginTop: 2 }}>
+            {userEmail}
           </Txt>
           <View style={{ alignSelf: 'stretch', marginTop: 12 }}>
             <FormError message={avatarError} />
           </View>
-          <Txt variant="bodyMd" color={colors.onSurfaceVariant}>
-            {userEmail}
-          </Txt>
         </Animated.View>
 
         <View style={{ gap: spacing.stackSm }}>
           <SectionTitle>Account</SectionTitle>
-          <View style={styles.group}>
-            <Row icon="person" label="Profile Information" onPress={() => router.push('/settings/profile')} />
+          <View style={[styles.group, { backgroundColor: c.surface, borderColor: c.line }, cardShadow]}>
+            <Row icon="person" label="Profile information" onPress={() => router.push('/settings/profile')} />
             <Row icon="shield" label="Security" last onPress={() => router.push('/settings/security')} />
           </View>
         </View>
@@ -233,39 +238,43 @@ export default function Settings() {
         <View style={{ gap: spacing.stackSm }}>
           <SectionTitle>Notifications</SectionTitle>
 
-          {/* Without this, someone can set up a dozen reminders, receive none of
-              them, and never find out why. */}
+          {/* The one alarm this app earns: without permission, the promise
+              cannot be kept. Without this, someone can set up a dozen reminders,
+              receive none of them, and never find out why. */}
           {permission.status === 'denied' && (
-            <Pressable onPress={permission.request} style={styles.permissionWarning}>
-              <Icon name="notifications-off" size={20} color={colors.onErrorContainer} />
+            <Pressable
+              onPress={permission.request}
+              style={[styles.permissionWarning, { backgroundColor: c.dangerWash, borderColor: c.danger }]}
+            >
+              <Icon name="notifications-off" size={20} color={c.danger} />
               <View style={{ flex: 1 }}>
-                <Txt variant="labelMd" color={colors.onErrorContainer}>Notifications are turned off</Txt>
-                <Txt variant="labelSm" color={colors.onErrorContainer} style={{ fontWeight: 'normal', marginTop: 2 }}>
+                <Txt variant="subMed" color={c.danger}>Notifications are turned off</Txt>
+                <Txt variant="sub" color={c.danger} style={{ marginTop: 2 }}>
                   Nudges won&apos;t reach you until you allow them. Tap to fix.
                 </Txt>
               </View>
-              <Icon name="chevron-right" size={20} color={colors.onErrorContainer} />
+              <Icon name="chevron-right" size={20} color={c.danger} />
             </Pressable>
           )}
 
-          <View style={styles.group}>
+          <View style={[styles.group, { backgroundColor: c.surface, borderColor: c.line }, cardShadow]}>
             <Row
               icon="notifications-active"
-              label="Gentle Nudges"
+              label="Gentle nudges"
               sublabel="Soft reminders for important moments"
               right={<Toggle value={nudges} onChange={handleToggleNudges} />}
               onPress={() => handleToggleNudges(!nudges)}
             />
             <Row
               icon="public"
-              label="Shared Occasions"
+              label="Shared occasions"
               sublabel="Mother's Day, Valentine's Day and more"
               value={`${enabledIds.length} on`}
               onPress={() => router.push('/settings/holidays')}
             />
             <Row
               icon="schedule"
-              label="Reminder Time"
+              label="Reminder time"
               sublabel="When nudges arrive each day"
               value={formatHour(reminderHour)}
               onPress={() => setHourPickerVisible(true)}
@@ -276,24 +285,30 @@ export default function Settings() {
 
         <View style={{ gap: spacing.stackSm }}>
           <SectionTitle>Appearance</SectionTitle>
-          <View style={styles.group}>
-            <Row icon="palette" label="Theme" soon />
+          <View style={[styles.group, { backgroundColor: c.surface, borderColor: c.line }, cardShadow]}>
+            <Row
+              icon="palette"
+              label="Theme"
+              sublabel="Lamplight in light or dark"
+              value={THEME_LABELS[pref]}
+              onPress={() => setThemePickerVisible(true)}
+            />
             <Row icon="language" label="Language" soon last />
           </View>
         </View>
 
         <View style={{ gap: spacing.stackSm }}>
           <SectionTitle>Support</SectionTitle>
-          <View style={styles.group}>
-            <Row icon="help" label="Help Center" soon />
+          <View style={[styles.group, { backgroundColor: c.surface, borderColor: c.line }, cardShadow]}>
+            <Row icon="help" label="Help center" soon />
             <Row icon="chat-bubble" label="Feedback" soon />
-            <Row icon="privacy-tip" label="Privacy Policy" soon last />
+            <Row icon="privacy-tip" label="Privacy policy" soon last />
           </View>
         </View>
 
         <Button
-          label="Log Out"
-          variant="tonal"
+          label="Log out"
+          variant="quiet"
           icon="logout"
           fullWidth
           style={{ marginTop: spacing.stackSm }}
@@ -301,35 +316,43 @@ export default function Settings() {
         />
 
         <Button
-          label="Delete Account"
-          variant="error"
+          label="Delete account"
+          variant="danger"
           icon="delete-forever"
           fullWidth
-          style={{ marginTop: spacing.stackSm, backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.error }}
+          style={{ marginTop: spacing.stackSm }}
           onPress={handleDeleteAccount}
         />
       </ScrollView>
 
       <Modal visible={deleteModalVisible} transparent animationType="none" onRequestClose={() => setDeleteModalVisible(false)}>
-        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={styles.modalOverlay}>
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          exiting={FadeOut.duration(200)}
+          style={[styles.modalOverlay, { backgroundColor: c.overlay }]}
+        >
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setDeleteModalVisible(false)} />
-          <Animated.View entering={SlideInDown.duration(300).springify()} exiting={SlideOutDown.duration(200)} style={styles.modalContent}>
-            <View style={styles.modalIconWrap}>
-              <Icon name="warning" size={32} color={colors.error} />
+          <Animated.View
+            entering={SlideInDown.duration(300).springify()}
+            exiting={SlideOutDown.duration(200)}
+            style={[styles.modalContent, { backgroundColor: c.surface }, floatShadow]}
+          >
+            <View style={[styles.modalIconWrap, { backgroundColor: c.dangerWash }]}>
+              <Icon name="warning" size={30} color={c.danger} />
             </View>
-            <Txt variant="headlineMd" color={colors.onSurface} style={{ marginTop: 16 }}>
-              {deleteStep === 1 ? 'Delete Account' : 'Final Warning'}
+            <Txt variant="heading" style={{ marginTop: 16 }}>
+              {deleteStep === 1 ? 'Delete account' : 'Final warning'}
             </Txt>
-            <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 8, textAlign: 'center', marginBottom: 24 }}>
-              {deleteStep === 1 
-                ? 'Are you absolutely sure? This will permanently delete your account, contacts, and all saved memories. This action cannot be undone.'
+            <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center', marginBottom: 24 }}>
+              {deleteStep === 1
+                ? 'Are you absolutely sure? This will permanently delete your account, your people, and all saved memories. This action cannot be undone.'
                 : 'This is your last chance. All your data will be permanently erased. Are you sure you want to proceed?'}
             </Txt>
-            
+
             <View style={{ width: '100%', gap: 12 }}>
-              <Button 
-                label={deleteStep === 1 ? 'Delete Everything' : 'Yes, Delete My Account'} 
-                variant="error"
+              <Button
+                label={deleteStep === 1 ? 'Delete everything' : 'Yes, delete my account'}
+                variant="dangerSolid"
                 onPress={() => {
                   if (deleteStep === 1) setDeleteStep(2);
                   else executeDelete();
@@ -337,10 +360,10 @@ export default function Settings() {
                 disabled={isDeleting}
                 fullWidth
               />
-              <Button 
-                label="Cancel" 
-                variant="tonal"
-                onPress={() => setDeleteModalVisible(false)} 
+              <Button
+                label="Cancel"
+                variant="quiet"
+                onPress={() => setDeleteModalVisible(false)}
                 disabled={isDeleting}
                 fullWidth
               />
@@ -352,56 +375,46 @@ export default function Settings() {
       <ScrollPickerModal
         visible={hourPickerVisible}
         onClose={() => setHourPickerVisible(false)}
-        title="Reminder Time"
+        title="Reminder time"
         options={Array.from({ length: 24 }, (_, h) => ({ label: formatHour(h), value: h }))}
         selectedValue={reminderHour}
         onSelect={(val) => handlePickHour(val as number)}
+      />
+
+      <ScrollPickerModal
+        visible={themePickerVisible}
+        onClose={() => setThemePickerVisible(false)}
+        title="Theme"
+        options={(['system', 'light', 'dark'] as ThemePref[]).map((p) => ({
+          label: THEME_LABELS[p],
+          value: p,
+        }))}
+        selectedValue={pref}
+        onSelect={(val) => {
+          setPref(val as ThemePref);
+          setThemePickerVisible(false);
+        }}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.containerMobile,
-    paddingBottom: spacing.stackMd,
-    backgroundColor: colors.background,
-  },
   profile: { alignItems: 'center' },
   permissionWarning: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: colors.errorContainer,
     borderRadius: radius.lg,
+    borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  profileAvatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    borderWidth: 4,
-    borderColor: colors.surfaceContainerLowest,
-  },
-  editBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radius.full,
-    padding: 4,
-    ...softShadow,
-  },
-  sectionTitle: { letterSpacing: 1.5, paddingLeft: spacing.unit },
+  sectionTitle: { paddingLeft: spacing.unit },
   group: {
-    backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radius.lg,
+    borderWidth: 1,
     overflow: 'hidden',
-    ...softShadow,
   },
   row: {
     flexDirection: 'row',
@@ -414,47 +427,37 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.surfaceContainer,
     alignItems: 'center',
     justifyContent: 'center',
   },
   rowRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.unit },
-  sublabel: { fontFamily: 'Inter_400Regular' },
-  rowSoon: { opacity: 0.45 },
   soonBadge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: radius.full,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
   },
-  soonText: { fontSize: 10, letterSpacing: 1 },
   divider: {
     height: 1,
-    backgroundColor: colors.surfaceVariant,
     marginHorizontal: 16,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.containerMobile,
   },
   modalContent: {
-    backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radius.xl,
     padding: 24,
     width: '100%',
     maxWidth: 400,
     alignItems: 'center',
-    ...ambientShadow,
   },
   modalIconWrap: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.errorContainer,
     alignItems: 'center',
     justifyContent: 'center',
   },
