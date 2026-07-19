@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
-import Animated, { FadeIn } from 'react-native-reanimated';
 import { colors, radius, spacing, ambientShadow } from '@/theme/tokens';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
@@ -12,14 +11,6 @@ import { pickPhoto, uploadPhoto } from '@/utils/avatars';
 import { GIFT_IDEA, MEMORY, NOTEBOOK, isLegacyNote } from '@/utils/notes';
 import type { Note, Person } from '@/data/mock';
 
-type Tab = 'gifts' | 'memories' | 'notebook';
-
-const TABS: { key: Tab; label: string; icon: string }[] = [
-  { key: 'gifts', label: 'Gift Ideas', icon: 'card-giftcard' },
-  { key: 'memories', label: 'Memories', icon: 'photo-library' },
-  { key: 'notebook', label: 'Notebook', icon: 'menu-book' },
-];
-
 // A gift idea is a line, not an essay — the cap is what keeps the list
 // scannable.
 const GIFT_MAX_LENGTH = 120;
@@ -29,12 +20,25 @@ type Props = {
   onDeleteNote: (noteId: string) => void;
 };
 
-// Everything the app knows about a person that isn't a date: short gift ideas,
-// photos, and one free-form notebook. Three tabs rather than one list, because
-// they are read at completely different moments.
-export function AboutPerson({ person, onDeleteNote }: Props) {
-  const [tab, setTab] = useState<Tab>('gifts');
+function Section({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
+  return (
+    <View style={{ gap: spacing.stackSm }}>
+      <View style={styles.sectionHead}>
+        <Icon name={icon as any} size={16} color={colors.tertiary} />
+        <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ letterSpacing: 1 }}>
+          {title.toUpperCase()}
+        </Txt>
+      </View>
+      {children}
+    </View>
+  );
+}
 
+// Everything the app knows about a person that isn't a date: short gift ideas,
+// photos, and one free-form notebook. All three are open at once — they're
+// short, and hiding two thirds of what you know about someone behind a tab was
+// more chrome than the content deserved.
+export function AboutPerson({ person, onDeleteNote }: Props) {
   const notes = person.notes ?? [];
   const gifts = notes.filter((n) => !n.photoUrl && n.kind === GIFT_IDEA);
   const photos = notes.filter((n) => !!n.photoUrl);
@@ -48,31 +52,19 @@ export function AboutPerson({ person, onDeleteNote }: Props) {
         <Txt variant="headlineMd" color={colors.onSurface}>About {person.name}</Txt>
       </View>
 
-      <View style={styles.tabBar}>
-        {TABS.map((t) => {
-          const active = tab === t.key;
-          return (
-            <Pressable
-              key={t.key}
-              onPress={() => setTab(t.key)}
-              style={({ pressed }) => [styles.tab, active && styles.tabActive, pressed && { opacity: 0.8 }]}
-            >
-              <Icon name={t.icon as any} size={16} color={active ? colors.onSecondaryContainer : colors.onSurfaceVariant} />
-              <Txt variant="labelSm" color={active ? colors.onSecondaryContainer : colors.onSurfaceVariant}>
-                {t.label}
-              </Txt>
-            </Pressable>
-          );
-        })}
-      </View>
+      <View style={{ gap: spacing.stackLg }}>
+        <Section icon="card-giftcard" title="Gift Ideas">
+          <GiftIdeas person={person} gifts={gifts} onDelete={onDeleteNote} />
+        </Section>
 
-      <Animated.View key={tab} entering={FadeIn.duration(180)} style={{ marginTop: spacing.stackMd }}>
-        {tab === 'gifts' && <GiftIdeas person={person} gifts={gifts} onDelete={onDeleteNote} />}
-        {tab === 'memories' && <Memories person={person} photos={photos} onDelete={onDeleteNote} />}
-        {tab === 'notebook' && (
+        <Section icon="photo-library" title="Memories">
+          <Memories person={person} photos={photos} onDelete={onDeleteNote} />
+        </Section>
+
+        <Section icon="menu-book" title="Notebook">
           <Notebook person={person} note={notebookNote} legacy={legacy} onDeleteLegacy={onDeleteNote} />
-        )}
-      </Animated.View>
+        </Section>
+      </View>
     </View>
   );
 }
@@ -109,8 +101,12 @@ function GiftIdeas({ person, gifts, onDelete }: { person: Person; gifts: Note[];
         <View style={{ gap: 8 }}>
           {gifts.map((gift) => (
             <View key={gift.id} style={styles.giftRow}>
-              <Icon name="card-giftcard" size={16} color={colors.tertiary} />
-              <Txt variant="bodyMd" color={colors.onSurface} style={{ flex: 1 }}>{gift.body}</Txt>
+              <Icon name="card-giftcard" size={16} color={colors.tertiary} style={{ marginTop: 2 }} />
+              {/* minWidth 0 is what actually lets the row shrink — without it a
+                  single long unbroken word pushes straight out of the card. */}
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Txt variant="bodyMd" color={colors.onSurface}>{gift.body}</Txt>
+              </View>
               <Pressable onPress={() => onDelete(gift.id)} hitSlop={8}>
                 <Icon name="close" size={16} color={colors.onSurfaceVariant} />
               </Pressable>
@@ -139,9 +135,6 @@ function GiftIdeas({ person, gifts, onDelete }: { person: Person; gifts: Note[];
           <Icon name="add" size={20} color={colors.onPrimary} />
         </Pressable>
       </View>
-      <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.hint}>
-        Add gift idea
-      </Txt>
     </View>
   );
 }
@@ -193,7 +186,12 @@ function Memories({ person, photos, onDelete }: { person: Person; photos: Note[]
         <View style={styles.grid}>
           {photos.map((photo) => (
             <View key={photo.id} style={styles.thumbWrap}>
-              <Pressable onPress={() => setViewing(photo)} style={({ pressed }) => pressed && { opacity: 0.85 }}>
+              {/* The Pressable has to fill the wrapper, or the image inside it
+                  has no height to be 100% of and collapses to nothing. */}
+              <Pressable
+                onPress={() => setViewing(photo)}
+                style={({ pressed }) => [StyleSheet.absoluteFill, pressed && { opacity: 0.85 }]}
+              >
                 <Image source={{ uri: photo.photoUrl }} style={styles.thumb} contentFit="cover" transition={150} />
               </Pressable>
               <Pressable onPress={() => onDelete(photo.id)} hitSlop={6} style={styles.thumbDelete}>
@@ -341,26 +339,15 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     marginBottom: 16,
   },
-  tabBar: { flexDirection: 'row', gap: 6 },
-  tab: {
-    flex: 1,
+  sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 9,
-    paddingHorizontal: 6,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    backgroundColor: colors.surfaceContainerLow,
+    gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surfaceVariant,
+    paddingBottom: 6,
   },
-  tabActive: {
-    backgroundColor: colors.secondaryContainer,
-    borderColor: colors.secondary,
-  },
-  empty: { fontStyle: 'italic', opacity: 0.9, paddingVertical: 8 },
-  hint: { fontWeight: 'normal', opacity: 0.7, marginLeft: 4 },
+  empty: { fontStyle: 'italic', opacity: 0.9, paddingVertical: 4 },
 
   giftRow: {
     flexDirection: 'row',

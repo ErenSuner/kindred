@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { colors, radius } from '@/theme/tokens';
 import { Txt } from '@/components/Txt';
+import { Icon } from '@/components/Icon';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
 import { SKIPPED_YEAR } from '@/utils/dates';
 
@@ -38,6 +40,9 @@ const now = () => {
 export function DateFields({ value, onChange, yearMode = 'past', allowSkipYear = true }: Props) {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerType, setPickerType] = useState<'day' | 'month' | 'year'>('day');
+  // Set when a choice was quietly moved forward, so the change is at least
+  // admitted to rather than just happening.
+  const [nudgedTo, setNudgedTo] = useState<string | null>(null);
 
   const { day, month, year } = value;
   const hasYear = year !== null && year !== SKIPPED_YEAR;
@@ -70,8 +75,12 @@ export function DateFields({ value, onChange, yearMode = 'past', allowSkipYear =
   const firstMonth = blocksPast ? today.getMonth() + 1 : 1;
   const firstDay = blocksPast && month === today.getMonth() + 1 ? today.getDate() : 1;
 
+  const noticeFor = (m: number, d: number) => `Moved to ${MONTHS_SHORT[m - 1]} ${d} — that date has passed.`;
+
   const handleSelect = (val: string | number) => {
     const n = val as number;
+    setNudgedTo(null);
+
     if (pickerType === 'day') {
       onChange({ ...value, day: n });
     } else if (pickerType === 'month') {
@@ -81,6 +90,7 @@ export function DateFields({ value, onChange, yearMode = 'past', allowSkipYear =
       // Moving onto the current month can strand a day that has already been.
       if (blocksPast && n === today.getMonth() + 1 && nextDay && nextDay < today.getDate()) {
         nextDay = today.getDate();
+        setNudgedTo(noticeFor(n, nextDay));
       }
       onChange({ ...value, month: n, day: nextDay });
     } else {
@@ -93,8 +103,10 @@ export function DateFields({ value, onChange, yearMode = 'past', allowSkipYear =
         if (nextMonth && nextMonth < today.getMonth() + 1) {
           nextMonth = today.getMonth() + 1;
           nextDay = today.getDate();
+          setNudgedTo(noticeFor(nextMonth, nextDay));
         } else if (nextMonth === today.getMonth() + 1 && nextDay && nextDay < today.getDate()) {
           nextDay = today.getDate();
+          setNudgedTo(noticeFor(nextMonth, nextDay));
         }
       }
       onChange({ ...value, year: n, month: nextMonth, day: nextDay });
@@ -117,6 +129,15 @@ export function DateFields({ value, onChange, yearMode = 'past', allowSkipYear =
           <Txt variant="bodyMd" color={hasYear ? colors.onSurface : colors.outline}>{hasYear ? year : 'Year'}</Txt>
         </Pressable>
       </View>
+
+      {nudgedTo && (
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={styles.notice}>
+          <Icon name="info" size={13} color={colors.onSurfaceVariant} />
+          <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.noticeText}>
+            {nudgedTo}
+          </Txt>
+        </Animated.View>
+      )}
 
       <ScrollPickerModal
         visible={pickerVisible}
@@ -154,4 +175,12 @@ const styles = StyleSheet.create({
     color: colors.onSurface,
   },
   center: { alignItems: 'center', justifyContent: 'center' },
+  notice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+    marginLeft: 2,
+  },
+  noticeText: { fontWeight: 'normal', opacity: 0.85, flex: 1 },
 });

@@ -36,6 +36,7 @@ export function ReminderEditor({ reminders, onChange }: Props) {
   const [leadUnit, setLeadUnit] = useState<LeadUnit>('day');
   const [amountPickerVisible, setAmountPickerVisible] = useState(false);
   const [unitPickerVisible, setUnitPickerVisible] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
 
   // The day-of reminder is never in the editable list — it is guaranteed.
   const chosen = reminders.filter((r) => r.value !== DAY_OF);
@@ -99,7 +100,11 @@ export function ReminderEditor({ reminders, onChange }: Props) {
       )}
 
       <Pressable
-        onPress={() => setPickerVisible(true)}
+        onPress={() => {
+          // Each visit starts on the presets, whatever last time ended on.
+          setCustomOpen(false);
+          setPickerVisible(true);
+        }}
         style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.8 }]}
       >
         <Icon name="add" size={18} color={colors.primary} />
@@ -148,12 +153,27 @@ export function ReminderEditor({ reminders, onChange }: Props) {
                 })}
               </View>
 
-              <View style={styles.divider}>
+              {/* Collapsed by default. Open, its filled Add button pulled more
+                  attention than Done did, which made the presets look like the
+                  side path rather than the main one. */}
+              <Pressable
+                onPress={() => setCustomOpen((open) => !open)}
+                style={({ pressed }) => [styles.divider, pressed && { opacity: 0.7 }]}
+              >
                 <View style={styles.rule} />
-                <Txt variant="labelSm" color={colors.onSurfaceVariant}>OR A SPECIFIC AMOUNT</Txt>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Txt variant="labelSm" color={colors.onSurfaceVariant}>OR A SPECIFIC AMOUNT</Txt>
+                  <Icon
+                    name={customOpen ? 'expand-less' : 'expand-more'}
+                    size={16}
+                    color={colors.onSurfaceVariant}
+                  />
+                </View>
                 <View style={styles.rule} />
-              </View>
+              </Pressable>
 
+              {customOpen && (
+                <Animated.View entering={FadeIn.duration(180)}>
               {/* Two steppers instead of a calendar — the reminder is relative to
                   the day, so an absolute date was never the right question. */}
               <View style={styles.leadRow}>
@@ -194,6 +214,8 @@ export function ReminderEditor({ reminders, onChange }: Props) {
                   {customChosen ? 'Already added' : customMatchesPreset ? 'Already an option above' : `Add ${leadLabel(leadAmount, leadUnit)}`}
                 </Txt>
               </Pressable>
+                </Animated.View>
+              )}
 
               {atLimit && (
                 <Animated.View entering={FadeIn.duration(180)}>
