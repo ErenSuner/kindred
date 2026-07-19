@@ -30,12 +30,19 @@ type RowProps = {
   right?: React.ReactNode;
   last?: boolean;
   onPress?: () => void;
+  // Not built yet. The row stays visible so the shape of the app is honest,
+  // but it doesn't pretend to be tappable.
+  soon?: boolean;
 };
 
-function Row({ icon, label, sublabel, value, trailingIcon = 'chevron-right', right, last, onPress }: RowProps) {
+function Row({ icon, label, sublabel, value, trailingIcon = 'chevron-right', right, last, onPress, soon }: RowProps) {
   return (
     <>
-      <Pressable onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]}>
+      <Pressable
+        onPress={soon ? undefined : onPress}
+        disabled={soon}
+        style={({ pressed }) => [styles.row, soon && styles.rowSoon, !soon && pressed && { backgroundColor: colors.surface }]}
+      >
         <View style={styles.rowLeft}>
           <View style={styles.rowIcon}>
             <Icon name={icon} size={22} color={colors.primary} />
@@ -53,12 +60,18 @@ function Row({ icon, label, sublabel, value, trailingIcon = 'chevron-right', rig
         </View>
         <View style={styles.rowRight}>
           {right}
-          {value && (
+          {value && !soon && (
             <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.sublabel}>
               {value}
             </Txt>
           )}
-          {!right && <Icon name={trailingIcon} size={20} color={colors.onSurfaceVariant} style={{ opacity: 0.6 }} />}
+          {soon ? (
+            <View style={styles.soonBadge}>
+              <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.soonText}>SOON</Txt>
+            </View>
+          ) : (
+            !right && <Icon name={trailingIcon} size={20} color={colors.onSurfaceVariant} style={{ opacity: 0.6 }} />
+          )}
         </View>
       </Pressable>
       {!last && <View style={styles.divider} />}
@@ -91,8 +104,13 @@ export default function Settings() {
   const permission = useNotificationPermission();
   const { user, signOut } = useAuth();
   const { people } = usePeople();
-  const { events } = useEvents();
+  const { events, routines } = useEvents();
   const { enabledIds } = useHolidays();
+
+  // syncNotifications cancels everything and reschedules from scratch, so every
+  // caller has to hand over the complete picture. Leaving routines out here
+  // silently wiped them until the next app launch.
+  const ownEvents = [...events, ...routines];
 
   useEffect(() => {
     AsyncStorage.getItem('@settings_nudges').then(val => {
@@ -107,14 +125,14 @@ export default function Settings() {
     await AsyncStorage.setItem(REMINDER_HOUR_KEY, String(hour));
     // Everything already scheduled is pinned to the old time, so it all has to
     // be laid down again.
-    syncNotifications(people, events, HOLIDAYS.filter(h => enabledIds.includes(h.id)), nudges);
+    syncNotifications(people, ownEvents, HOLIDAYS.filter(h => enabledIds.includes(h.id)), nudges);
   };
 
   const handleToggleNudges = async (val: boolean) => {
     setNudges(val);
     await AsyncStorage.setItem('@settings_nudges', String(val));
     // Pass the setting directly to sync — reading it back could race the write.
-    syncNotifications(people, events, HOLIDAYS.filter(h => enabledIds.includes(h.id)), val);
+    syncNotifications(people, ownEvents, HOLIDAYS.filter(h => enabledIds.includes(h.id)), val);
   };
 
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
@@ -135,10 +153,13 @@ export default function Settings() {
       // If successful, log out
       await signOut();
     } catch (e: any) {
-      console.error(e);
+      // The cause is almost always a missing delete_user RPC, which is a
+      // deployment problem — not something the person tapping the button can
+      // act on. It goes to the console; they get a plain apology.
+      console.error('Account deletion failed', e);
       Alert.alert(
         'Delete Failed',
-        'Could not delete account. Make sure you have created the "delete_user" function in your Supabase SQL editor.\n\nError: ' + e.message
+        "We couldn't delete your account just now. Nothing has been changed. Please try again in a moment.",
       );
     } finally {
       setIsDeleting(false);
@@ -256,17 +277,17 @@ export default function Settings() {
         <View style={{ gap: spacing.stackSm }}>
           <SectionTitle>Appearance</SectionTitle>
           <View style={styles.group}>
-            <Row icon="palette" label="Theme" value="System" />
-            <Row icon="language" label="Language" value="English" last />
+            <Row icon="palette" label="Theme" soon />
+            <Row icon="language" label="Language" soon last />
           </View>
         </View>
 
         <View style={{ gap: spacing.stackSm }}>
           <SectionTitle>Support</SectionTitle>
           <View style={styles.group}>
-            <Row icon="help" label="Help Center" />
-            <Row icon="chat-bubble" label="Feedback" />
-            <Row icon="privacy-tip" label="Privacy Policy" trailingIcon="open-in-new" last />
+            <Row icon="help" label="Help Center" soon />
+            <Row icon="chat-bubble" label="Feedback" soon />
+            <Row icon="privacy-tip" label="Privacy Policy" soon last />
           </View>
         </View>
 
@@ -399,6 +420,15 @@ const styles = StyleSheet.create({
   },
   rowRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.unit },
   sublabel: { fontFamily: 'Inter_400Regular' },
+  rowSoon: { opacity: 0.45 },
+  soonBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+  },
+  soonText: { fontSize: 10, letterSpacing: 1 },
   divider: {
     height: 1,
     backgroundColor: colors.surfaceVariant,

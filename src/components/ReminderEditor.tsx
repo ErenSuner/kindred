@@ -11,6 +11,7 @@ import {
   LeadUnit,
   MAX_LEAD_PICK,
   Nudge,
+  PRESET_OFFSET_DAYS,
   PRESET_REMINDERS,
   leadLabel,
   leadValue,
@@ -25,18 +26,26 @@ type Props = {
   // The event's own date. Kept for call-site compatibility; lead times are
   // relative so nothing needs validating against it any more.
   eventDate?: Date | null;
+  // Caps how far ahead a reminder can be set. A weekly routine passes 6: "a
+  // week before" a weekly thing is the previous occurrence, so offering it
+  // would just fire every week and say nothing.
+  maxLeadDays?: number;
 };
 
 // Everything except the day itself, which is fixed and shown separately.
-const CHOOSABLE_PRESETS = PRESET_REMINDERS.filter((p) => p.value !== DAY_OF);
+const ALL_PRESETS = PRESET_REMINDERS.filter((p) => p.value !== DAY_OF);
 
-export function ReminderEditor({ reminders, onChange }: Props) {
+export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [leadAmount, setLeadAmount] = useState(4);
   const [leadUnit, setLeadUnit] = useState<LeadUnit>('day');
   const [amountPickerVisible, setAmountPickerVisible] = useState(false);
   const [unitPickerVisible, setUnitPickerVisible] = useState(false);
   const [customOpen, setCustomOpen] = useState(false);
+
+  const withinLimit = (days: number) => maxLeadDays === undefined || days <= maxLeadDays;
+  const CHOOSABLE_PRESETS = ALL_PRESETS.filter((p) => withinLimit(PRESET_OFFSET_DAYS[p.value] ?? 0));
+  const LEAD_UNIT_OPTIONS = LEAD_UNITS.filter((u) => withinLimit(u.days));
 
   // The day-of reminder is never in the editable list — it is guaranteed.
   const chosen = reminders.filter((r) => r.value !== DAY_OF);
@@ -248,8 +257,8 @@ export function ReminderEditor({ reminders, onChange }: Props) {
       <ScrollPickerModal
         visible={unitPickerVisible}
         onClose={() => setUnitPickerVisible(false)}
-        title="Days, weeks or months?"
-        options={LEAD_UNITS.map((u) => ({ label: u.plural, value: u.value }))}
+        title={LEAD_UNIT_OPTIONS.length === 1 ? 'How far ahead?' : 'Days, weeks or months?'}
+        options={LEAD_UNIT_OPTIONS.map((u) => ({ label: u.plural, value: u.value }))}
         selectedValue={leadUnit}
         onSelect={(v) => {
           setLeadUnit(v as LeadUnit);

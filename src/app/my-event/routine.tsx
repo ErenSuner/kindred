@@ -144,7 +144,9 @@ export default function RoutineForm() {
 
             <WeekdayPicker value={weekdays} onChange={setWeekdays} />
 
-            <ReminderEditor reminders={reminders} onChange={setReminders} />
+            {/* A routine comes round weekly, so anything further out than six
+                days would fire every week and mean nothing. */}
+            <ReminderEditor reminders={reminders} onChange={setReminders} maxLeadDays={6} />
           </Animated.View>
 
           <FormError message={error} />

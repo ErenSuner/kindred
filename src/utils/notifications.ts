@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DAY_OF, Nudge, offsetDaysFor, parseNudge, parseNudges } from '@/utils/nudges';
 import { Recurrence, YEARLY } from '@/utils/recurrence';
 import { getUpcomingOccurrences } from '@/utils/dates';
-import { isRoutine, upcomingRoutineDates } from '@/utils/routines';
+import { Weekday, isRoutine } from '@/utils/routines';
 import { Holiday } from '@/data/holidays';
 import { formatHolidayDate, nextHolidayDates } from '@/utils/holidays';
 
@@ -118,30 +118,9 @@ function collectMyEventNotifications(myEvents: MyEvent[], hour: number): Pending
   const pending: PendingNotification[] = [];
 
   for (const event of myEvents) {
-    // A routine's dates come from its weekdays, not from a recurrence anchored
-    // to the day it was created.
-    if (isRoutine(event.weekdays)) {
-      const now = new Date();
-      for (const nudge of nudgesFor(event.nudges)) {
-        const offsetDays = offsetDaysFor(nudge) ?? 0;
-        upcomingRoutineDates(event.weekdays ?? [], MAX_OCCURRENCES_PER_NUDGE)
-          .map((occurrence) => {
-            const at = new Date(occurrence.getFullYear(), occurrence.getMonth(), occurrence.getDate(), hour, 0, 0, 0);
-            at.setDate(at.getDate() - offsetDays);
-            return at;
-          })
-          .filter((at) => at.getTime() > now.getTime())
-          .forEach((date, i) => {
-            pending.push({
-              id: `rt_${event.id}_${nudge.value}_${i}`,
-              title: 'Your Routine',
-              body: nudge.value === DAY_OF ? `${event.title} is today.` : `${event.title} is coming up.`,
-              date,
-            });
-          });
-      }
-      continue;
-    }
+    // Routines are booked as repeating weekly triggers instead — see
+    // collectRoutineTriggers.
+    if (isRoutine(event.weekdays)) continue;
 
     for (const nudge of nudgesFor(event.nudges)) {
       const dates = notificationDatesFor(event.originalDate, event.recurrence, nudge, hour);
@@ -160,6 +139,49 @@ function collectMyEventNotifications(myEvents: MyEvent[], hour: number): Pending
   }
 
   return pending;
+}
+
+// A weekly repeating trigger. Unlike a dated notification this never runs out,
+// so a routine costs a fixed number of slots forever instead of re-booking six
+// occurrences at a time and going quiet when they're used up.
+type RoutineTrigger = { id: string; title: string; body: string; weekday: Weekday; hour: number };
+
+// Lead times of a week or more are dropped for routines. "A week before" a
+// weekly routine is the previous occurrence — it would fire every single week
+// and say nothing useful.
+const MAX_ROUTINE_LEAD_DAYS = 6;
+
+function collectRoutineTriggers(myEvents: MyEvent[], hour: number): RoutineTrigger[] {
+  const triggers: RoutineTrigger[] = [];
+
+  for (const event of myEvents) {
+    if (!isRoutine(event.weekdays)) continue;
+
+    for (const nudge of nudgesFor(event.nudges)) {
+      const offsetDays = offsetDaysFor(nudge) ?? 0;
+      if (offsetDays > MAX_ROUTINE_LEAD_DAYS) continue;
+
+      for (const weekday of event.weekdays ?? []) {
+        // Firing N days earlier is the same as firing on an earlier weekday.
+        const fireOn = (((weekday - offsetDays) % 7) + 7) % 7;
+
+        triggers.push({
+          id: `rt_${event.id}_${nudge.value}_${weekday}`,
+          title: 'Your Routine',
+          body:
+            offsetDays === 0
+              ? `${event.title} is today.`
+              : offsetDays === 1
+              ? `${event.title} is tomorrow.`
+              : `${event.title} is in ${offsetDays} days.`,
+          weekday: fireOn as Weekday,
+          hour,
+        });
+      }
+    }
+  }
+
+  return triggers;
 }
 
 function collectHolidayNotifications(holidays: Holiday[], hour: number): PendingNotification[] {
@@ -221,20 +243,44 @@ export async function syncNotifications(
 
   const hour = await getReminderHour();
 
-  // 2. Gather all reminders
+  // 2. Routines go down first. They repeat forever on a fixed number of slots,
+  //    and taking them off the dated budget is what stops a Tue/Thu course from
+  //    crowding out a birthday six months out.
+  const routineTriggers = collectRoutineTriggers(myEvents, hour);
+  let routinesScheduled = 0;
+
+  for (const trigger of routineTriggers.slice(0, MAX_NOTIFICATIONS)) {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: { title: trigger.title, body: trigger.body, sound: true },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+          // expo counts weekdays from 1 = Sunday; ours count from 0 = Sunday.
+          weekday: trigger.weekday + 1,
+          hour: trigger.hour,
+          minute: 0,
+        },
+      });
+      routinesScheduled++;
+    } catch (e) {
+      console.warn(`Failed to schedule routine ${trigger.title}:`, e);
+    }
+  }
+
+  // 3. Gather the dated reminders
   const upcomingNotifications = [
     ...collectPeopleNotifications(people, hour),
     ...collectMyEventNotifications(myEvents, hour),
     ...collectHolidayNotifications(holidays, hour),
   ];
 
-  // 3. Sort by closest date
+  // 4. Sort by closest date
   upcomingNotifications.sort((a, b) => a.date.getTime() - b.date.getTime());
 
-  // 4. Take the next MAX_NOTIFICATIONS
-  const toSchedule = upcomingNotifications.slice(0, MAX_NOTIFICATIONS);
+  // 5. Take whatever the routines left behind
+  const toSchedule = upcomingNotifications.slice(0, Math.max(0, MAX_NOTIFICATIONS - routinesScheduled));
 
-  // 5. Schedule them
+  // 6. Schedule them
   for (const notification of toSchedule) {
     try {
       await Notifications.scheduleNotificationAsync({
@@ -250,5 +296,5 @@ export async function syncNotifications(
     }
   }
 
-  console.log(`[Notifications] Synced ${toSchedule.length} upcoming reminders.`);
+  console.log(`[Notifications] Synced ${toSchedule.length} dated reminders and ${routinesScheduled} weekly routines.`);
 }

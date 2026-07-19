@@ -158,7 +158,7 @@ export default function NewConnection() {
               Name Exists
             </Txt>
             <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 8, textAlign: 'center' }}>
-              You already have a connection named "{name.trim()}". Please use a different name or add a last initial.
+              You already have a connection named &ldquo;{name.trim()}&rdquo;. Please use a different name or add a last initial.
             </Txt>
             <Button label="Got it" onPress={() => setDuplicateAlertVisible(false)} fullWidth style={{ marginTop: 24 }} />
           </Animated.View>

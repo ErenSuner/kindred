@@ -23,6 +23,7 @@ import { HolidaysProvider } from '@/context/HolidaysContext';
 import { NotificationSync } from '@/components/NotificationSync';
 import { UndoProvider } from '@/context/UndoContext';
 import { UndoSnackbar } from '@/components/UndoSnackbar';
+import { AppErrorBoundary } from '@/components/AppErrorBoundary';
 
 import { Platform, LogBox } from 'react-native';
 
@@ -127,21 +128,24 @@ export default function RootLayout() {
   if (!loaded) return null;
 
   return (
-    <AuthProvider>
-      <UndoProvider>
-      <PeopleProvider>
-        <EventsProvider>
-          <HolidaysProvider>
-            <GestureHandlerRootView style={{ flex: 1 }}>
-              <StatusBar style="dark" />
-              <NotificationSync />
-              <RootLayoutNav />
-              <UndoSnackbar />
-            </GestureHandlerRootView>
-          </HolidaysProvider>
-        </EventsProvider>
-      </PeopleProvider>
-      </UndoProvider>
-    </AuthProvider>
+    // Outside the providers, so a crash in any of them is caught too.
+    <AppErrorBoundary>
+      <AuthProvider>
+        <UndoProvider>
+        <PeopleProvider>
+          <EventsProvider>
+            <HolidaysProvider>
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <StatusBar style="dark" />
+                <NotificationSync />
+                <RootLayoutNav />
+                <UndoSnackbar />
+              </GestureHandlerRootView>
+            </HolidaysProvider>
+          </EventsProvider>
+        </PeopleProvider>
+        </UndoProvider>
+      </AuthProvider>
+    </AppErrorBoundary>
   );
 }

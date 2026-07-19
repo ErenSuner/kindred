@@ -1,10 +1,19 @@
 import type { Person, Relationship, SpecialDay } from '@/data/mock';
+import type { Recurrence } from '@/utils/recurrence';
 
 export type Upcoming = Pick<Person, 'eventTitle' | 'eventTag' | 'daysAway' | 'eventDate' | 'countdown'>;
 
 // Sorts a person to the bottom of any "soonest first" list when they have
 // nothing coming up.
 export const NO_UPCOMING_DAYS = 9999;
+
+// How long one turn of the cycle is, in days. The progress bar fills over this
+// — measuring a weekly event against a year left the bar permanently full.
+function cycleLengthDays(recurrence: Recurrence | undefined): number {
+  if (!recurrence || recurrence.unit === 'none') return 365;
+  const perUnit = { day: 1, week: 7, month: 30, year: 365 }[recurrence.unit];
+  return Math.max(1, perUnit * Math.max(1, recurrence.interval));
+}
 
 // The headline "next big day" fields, derived rather than stored.
 //
@@ -32,6 +41,7 @@ export function deriveUpcoming(name: string, role: Relationship, days: SpecialDa
   const daysAway = next.daysAway ?? 0;
   const ageStr = next.turningAge ? ` (Turning ${next.turningAge})` : '';
   const title = `${name}'s ${next.title}${ageStr}`;
+  const cycle = cycleLengthDays(next.recurrence);
 
   return {
     eventTitle: title,
@@ -43,7 +53,7 @@ export function deriveUpcoming(name: string, role: Relationship, days: SpecialDa
       days: daysAway,
       title,
       date: next.date,
-      progress: Math.max(0, Math.min(1, 1 - daysAway / 365)),
+      progress: Math.max(0, Math.min(1, 1 - daysAway / cycle)),
     },
   };
 }
