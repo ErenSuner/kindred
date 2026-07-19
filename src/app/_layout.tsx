@@ -24,6 +24,7 @@ import { NotificationSync } from '@/components/NotificationSync';
 import { UndoProvider } from '@/context/UndoContext';
 import { UndoSnackbar } from '@/components/UndoSnackbar';
 import { AppErrorBoundary } from '@/components/AppErrorBoundary';
+import { PendingWrites } from '@/components/PendingWrites';
 
 import { Platform, LogBox } from 'react-native';
 
@@ -140,6 +141,7 @@ export default function RootLayout() {
                 <StatusBar style="dark" />
                 <NotificationSync />
                 <RootLayoutNav />
+                <PendingWrites />
                 <UndoSnackbar />
               </GestureHandlerRootView>
             </HolidaysProvider>

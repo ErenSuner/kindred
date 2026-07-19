@@ -41,6 +41,7 @@ const PEOPLE_SELECT = `
   role,
   avatar_url,
   is_pinned,
+  contact_id,
   special_days (id, title, date, icon, accent, nudges, repeat_unit, repeat_interval, is_birthday, created_at),
   notes (id, kind, body, created_at, special_day_id, occurred_on, photo_url, done_at)
 `;
@@ -68,6 +69,72 @@ export async function insertPerson(
       .single(),
   );
   return row.id;
+}
+
+// One person, imported from the address book. `contactId` is the phone's own
+// identifier — see contact_link.sql for why it, and only it, is stored.
+export type ImportEntry = {
+  name: string;
+  role: Relationship;
+  avatarUrl?: string | null;
+  contactId?: string;
+  // 'YYYY-MM-DD', with SKIPPED_YEAR when only a day and month are known.
+  birthday?: string;
+  birthdayNudges?: string[];
+};
+
+// Imports a whole selection in two round trips rather than two per person.
+// Doing it one at a time meant fifty contacts cost a hundred full reloads of
+// every person, day and note the user has.
+export async function insertPeopleBatch(userId: string, entries: ImportEntry[]): Promise<string[]> {
+  if (entries.length === 0) return [];
+
+  const inserted = unwrapRow<{ id: string }[]>(
+    await supabase
+      .from('people')
+      .insert(
+        entries.map((e) => ({
+          user_id: userId,
+          name: e.name,
+          role: e.role,
+          avatar_url: e.avatarUrl ?? null,
+          contact_id: e.contactId ?? null,
+        })),
+      )
+      .select('id'),
+  );
+
+  // Postgres returns inserted rows in the order they were given, which is what
+  // lets a birthday be matched back to the contact it came from.
+  const birthdays = entries
+    .map((entry, i) => ({ entry, id: inserted[i]?.id }))
+    .filter(({ entry, id }) => !!entry.birthday && !!id)
+    .map(({ entry, id }) => ({
+      person_id: id,
+      title: 'Birthday',
+      date: entry.birthday,
+      nudges: entry.birthdayNudges ?? [],
+      icon: 'cake',
+      accent: 'tertiary',
+      repeat_unit: 'year',
+      repeat_interval: 1,
+      is_birthday: true,
+    }));
+
+  if (birthdays.length > 0) {
+    // The people saved. Losing a birthday shouldn't undo that, so this is
+    // reported rather than thrown.
+    const { error } = await supabase.from('special_days').insert(birthdays);
+    if (error) console.error('People imported, but some birthdays failed:', error);
+  }
+
+  return inserted.map((row) => row.id);
+}
+
+// Used to undo an import. One call, however many people.
+export async function deletePeopleRows(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  unwrap(await supabase.from('people').delete().in('id', ids));
 }
 
 export async function updatePersonRow(

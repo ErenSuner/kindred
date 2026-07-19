@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, ScrollView, StyleSheet, Pressable, Modal } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, Modal, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +15,7 @@ import { NotePreview } from '@/components/NotePreview';
 import { LookingBack } from '@/components/LookingBack';
 import { PhotoViewer } from '@/components/PhotoViewer';
 import { AboutPerson } from '@/components/AboutPerson';
+import { openInContacts } from '@/utils/contacts';
 import type { SpecialDay } from '@/data/mock';
 
 const accentMap = {
@@ -77,6 +78,9 @@ export default function PersonDetail() {
 
   const [photoVisible, setPhotoVisible] = useState(false);
 
+  const [openingContact, setOpeningContact] = useState(false);
+  const [contactError, setContactError] = useState<string | null>(null);
+
   const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
   const [deleteNoteConfirmVisible, setDeleteNoteConfirmVisible] = useState(false);
 
@@ -111,6 +115,20 @@ export default function PersonDetail() {
     setDeleteConfirmVisible(false);
     removePersonWithUndo(person);
     router.back();
+  };
+
+  const handleOpenContact = async () => {
+    if (!person?.contactId || openingContact) return;
+    setContactError(null);
+    setOpeningContact(true);
+    try {
+      const opened = await openInContacts(person.contactId);
+      // A contact id only means something on the phone it came from, so a
+      // restored backup will have ids that resolve to nothing.
+      if (!opened) setContactError("They're no longer in this phone's contacts.");
+    } finally {
+      setOpeningContact(false);
+    }
   };
 
   const confirmDeleteNote = (noteId: string) => {
@@ -186,6 +204,28 @@ export default function PersonDetail() {
               <Chip key={t} label={t} tone={t === 'Local' ? 'tertiary' : 'primary'} role={t} />
             ))}
           </View>
+
+          {/* Kindred holds no way to reach anyone. This hands the phone back its
+              own contact id so calling and messaging happen where they already
+              live. Only appears for someone imported from the address book. */}
+          {person.contactId && Platform.OS !== 'web' && (
+            <Pressable
+              onPress={handleOpenContact}
+              disabled={openingContact}
+              style={({ pressed }) => [styles.contactBtn, pressed && { opacity: 0.8 }]}
+            >
+              <Icon name="person-search" size={18} color={colors.primary} />
+              <Txt variant="labelMd" color={colors.primary}>
+                {openingContact ? 'Opening…' : 'Open in Contacts'}
+              </Txt>
+            </Pressable>
+          )}
+
+          {contactError && (
+            <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.contactError}>
+              {contactError}
+            </Txt>
+          )}
         </Animated.View>
 
         {/* Countdown */}
@@ -423,6 +463,19 @@ const styles = StyleSheet.create({
     ...ambientShadow,
   },
   bigInitials: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryContainer },
+  contactBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    backgroundColor: colors.surfaceContainerLowest,
+  },
+  contactError: { fontWeight: 'normal', opacity: 0.8, marginTop: 8, textAlign: 'center' },
   countdownCard: {
     backgroundColor: 'rgba(255,255,255,0.9)',
     borderRadius: radius.lg,

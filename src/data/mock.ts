@@ -93,6 +93,9 @@ export type Person = {
   birthday?: { id: string; date: string; nudges: any[] };
   notes?: Note[];
   isPinned?: boolean;
+  // The address-book entry this person was imported from, when there was one.
+  // Only ever handed back to the OS to open its own Contacts app.
+  contactId?: string;
 };
 
 // Seed data — only Eleanor ships as an example.

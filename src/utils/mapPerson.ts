@@ -74,5 +74,6 @@ export function mapDbPersonToPerson(dbPerson: any): Person {
     birthday,
     notes: generalNotes,
     isPinned: dbPerson.is_pinned || false,
+    contactId: dbPerson.contact_id || undefined,
   };
 }

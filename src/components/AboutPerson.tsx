@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeOut,
+  LinearTransition,
+  useAnimatedStyle,
+  useDerivedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { colors, radius, spacing, ambientShadow } from '@/theme/tokens';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
@@ -8,12 +17,16 @@ import { PhotoViewer } from '@/components/PhotoViewer';
 import { useAuth } from '@/context/AuthContext';
 import { usePeople } from '@/context/PeopleContext';
 import { pickPhoto, uploadPhoto } from '@/utils/avatars';
-import { GIFT_IDEA, MEMORY, NOTEBOOK, isLegacyNote } from '@/utils/notes';
+import { GIFT_IDEA, MEMORY, NOTEBOOK } from '@/utils/notes';
 import type { Note, Person } from '@/data/mock';
 
 // A gift idea is a line, not an essay — the cap is what keeps the list
 // scannable.
 const GIFT_MAX_LENGTH = 120;
+
+// Shared by every container a gift row can move through, so the row and the
+// space it leaves behind travel at the same speed.
+const ROW_MOTION = LinearTransition.duration(240);
 
 type Props = {
   person: Person;
@@ -43,7 +56,6 @@ export function AboutPerson({ person, onDeleteNote }: Props) {
   const gifts = notes.filter((n) => !n.photoUrl && n.kind === GIFT_IDEA);
   const photos = notes.filter((n) => !!n.photoUrl);
   const notebookNote = notes.find((n) => n.kind === NOTEBOOK);
-  const legacy = notes.filter(isLegacyNote).filter((n) => n.kind !== GIFT_IDEA);
 
   return (
     <View style={styles.card}>
@@ -62,7 +74,7 @@ export function AboutPerson({ person, onDeleteNote }: Props) {
         </Section>
 
         <Section icon="menu-book" title="Notebook">
-          <Notebook person={person} note={notebookNote} legacy={legacy} onDeleteLegacy={onDeleteNote} />
+          <Notebook person={person} note={notebookNote} />
         </Section>
       </View>
     </View>
@@ -99,19 +111,24 @@ function GiftIdeas({ person, gifts, onDelete }: { person: Person; gifts: Note[];
   const bought = gifts.filter((g) => !!g.doneAt);
 
   return (
-    <View style={{ gap: spacing.stackSm }}>
+    // Every container a row can move between animates its own layout, so a gift
+    // crossing from the open list to the bought one pushes its neighbours aside
+    // instead of everything below it snapping to a new position.
+    <Animated.View layout={ROW_MOTION} style={{ gap: spacing.stackSm }}>
       {open.length === 0 ? (
-        <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={styles.empty}>
-          {bought.length > 0
-            ? 'All caught up — everything on the list has been bought.'
-            : 'Nothing yet. Anything they mention wanting, jot it here — a line is enough.'}
-        </Txt>
+        <Animated.View entering={FadeIn.duration(160)} style={styles.emptyWrap}>
+          <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={styles.empty}>
+            {bought.length > 0
+              ? 'All caught up — everything on the list has been bought.'
+              : 'Nothing yet. Anything they mention wanting, jot it here — a line is enough.'}
+          </Txt>
+        </Animated.View>
       ) : (
-        <View style={{ gap: 8 }}>
+        <Animated.View layout={ROW_MOTION} style={{ gap: 8 }}>
           {open.map((gift) => (
             <GiftRow key={gift.id} gift={gift} onDelete={onDelete} />
           ))}
-        </View>
+        </Animated.View>
       )}
 
       <View style={styles.giftInputRow}>
@@ -136,7 +153,12 @@ function GiftIdeas({ person, gifts, onDelete }: { person: Person; gifts: Note[];
       </View>
 
       {bought.length > 0 && (
-        <View style={{ gap: 8, marginTop: 4 }}>
+        <Animated.View
+          entering={FadeIn.duration(160)}
+          exiting={FadeOut.duration(120)}
+          layout={ROW_MOTION}
+          style={{ gap: 8, marginTop: 4 }}
+        >
           <Pressable
             onPress={() => setShowBought((v) => !v)}
             style={({ pressed }) => [styles.boughtToggle, pressed && { opacity: 0.7 }]}
@@ -149,9 +171,9 @@ function GiftIdeas({ person, gifts, onDelete }: { person: Person; gifts: Note[];
 
           {showBought &&
             bought.map((gift) => <GiftRow key={gift.id} gift={gift} onDelete={onDelete} />)}
-        </View>
+        </Animated.View>
       )}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -161,6 +183,13 @@ function GiftRow({ gift, onDelete }: { gift: Note; onDelete: (id: string) => voi
   const { setNoteDone } = usePeople();
   const [busy, setBusy] = useState(false);
   const done = !!gift.doneAt;
+
+  // Driven off `done` rather than a separate flag, so the row settles into its
+  // new look as one movement instead of stepping through it.
+  const progress = useDerivedValue(() => withTiming(done ? 1 : 0, { duration: 220 }), [done]);
+
+  const rowStyle = useAnimatedStyle(() => ({ opacity: 1 - progress.value * 0.4 }));
+  const textStyle = useAnimatedStyle(() => ({ opacity: 1 - progress.value * 0.25 }));
 
   const toggle = async () => {
     if (busy) return;
@@ -175,18 +204,27 @@ function GiftRow({ gift, onDelete }: { gift: Note; onDelete: (id: string) => voi
   };
 
   return (
-    <View style={[styles.giftRow, done && styles.giftRowDone]}>
+    <Animated.View
+      entering={FadeInDown.duration(200).springify().damping(18)}
+      exiting={FadeOut.duration(140)}
+      layout={ROW_MOTION}
+      style={[styles.giftRow, rowStyle]}
+    >
       <Pressable onPress={toggle} disabled={busy} hitSlop={8} style={{ marginTop: 1 }}>
-        <Icon
-          name={done ? 'check-circle' : 'radio-button-unchecked'}
-          size={20}
-          color={done ? colors.secondary : colors.outline}
-        />
+        {/* Swapping the icon outright is the one hard cut left, so it gets a
+            fade of its own rather than blinking between two glyphs. */}
+        <Animated.View key={done ? 'on' : 'off'} entering={FadeIn.duration(180)}>
+          <Icon
+            name={done ? 'check-circle' : 'radio-button-unchecked'}
+            size={20}
+            color={done ? colors.secondary : colors.outline}
+          />
+        </Animated.View>
       </Pressable>
 
       {/* minWidth 0 is what actually lets the row shrink — without it a single
           long unbroken word pushes straight out of the card. */}
-      <View style={{ flex: 1, minWidth: 0 }}>
+      <Animated.View style={[{ flex: 1, minWidth: 0 }, textStyle]}>
         <Txt
           variant="bodyMd"
           color={done ? colors.onSurfaceVariant : colors.onSurface}
@@ -194,12 +232,12 @@ function GiftRow({ gift, onDelete }: { gift: Note; onDelete: (id: string) => voi
         >
           {gift.body}
         </Txt>
-      </View>
+      </Animated.View>
 
       <Pressable onPress={() => onDelete(gift.id)} hitSlop={8}>
         <Icon name="close" size={16} color={colors.onSurfaceVariant} />
       </Pressable>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -297,17 +335,7 @@ function Memories({ person, photos, onDelete }: { person: Person; photos: Note[]
 
 // --- Notebook ----------------------------------------------------------------
 
-function Notebook({
-  person,
-  note,
-  legacy,
-  onDeleteLegacy,
-}: {
-  person: Person;
-  note?: Note;
-  legacy: Note[];
-  onDeleteLegacy: (id: string) => void;
-}) {
+function Notebook({ person, note }: { person: Person; note?: Note }) {
   const { saveNotebook } = usePeople();
   const [body, setBody] = useState(note?.body ?? '');
   const [saving, setSaving] = useState(false);
@@ -360,29 +388,6 @@ function Notebook({
         </Pressable>
       </View>
 
-      {/* Notes written under the old tagged-note system. Nothing is migrated
-          automatically — they're shown here so they can be copied across or
-          cleared out deliberately. */}
-      {legacy.length > 0 && (
-        <View style={{ marginTop: spacing.stackMd, gap: 8 }}>
-          <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ letterSpacing: 1 }}>
-            EARLIER NOTES
-          </Txt>
-          {legacy.map((n) => (
-            <View key={n.id} style={styles.legacyRow}>
-              <View style={{ flex: 1, gap: 2 }}>
-                <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontWeight: 'normal', opacity: 0.7 }}>
-                  {n.when}
-                </Txt>
-                <Txt variant="bodyMd" color={colors.onSurface}>{n.body}</Txt>
-              </View>
-              <Pressable onPress={() => onDeleteLegacy(n.id)} hitSlop={8}>
-                <Icon name="delete-outline" size={18} color={colors.error} />
-              </Pressable>
-            </View>
-          ))}
-        </View>
-      )}
     </View>
   );
 }
@@ -424,8 +429,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  giftRowDone: { opacity: 0.6 },
   giftTextDone: { textDecorationLine: 'line-through' },
+  emptyWrap: { paddingVertical: 4 },
   boughtToggle: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4 },
   giftInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   giftInput: {
@@ -493,15 +498,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 9,
     borderRadius: radius.full,
-  },
-  legacyRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: colors.inverseOnSurface,
-    borderRadius: radius.DEFAULT,
-    borderWidth: 1,
-    borderColor: 'rgba(215,193,193,0.3)',
-    padding: 12,
   },
 });

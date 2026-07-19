@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { View, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,53 +7,67 @@ import { colors, spacing, radius } from '@/theme/tokens';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Avatar } from '@/components/Avatar';
-import { Chip } from '@/components/Chip';
 import { Card } from '@/components/Card';
 import { NotePreview } from '@/components/NotePreview';
 import { FormError } from '@/components/FormError';
-import type { MyEvent, Person } from '@/data/mock';
 import { usePeople } from '@/context/PeopleContext';
 import { useEvents } from '@/context/EventsContext';
 import { useHolidays } from '@/context/HolidaysContext';
 import { useAuth } from '@/context/AuthContext';
+import { formatTimeOfDay } from '@/utils/eventTime';
+import { TimelineEntry, buildTimeline } from '@/utils/timeline';
 
-type FeedItem =
-  | { kind: 'person'; id: string; daysAway: number; person: Person }
-  | { kind: 'event'; id: string; daysAway: number; event: MyEvent };
+function countdown(daysAway: number): string {
+  if (daysAway === 0) return 'Today';
+  if (daysAway === 1) return 'Tomorrow';
+  return `${daysAway}d`;
+}
 
+// Home answers one question: what is coming up, and when. It deliberately does
+// not list people or reminders — those are whole tabs of their own, and having
+// them here too meant the same thing appeared twice under different headings.
 export default function Home() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { people, loadError, refreshPeople } = usePeople();
-  const { events } = useEvents();
+  const { events, routines } = useEvents();
   const { imminent } = useHolidays();
   const { user } = useAuth();
 
   const userName = user?.user_metadata?.name || (user?.email ? user.email.split('@')[0] : 'there');
+  const ownAvatar: string | undefined = user?.user_metadata?.avatar_url ?? undefined;
 
-  const activePeople = people.filter(p => p.specialDays && p.specialDays.length > 0);
+  const groups = useMemo(
+    () =>
+      buildTimeline(
+        people,
+        events,
+        routines,
+        imminent.map((u) => ({
+          id: u.holiday.id,
+          name: u.holiday.name,
+          icon: u.holiday.icon,
+          formattedDate: u.formattedDate,
+          daysAway: u.daysAway,
+        })),
+      ),
+    [people, events, routines, imminent],
+  );
 
-  // People arrive already sorted with pinned ones first, and pinning should keep
-  // winning over a merely-sooner event, so only the unpinned tail gets mixed in
-  // with the user's own events.
-  const pinnedItems: FeedItem[] = activePeople
-    .filter(p => p.isPinned)
-    .map(p => ({ kind: 'person', id: p.id, daysAway: p.daysAway, person: p }));
+  const total = groups.reduce((n, g) => n + g.entries.length, 0);
+  const nothingAtAll = people.length === 0 && events.length === 0 && routines.length === 0;
 
-  const mixedItems: FeedItem[] = [
-    ...activePeople.filter(p => !p.isPinned).map((p): FeedItem => ({ kind: 'person', id: p.id, daysAway: p.daysAway, person: p })),
-    ...events.map((e): FeedItem => ({ kind: 'event', id: e.id, daysAway: e.daysAway, event: e })),
-  ].sort((a, b) => a.daysAway - b.daysAway);
-
-  const feed = [...pinnedItems, ...mixedItems];
-  const featuredItems = feed.filter((item, i) => i === 0 || item.daysAway <= 7);
-  const rest = feed.filter((item, i) => i !== 0 && item.daysAway > 7);
+  const openEntry = (entry: TimelineEntry) => {
+    if (entry.personId) router.push(`/person/${entry.personId}` as any);
+    else if (entry.source === 'routine' && entry.eventId) {
+      router.push({ pathname: '/my-event/routine', params: { id: entry.eventId } } as any);
+    } else if (entry.eventId) router.push(`/my-event/edit/${entry.eventId}` as any);
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Sticky title header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Txt variant="headlineMd" color={colors.primary} style={{ fontFamily: 'Literata_700Bold', fontSize: 28, letterSpacing: -0.5 }}>
+        <Txt variant="headlineMd" color={colors.primary} style={styles.wordmark}>
           Kindred
         </Txt>
       </View>
@@ -65,282 +80,124 @@ export default function Home() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Welcome */}
-        <Animated.View entering={FadeInDown.duration(500)} style={{ marginBottom: spacing.stackXl, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <Animated.View entering={FadeInDown.duration(500)} style={styles.welcome}>
           <View style={{ flex: 1 }}>
             <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginBottom: 4, textTransform: 'capitalize' }}>
               Welcome back, {userName}
             </Txt>
             <Txt variant="headlineLgMobile" color={colors.onSurface}>
-              Here is what&apos;s coming up.
+              {total === 0 ? 'Nothing coming up.' : "Here's what's coming up."}
             </Txt>
           </View>
+
           <Pressable
             onPress={() => router.push('/birthdays')}
-            style={({ pressed }) => [
-              {
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-                backgroundColor: colors.primaryContainer,
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                borderRadius: radius.full,
-                marginTop: 4,
-              },
-              pressed && { opacity: 0.8 }
-            ]}
+            style={({ pressed }) => [styles.birthdaysBtn, pressed && { opacity: 0.8 }]}
           >
             <Icon name="cake" size={20} color={colors.onPrimaryContainer} />
             <Txt variant="labelMd" color={colors.onPrimaryContainer}>Birthdays</Txt>
           </Pressable>
         </Animated.View>
 
-        {/* Shared occasions close enough to act on */}
-        {imminent.map((item, index) => (
-          <Animated.View
-            key={item.holiday.id}
-            entering={FadeInDown.duration(500).delay(80 + index * 60)}
-            style={{ marginBottom: spacing.gutter }}
-          >
-            <Card style={styles.holidayCard}>
-              <View style={[styles.holidayGlow, { pointerEvents: 'none' } as any]} />
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-                <View style={styles.holidayIconWrap}>
-                  <Icon name={item.holiday.icon as any} size={26} color={colors.onTertiaryFixed} />
-                </View>
-                <View style={{ flex: 1, gap: 6 }}>
-                  <View style={styles.holidayChip}>
-                    <Icon name="public" size={12} color={colors.onTertiaryFixed} />
-                    <Txt variant="labelSm" color={colors.onTertiaryFixed}>Shared occasion</Txt>
-                  </View>
-                  <Txt variant="headlineMd" color={colors.onSurface}>{item.holiday.name}</Txt>
-                </View>
-              </View>
-
-              <View style={styles.holidayFooter}>
-                <View>
-                  <Txt variant="bodyMd" color={colors.onSurfaceVariant}>{item.formattedDate}</Txt>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Txt variant="headlineMd" color={colors.tertiary}>
-                    {item.daysAway === 0 ? 'Today!' : item.daysAway === 1 ? 'Tomorrow' : item.daysAway}
-                  </Txt>
-                  {item.daysAway > 1 && (
-                    <Txt variant="labelSm" color={colors.onSurfaceVariant}>days away</Txt>
-                  )}
-                </View>
-              </View>
-            </Card>
-          </Animated.View>
-        ))}
-
         <FormError message={loadError} onRetry={refreshPeople} retryLabel="Retry" />
 
-        {/* Empty state — suppressed on a failed load, where an empty list means
-            "couldn't fetch", not "you have nobody". */}
-        {people.length === 0 && events.length === 0 && !loadError && (
-          <Animated.View entering={FadeInDown.duration(500).delay(120)} style={styles.emptyState}>
-            <Icon name="people" size={48} color={colors.outlineVariant} />
-            <Txt variant="headlineMd" color={colors.onSurface} style={{ marginTop: 16, textAlign: 'center' }}>
-              No connections yet
-            </Txt>
-            <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 8, textAlign: 'center', maxWidth: 280 }}>
-              Add someone special to start tracking the moments that matter.
-            </Txt>
-          </Animated.View>
-        )}
-
-        {/* Empty special days state */}
-        {people.length > 0 && activePeople.length === 0 && events.length === 0 && (
-          <Animated.View entering={FadeInDown.duration(600).delay(150)}>
-            <Card style={styles.emptyDaysCard}>
-              <View style={styles.emptyDaysAccent} />
-              <View style={styles.emptyDaysContent}>
-                <View style={styles.emptyDaysIconWrap}>
-                  <Icon name="event" size={32} color={colors.primary} />
+        {/* An empty list on a failed load means "couldn't fetch", not "you have
+            nobody", so the invitation is held back until the load succeeded. */}
+        {total === 0 && !loadError && (
+          <Animated.View entering={FadeInDown.duration(500).delay(120)}>
+            <Card style={styles.emptyCard}>
+              <View style={styles.emptyAccent} />
+              <View style={{ alignItems: 'center' }}>
+                <View style={styles.emptyIconWrap}>
+                  <Icon name={nothingAtAll ? 'people' : 'event'} size={32} color={colors.primary} />
                 </View>
                 <Txt variant="headlineMd" color={colors.onSurface} style={{ textAlign: 'center', marginTop: 20 }}>
-                  No special days yet
+                  {nothingAtAll ? 'Nobody here yet' : 'No dates yet'}
                 </Txt>
-                <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ textAlign: 'center', marginTop: 8, maxWidth: 260, lineHeight: 22 }}>
-                  Birthdays, anniversaries, milestones — add a special day to someone you care about and never miss a moment.
+                <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={styles.emptyBlurb}>
+                  {nothingAtAll
+                    ? 'Add the people you care about and their days will show up here, soonest first.'
+                    : 'Add a birthday or a special day to someone, and it will appear here.'}
                 </Txt>
                 <Pressable
-                  onPress={() => {
-                    if (people.length > 0) {
-                      router.push(`/person/${people[0].id}` as any);
-                    }
-                  }}
-                  style={({ pressed }) => [
-                    styles.emptyDaysBtn,
-                    pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
-                  ]}
+                  onPress={() => router.push('/add')}
+                  style={({ pressed }) => [styles.emptyBtn, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] }]}
                 >
-                  <Icon name="add" size={18} color={colors.onPrimary} />
-                  <Txt variant="labelMd" color={colors.onPrimary}>
-                    Add a special day
-                  </Txt>
+                  <Icon name="arrow-forward" size={18} color={colors.onPrimary} />
+                  <Txt variant="labelMd" color={colors.onPrimary}>Go to your people</Txt>
                 </Pressable>
               </View>
             </Card>
           </Animated.View>
         )}
 
-        {/* Featured events */}
-        {featuredItems.map((item, index) => {
-          if (item.kind === 'event') {
-            const event = item.event;
-            return (
-              <Animated.View key={`event-${event.id}`} entering={FadeInDown.duration(500).delay(120 + index * 50)} style={{ marginBottom: spacing.gutter }}>
-                <Card pressable onPress={() => router.push(`/my-event/edit/${event.id}` as any)} style={styles.featured}>
-                  <View style={[styles.blur, { pointerEvents: 'none' } as any]} />
-                  <View style={styles.featuredTop}>
-                    <Avatar uri={user?.user_metadata?.avatar_url ?? undefined} initials={userName?.charAt(0)?.toUpperCase()} size={64} />
-                    <View style={{ flex: 1, gap: 8 }}>
-                      <Chip label="For you" tone="secondary" />
-                      <Txt variant="headlineMd" color={colors.onSurface}>
-                        {event.title}
-                      </Txt>
-                    </View>
-                  </View>
-                  <View style={{ marginTop: spacing.stackLg, marginBottom: spacing.stackSm }}>
-                    <View style={styles.daysRow}>
-                      <Txt variant="headlineXl" color={colors.primary}>
-                        {event.daysAway === 0 ? 'Today!' : event.daysAway}
-                      </Txt>
-                      {event.daysAway !== 0 && (
-                        <Txt variant="bodyLg" color={colors.onSurfaceVariant} style={{ marginBottom: 6 }}>
-                          days away
-                        </Txt>
-                      )}
-                    </View>
-                    <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 4 }}>
-                      {event.date}
-                    </Txt>
-                  </View>
-                </Card>
-              </Animated.View>
-            );
-          }
+        {groups.map((group, groupIndex) => (
+          <Animated.View
+            key={group.key}
+            entering={FadeInDown.duration(500).delay(80 + groupIndex * 60)}
+            style={{ marginBottom: spacing.stackLg }}
+          >
+            <View style={styles.groupHead}>
+              <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ letterSpacing: 1 }}>
+                {group.label.toUpperCase()}
+              </Txt>
+              <View style={styles.groupRule} />
+            </View>
 
-          const featured = item.person;
-          // specialDays is sorted soonest-first, so the headline event is the
-          // first one and its notes are the ones worth previewing.
-          const upcomingDay = featured.specialDays?.[0];
-          const nextDay = featured.specialDays && featured.specialDays.length > 1 ? featured.specialDays[1] : null;
-          return (
-            <Animated.View key={`person-${featured.id}`} entering={FadeInDown.duration(500).delay(120 + index * 50)} style={{ marginBottom: spacing.gutter }}>
-              <Card pressable onPress={() => router.push(`/person/${featured.id}` as any)} style={styles.featured}>
-                <View style={[styles.blur, { pointerEvents: 'none' } as any]} />
-                <View style={styles.featuredTop}>
-                  <Avatar uri={featured.avatar} initials={featured.initials} size={64} />
-                  <View style={{ flex: 1, gap: 8 }}>
-                    <Chip label={featured.eventTag} tone="secondary" role={featured.eventTag} />
-                    <Txt variant="headlineMd" color={colors.onSurface}>
-                      {featured.eventTitle}
-                    </Txt>
-                  </View>
-                </View>
-                <View style={{ marginTop: spacing.stackLg, marginBottom: nextDay ? 0 : spacing.stackSm }}>
-                  <View style={styles.daysRow}>
-                    <Txt variant="headlineXl" color={colors.primary}>
-                      {featured.daysAway === 0 ? 'Today!' : featured.daysAway}
-                    </Txt>
-                    {featured.daysAway !== 0 && (
-                      <Txt variant="bodyLg" color={colors.onSurfaceVariant} style={{ marginBottom: 6 }}>
-                        days away
-                      </Txt>
-                    )}
-                  </View>
-                  <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 4 }}>
-                    {featured.eventDate}
-                  </Txt>
-                  {upcomingDay?.notes && upcomingDay.notes.length > 0 && (
-                    <View style={{ marginTop: 12 }}>
-                      <NotePreview notes={upcomingDay.notes} lines={2} />
-                    </View>
-                  )}
-                </View>
-                {nextDay && (
-                  <View style={styles.nextEventDivider}>
-                    <View style={styles.nextEventInner}>
-                      <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ opacity: 0.8 }}>
-                        Next: {nextDay.title}
-                      </Txt>
-                      <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ opacity: 0.8 }}>
-                        {nextDay.date} ({nextDay.daysAway === 0 ? 'Today!' : `${nextDay.daysAway}d`})
-                      </Txt>
-                    </View>
-                  </View>
-                )}
-              </Card>
-            </Animated.View>
-          );
-        })}
-
-        {/* Everything further out */}
-        {rest.length > 0 && (
-          <Animated.View entering={FadeInDown.duration(500).delay(200)} style={{ marginTop: spacing.gutter, gap: spacing.gutter }}>
-            {rest.map((item) => {
-              const isEvent = item.kind === 'event';
-              const onPress = isEvent
-                ? () => router.push(`/my-event/edit/${item.id}` as any)
-                : () => router.push(`/person/${item.id}` as any);
-              const primaryText = isEvent ? item.event.title : item.person.name;
-              const secondaryText = isEvent ? item.event.date : item.person.eventTitle;
-              const rowNotes = isEvent ? undefined : item.person.specialDays?.[0]?.notes;
-
-              return (
-                <Card key={`${item.kind}-${item.id}`} pressable onPress={onPress} style={styles.rowCard}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flex: 1 }}>
-                    {isEvent ? (
-                      <Avatar uri={user?.user_metadata?.avatar_url ?? undefined} initials={userName?.charAt(0)?.toUpperCase()} size={48} />
+            <View style={{ gap: spacing.stackSm }}>
+              {group.entries.map((entry) => (
+                <Card
+                  key={entry.id}
+                  pressable={!!(entry.personId || entry.eventId)}
+                  onPress={() => openEntry(entry)}
+                  style={styles.row}
+                >
+                  <View style={styles.rowLeft}>
+                    {entry.personId ? (
+                      <Avatar uri={entry.avatar} initials={entry.initials} size={44} />
+                    ) : entry.source === 'event' ? (
+                      <Avatar uri={ownAvatar} initials={userName?.charAt(0)?.toUpperCase()} size={44} />
                     ) : (
-                      <Avatar uri={item.person.avatar} initials={item.person.initials} size={48} />
+                      <View style={[styles.iconWrap, entry.source === 'holiday' && styles.iconWrapHoliday]}>
+                        <Icon
+                          name={entry.icon as any}
+                          size={20}
+                          color={entry.source === 'holiday' ? colors.tertiary : colors.secondary}
+                        />
+                      </View>
                     )}
-                    <View style={{ flex: 1 }}>
+
+                    <View style={{ flex: 1, minWidth: 0 }}>
                       <Txt variant="bodyLg" color={colors.onSurface} style={{ fontFamily: 'Inter_500Medium' }}>
-                        {primaryText}
+                        {entry.title}
                       </Txt>
-                      <Txt variant="bodyMd" color={colors.onSurfaceVariant}>
-                        {secondaryText}
+                      <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.rowMeta}>
+                        {entry.date}
+                        {entry.timeOfDay ? ` · ${formatTimeOfDay(entry.timeOfDay)}` : ''}
+                        {entry.subtitle ? ` · ${entry.subtitle}` : ''}
                       </Txt>
-                      {rowNotes && rowNotes.length > 0 && (
+
+                      {entry.notes && entry.notes.length > 0 && (
                         <View style={{ marginTop: 6 }}>
-                          <NotePreview notes={rowNotes} lines={1} compact />
+                          <NotePreview notes={entry.notes} lines={1} compact />
                         </View>
                       )}
                     </View>
                   </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Txt variant="headlineMd" color={colors.onSurface}>
-                      {item.daysAway === 0 ? 'Today!' : item.daysAway}
+
+                  <View style={styles.countdown}>
+                    <Txt
+                      variant="labelMd"
+                      color={entry.daysAway === 0 ? colors.primary : colors.onSurfaceVariant}
+                    >
+                      {countdown(entry.daysAway)}
                     </Txt>
-                    {item.daysAway !== 0 && (
-                      <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-                        days
-                      </Txt>
-                    )}
                   </View>
                 </Card>
-              );
-            })}
+              ))}
+            </View>
           </Animated.View>
-        )}
-
-        {/* Quick add */}
-        <Animated.View entering={FadeInDown.duration(500).delay(280)}>
-          <Pressable
-            onPress={() => router.push('/new-connection')}
-            style={({ pressed }) => [styles.addBtn, pressed && { backgroundColor: colors.surfaceContainerHigh }]}
-          >
-            <Icon name="add" size={22} color={colors.primary} />
-            <Txt variant="labelMd" color={colors.primary}>
-              Add a new connection
-            </Txt>
-          </Pressable>
-        </Animated.View>
+        ))}
       </ScrollView>
     </View>
   );
@@ -352,101 +209,45 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.stackMd,
     backgroundColor: colors.background,
   },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.stackXl * 2,
-  },
-  featured: {
-    minHeight: 260,
+  wordmark: { fontFamily: 'Literata_700Bold', fontSize: 28, letterSpacing: -0.5 },
+  welcome: {
+    marginBottom: spacing.stackXl,
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    overflow: 'hidden',
+    alignItems: 'flex-start',
   },
-  featuredTop: { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
-  // Warm/tertiary so a shared occasion reads as a different kind of thing from
-  // the blush-toned people and personal event cards.
-  holidayCard: {
-    overflow: 'hidden',
-    paddingVertical: 20,
-  },
-  holidayGlow: {
-    position: 'absolute',
-    top: -70,
-    right: -50,
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: 'rgba(207,151,83,0.14)',
-  },
-  holidayIconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.tertiaryFixed,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  holidayChip: {
+  birthdaysBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    alignSelf: 'flex-start',
-    backgroundColor: colors.tertiaryFixed,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    gap: 6,
+    backgroundColor: colors.primaryContainer,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: radius.full,
+    marginTop: 4,
   },
-  holidayFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.06)',
-  },
-  daysRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
-  rowCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  blur: {
-    position: 'absolute',
-    bottom: -80,
-    right: -80,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: 'rgba(217,142,142,0.18)',
-  },
-  addBtn: {
-    marginTop: spacing.gutter,
-    flexDirection: 'row',
+  groupHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: spacing.stackSm, marginLeft: 2 },
+  groupRule: { flex: 1, height: 1, backgroundColor: colors.surfaceVariant },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1, minWidth: 0 },
+  rowMeta: { fontWeight: 'normal', marginTop: 2 },
+  iconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    paddingVertical: 24,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.outlineVariant,
-    backgroundColor: colors.surfaceContainer,
+    backgroundColor: 'rgba(206,234,207,0.5)',
   },
-  nextEventDivider: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.06)',
+  iconWrapHoliday: { backgroundColor: 'rgba(207,151,83,0.25)' },
+  countdown: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceContainerLow,
   },
-  nextEventInner: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  emptyDaysCard: {
-    overflow: 'hidden',
-    paddingVertical: 40,
-    paddingHorizontal: 24,
-    marginBottom: spacing.gutter,
-  },
-  emptyDaysAccent: {
+  emptyCard: { overflow: 'hidden', paddingVertical: 40, paddingHorizontal: 24, marginBottom: spacing.stackLg },
+  emptyAccent: {
     position: 'absolute',
     top: -40,
     left: -40,
@@ -455,10 +256,7 @@ const styles = StyleSheet.create({
     borderRadius: 80,
     backgroundColor: 'rgba(217,142,142,0.12)',
   },
-  emptyDaysContent: {
-    alignItems: 'center',
-  },
-  emptyDaysIconWrap: {
+  emptyIconWrap: {
     width: 64,
     height: 64,
     borderRadius: 32,
@@ -466,7 +264,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emptyDaysBtn: {
+  emptyBlurb: { textAlign: 'center', marginTop: 8, maxWidth: 280, lineHeight: 22 },
+  emptyBtn: {
     marginTop: 24,
     flexDirection: 'row',
     alignItems: 'center',

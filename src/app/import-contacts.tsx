@@ -20,6 +20,7 @@ import { SearchBar } from '@/components/SearchBar';
 import { useAuth } from '@/context/AuthContext';
 import { usePeople } from '@/context/PeopleContext';
 import { ImportableContact, loadContacts, readContactPhoto } from '@/utils/contacts';
+import type { ImportEntry } from '@/lib/peopleApi';
 import { uploadPhoto } from '@/utils/avatars';
 import { formatOccurrenceDate } from '@/utils/dates';
 import { serializeNudges } from '@/utils/nudges';
@@ -29,6 +30,11 @@ import type { Relationship } from '@/data/mock';
 // What an imported person gets until the user says otherwise. Every other
 // relationship is a guess Kindred has no business making.
 const DEFAULT_ROLE: Relationship = 'Friend';
+
+// How many contact photos to read and upload at once. Enough to stop fifty
+// contacts taking fifty round trips, small enough not to swamp a phone
+// connection.
+const PHOTO_BATCH = 5;
 
 // Imported birthdays get the same two reminders a hand-added one does.
 const DEFAULT_NUDGES = [
@@ -48,7 +54,7 @@ export default function ImportContacts() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { people, addPerson, addBirthday, refreshPeople } = usePeople();
+  const { people, importPeople } = usePeople();
 
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState(false);
@@ -121,53 +127,54 @@ export default function ImportContacts() {
     setProgress(0);
 
     const chosen = contacts.filter((c) => selected.has(c.id));
-    let failed = 0;
+    const nudges = serializeNudges(DEFAULT_NUDGES);
 
-    for (const contact of chosen) {
-      try {
-        // The photo is uploaded before the person exists, so a failure here
-        // costs a picture rather than the whole import.
-        let avatarUrl: string | null = null;
-        if (contact.imageUri) {
-          const base64 = await readContactPhoto(contact.imageUri);
-          if (base64) {
-            avatarUrl = await uploadPhoto(user.id, base64, 'image/jpeg', `contact-${contact.id}`);
-          }
-        }
+    try {
+      // Photos are the slow part and each one is independent, so they go up a
+      // few at a time. A photo that fails costs a picture, not the person.
+      const entries: ImportEntry[] = [];
 
-        const personId = await addPerson({ name: contact.name, role: DEFAULT_ROLE, avatarUrl });
+      for (let i = 0; i < chosen.length; i += PHOTO_BATCH) {
+        const batch = chosen.slice(i, i + PHOTO_BATCH);
+        const uploaded = await Promise.all(
+          batch.map(async (contact) => {
+            let avatarUrl: string | null = null;
+            try {
+              if (contact.imageUri) {
+                const base64 = await readContactPhoto(contact.imageUri);
+                if (base64) {
+                  avatarUrl = await uploadPhoto(user.id, base64, 'image/jpeg', `contact-${contact.id}`);
+                }
+              }
+            } catch (e) {
+              console.warn(`Could not upload photo for ${contact.name}`, e);
+            }
 
-        // The id comes straight back from the insert. Looking it up in `people`
-        // instead would read a stale closure — that list doesn't update until
-        // after this loop finishes.
-        if (contact.birthday && personId) {
-          await addBirthday(personId, {
-            date: contact.birthday,
-            nudges: serializeNudges(DEFAULT_NUDGES),
-          });
-        }
-      } catch (e) {
-        console.error(`Could not import ${contact.name}`, e);
-        failed++;
-      } finally {
-        setProgress((n) => n + 1);
+            return {
+              name: contact.name,
+              role: DEFAULT_ROLE,
+              avatarUrl,
+              contactId: contact.id,
+              birthday: contact.birthday,
+              birthdayNudges: contact.birthday ? nudges : undefined,
+            };
+          }),
+        );
+
+        entries.push(...uploaded);
+        setProgress(entries.length);
       }
+
+      // One insert for everyone, one for their birthdays, one reload. Doing it
+      // person by person cost two full reloads each.
+      await importPeople(entries);
+      router.back();
+    } catch (e) {
+      console.error('Import failed', e);
+      setError("Couldn't add them. Check your connection and try again.");
+    } finally {
+      setImporting(false);
     }
-
-    await refreshPeople();
-    setImporting(false);
-
-    if (failed > 0) {
-      setError(
-        failed === chosen.length
-          ? "None of them could be added. Check your connection and try again."
-          : `${chosen.length - failed} added, ${failed} couldn't be. Try those again.`,
-      );
-      setSelected(new Set());
-      return;
-    }
-
-    router.back();
   };
 
   const header = (
@@ -319,7 +326,9 @@ export default function ImportContacts() {
               <Button
                 label={
                   importing
-                    ? `Adding ${progress} of ${selected.size}…`
+                    ? progress < selected.size
+                      ? `Preparing ${progress} of ${selected.size}…`
+                      : 'Adding…'
                     : `Add ${selected.size} ${selected.size === 1 ? 'person' : 'people'}`
                 }
                 icon="person-add"

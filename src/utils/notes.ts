@@ -10,12 +10,6 @@ export const NOTEBOOK = 'Notebook';
 // A plain note attached to one occasion.
 export const NOTE = 'Note';
 
-// Anything written under the old chips that isn't a gift idea, a photo or the
-// notebook. Still shown, just not in a tab of its own.
-export function isLegacyNote(note: Note): boolean {
-  return !note.photoUrl && note.kind !== GIFT_IDEA && note.kind !== NOTEBOOK;
-}
-
 export function relativeWhen(createdAt: string, now: number = Date.now()): string {
   const diffMs = now - new Date(createdAt).getTime();
   const diffMins = Math.floor(diffMs / 60000);

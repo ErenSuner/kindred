@@ -78,6 +78,25 @@ export async function loadContacts(): Promise<ContactsResult> {
 // The picker hands back a local file path. Uploading needs the bytes, and
 // fetch().blob() is unreliable across React Native platforms — the same reason
 // the image picker asks for base64 directly.
+// Hands the id back to the phone so it can open its own Contacts app, where
+// calling and messaging already live. Kindred stores no way to reach anyone —
+// this is the whole point of keeping the id instead of the number.
+//
+// The id is device-specific, so a restored backup will have ids that resolve to
+// nothing. Returns false in that case so the caller can say so.
+export async function openInContacts(contactId: string): Promise<boolean> {
+  try {
+    const existing = await Contacts.getContactByIdAsync(contactId);
+    if (!existing) return false;
+
+    await Contacts.presentFormAsync(contactId);
+    return true;
+  } catch (e) {
+    console.warn('Could not open contact', e);
+    return false;
+  }
+}
+
 export async function readContactPhoto(uri: string): Promise<string | null> {
   try {
     return await new File(uri).base64();
