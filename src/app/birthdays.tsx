@@ -35,7 +35,7 @@ export default function Birthdays() {
     const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c, floatShadow } = useTheme();
+  const { c } = useTheme();
   const { people } = usePeople();
   const { birthdays: simpleBirthdays } = useBirthdays();
 
@@ -220,14 +220,14 @@ export default function Birthdays() {
 
       <ScrollView
         contentContainerStyle={{
-          paddingBottom: insets.bottom + spacing.stackXl * 2,
+          paddingBottom: insets.bottom + spacing.stackXl,
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* One filter control instead of a row of chips; the default view needs
-            no chip of its own. */}
-        {availableMonths.length > 1 && (
-          <View style={{ paddingHorizontal: spacing.containerMobile, paddingBottom: 16 }}>
+        {/* Filter (left) and add (right) share a row. The filter only appears
+            when there's more than one month to sift; add is always here. */}
+        <View style={styles.actionRow}>
+          {availableMonths.length > 1 ? (
             <Pressable
               onPress={() => setFilterVisible(true)}
               style={({ pressed }) => [
@@ -240,8 +240,22 @@ export default function Birthdays() {
               <Txt variant="subMed" color={c.text}>{filterLabel}</Txt>
               <Icon name="expand-more" size={18} color={c.muted} />
             </Pressable>
-          </View>
-        )}
+          ) : (
+            <View />
+          )}
+
+          <Pressable
+            onPress={() => router.push('/birthday/add' as any)}
+            style={({ pressed }) => [
+              styles.addBtn,
+              { backgroundColor: c.flame },
+              pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
+            ]}
+          >
+            <Icon name="add" size={18} color={c.onFlame} />
+            <Txt variant="label" color={c.onFlame}>{t('add')}</Txt>
+          </Pressable>
+        </View>
 
         <View style={{ paddingHorizontal: spacing.containerMobile, paddingTop: 4, gap: spacing.stackSm }}>
           {filteredBirthdays.length === 0 ? (
@@ -283,19 +297,6 @@ export default function Birthdays() {
         </View>
       </ScrollView>
 
-      {/* Add sits where the thumb reaches, not up in the header. */}
-      <Pressable
-        onPress={() => router.push('/birthday/add' as any)}
-        style={({ pressed }) => [
-          styles.fab,
-          { backgroundColor: c.flame, bottom: insets.bottom + 24 },
-          floatShadow,
-          pressed && { opacity: 0.9, transform: [{ scale: 0.96 }] },
-        ]}
-      >
-        <Icon name="add" size={28} color={c.onFlame} />
-      </Pressable>
-
       <ScrollPickerModal
         visible={filterVisible}
         onClose={() => setFilterVisible(false)}
@@ -319,15 +320,30 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.stackMd,
     zIndex: 40,
   },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.containerMobile,
+    paddingBottom: 16,
+    gap: 12,
+  },
   filterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
     gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: radius.full,
     borderWidth: 1,
+  },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: radius.full,
   },
   card: {
     padding: 16,
@@ -354,16 +370,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: radius.full,
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 50,
   },
   emojiAvatar: {
     width: 56,
