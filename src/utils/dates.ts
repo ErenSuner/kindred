@@ -1,11 +1,7 @@
 // Date helpers shared by people's special days and the user's own events.
 
 import { Recurrence, YEARLY } from '@/utils/recurrence';
-
-const MONTHS_FULL = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
+import i18n from '@/lib/i18n';
 
 // A stored year of 1000 means the user skipped the year field.
 export const SKIPPED_YEAR = 1000;
@@ -14,6 +10,17 @@ export function getOrdinal(n: number) {
   const s = ['th', 'st', 'nd', 'rd'];
   const v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+// A long date, written the way the current language does it: English keeps the
+// ordinal ("August 3rd, 2026"); Turkish has no ordinals and leads with the day
+// ("3 Ağustos 2026").
+function formatLongDate(date: Date): string {
+  const month = i18n.t(`month_${date.getMonth()}`);
+  const day = date.getDate();
+  const year = date.getFullYear();
+  if (i18n.language === 'tr') return `${day} ${month} ${year}`;
+  return `${month} ${getOrdinal(day)}, ${year}`;
 }
 
 export type Occurrence = {
@@ -106,7 +113,7 @@ function resolveAnchor(dateStr: string, recurrence: Recurrence): Anchor {
 function describe(date: Date, anchorYear: number, recurrence: Recurrence, countsAge: boolean): Occurrence {
   const today = startOfToday();
   const daysAway = Math.ceil((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  const formattedDate = `${MONTHS_FULL[date.getMonth()]} ${getOrdinal(date.getDate())}, ${date.getFullYear()}`;
+  const formattedDate = formatLongDate(date);
 
   // Only a birthday has an age to count. Every other yearly day used to get one
   // too, which is where "Anniversary (Turning 1)" came from.
@@ -170,7 +177,7 @@ export function getPastOccurrences(dateStr: string, recurrence: Recurrence, coun
 
 // Formats a date the way the rest of the app writes them.
 export function formatOccurrenceDate(date: Date): string {
-  return `${MONTHS_FULL[date.getMonth()]} ${getOrdinal(date.getDate())}, ${date.getFullYear()}`;
+  return formatLongDate(date);
 }
 
 // 'YYYY-MM-DD' for a Date, in local time — matching how dates are stored.

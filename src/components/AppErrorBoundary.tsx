@@ -3,6 +3,7 @@ import { View, StyleSheet, Pressable, ScrollView, Text } from 'react-native';
 import { light, radius, spacing } from '@/theme/tokens';
 import { type as typeScale } from '@/theme/type';
 import { Icon } from '@/components/Icon';
+import i18n from '@/lib/i18n';
 
 type Props = { children: React.ReactNode };
 type State = { error: Error | null };
@@ -36,18 +37,16 @@ export class AppErrorBoundary extends React.Component<Props, State> {
           <Icon name="sentiment-dissatisfied" size={32} color={c.flameDeep} />
         </View>
 
-        <Text style={[typeScale.heading, styles.title]}>Something went wrong</Text>
+        <Text style={[typeScale.heading, styles.title]}>{i18n.t('something_went_wrong')}</Text>
         <Text style={[typeScale.body, styles.blurb]}>
-          Nothing has been lost — everything you&apos;ve saved is still there. Try again, and if it
-          keeps happening, closing and reopening Kindred usually clears it.
-        </Text>
+          {i18n.t('nothing_has_been_lost_everythi')}</Text>
 
         <Pressable
           onPress={() => this.setState({ error: null })}
           style={({ pressed }) => [styles.button, pressed && { opacity: 0.85 }]}
         >
           <Icon name="refresh" size={18} color={c.onFlame} />
-          <Text style={[typeScale.bodySemi, { color: c.onFlame }]}>Try again</Text>
+          <Text style={[typeScale.bodySemi, { color: c.onFlame }]}>{i18n.t('try_again')}</Text>
         </Pressable>
 
         {/* Only useful while developing, and hidden behind a scroll so it never

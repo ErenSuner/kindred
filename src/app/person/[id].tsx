@@ -20,7 +20,11 @@ import { LookingBack } from '@/components/LookingBack';
 import { PhotoViewer } from '@/components/PhotoViewer';
 import { AboutPerson } from '@/components/AboutPerson';
 import { openInContacts } from '@/utils/contacts';
+import { relationshipLabel } from '@/utils/relationshipLabel';
+import { daysLongLabel } from '@/utils/countdownLabel';
 import type { SpecialDay } from '@/data/mock';
+import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 
 function SpecialDayRow({ day, personId, onLongPress, onMore }: { day: SpecialDay; personId: string; onLongPress?: () => void; onMore?: () => void }) {
   const router = useRouter();
@@ -42,7 +46,7 @@ function SpecialDayRow({ day, personId, onLongPress, onMore }: { day: SpecialDay
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Txt variant="bodyMed">
-            {day.title}{day.turningAge ? ` (Turning ${day.turningAge})` : ''}
+            {day.title}{day.turningAge ? i18n.t('turning_age', { age: day.turningAge }) : ''}
           </Txt>
           <Txt variant="sub" color={c.muted} style={{ marginTop: 2 }}>
             {day.date}
@@ -66,6 +70,7 @@ function SpecialDayRow({ day, personId, onLongPress, onMore }: { day: SpecialDay
 }
 
 export default function PersonDetail() {
+    const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -101,11 +106,9 @@ export default function PersonDetail() {
         </View>
         <Icon name="person-off" size={44} color={c.lineStrong} />
         <Txt variant="heading" style={{ marginTop: 16 }}>
-          Person not found
-        </Txt>
+          {t('person_not_found')}</Txt>
         <Txt variant="body" color={c.muted} style={{ marginTop: 8 }}>
-          They may have been removed.
-        </Txt>
+          {t('they_may_have_been_removed')}</Txt>
       </View>
     );
   }
@@ -124,7 +127,7 @@ export default function PersonDetail() {
       const opened = await openInContacts(person.contactId);
       // A contact id only means something on the phone it came from, so a
       // restored backup will have ids that resolve to nothing.
-      if (!opened) setContactError("They're no longer in this phone's contacts.");
+      if (!opened) setContactError(t('contact_gone'));
     } finally {
       setOpeningContact(false);
     }
@@ -193,7 +196,7 @@ export default function PersonDetail() {
           {/* tags already carries the role, so filter it out — otherwise the
               relationship shows up as two identical chips. */}
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-            <Chip label={person.role} />
+            <Chip label={relationshipLabel(person.role)} />
             {person.tags.filter((t) => t !== person.role).map((t) => (
               <Chip key={t} label={t} />
             ))}
@@ -215,7 +218,7 @@ export default function PersonDetail() {
               <View style={styles.cardHeaderRow}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <View style={[styles.flameDot, { backgroundColor: c.flame }]} />
-                  <Txt variant="eyebrow" color={c.flame}>Next big day</Txt>
+                  <Txt variant="eyebrow" color={c.flame}>{t('next_big_day')}</Txt>
                 </View>
                 <Chip label={person.countdown.tag} tone="ink" />
               </View>
@@ -224,11 +227,7 @@ export default function PersonDetail() {
                 color={c.flame}
                 style={{ fontFamily: fonts.frauncesSemiBold, fontSize: 34, lineHeight: 42, marginTop: 14 }}
               >
-                {person.countdown.days === 0
-                  ? 'Today'
-                  : person.countdown.days === 1
-                  ? 'Tomorrow'
-                  : `in ${person.countdown.days} days`}
+{daysLongLabel(person.countdown.days)}
               </Txt>
 
               <View style={{ marginTop: 6 }}>
@@ -254,7 +253,7 @@ export default function PersonDetail() {
         {/* Birthday */}
         <Animated.View entering={FadeInDown.duration(500).delay(140)} style={{ gap: spacing.stackMd }}>
           <View style={styles.sectionHead}>
-            <Txt variant="eyebrow" color={c.faint}>Birthday</Txt>
+            <Txt variant="eyebrow" color={c.faint}>{t('birthday')}</Txt>
             <View style={[styles.sectionRule, { backgroundColor: c.line }]} />
           </View>
           <InlineBirthdayCard person={person as any} />
@@ -263,7 +262,7 @@ export default function PersonDetail() {
         {/* Special days */}
         <Animated.View entering={FadeInDown.duration(500).delay(180)} style={{ gap: spacing.stackMd }}>
           <View style={styles.sectionHead}>
-            <Txt variant="eyebrow" color={c.faint}>Special days</Txt>
+            <Txt variant="eyebrow" color={c.faint}>{t('special_days')}</Txt>
             <View style={[styles.sectionRule, { backgroundColor: c.line }]} />
           </View>
 
@@ -288,13 +287,12 @@ export default function PersonDetail() {
           ) : (
             <Card style={{ alignItems: 'center' }}>
               <Txt variant="body" color={c.muted}>
-                Anniversaries, graduations, memorials — add one below.
-              </Txt>
+                {t('anniversaries_graduations_memo')}</Txt>
             </Card>
           )}
 
           <Button
-            label="Add special day"
+            label={t('add_special_day')}
             icon="add"
             variant="quiet"
             onPress={() => router.push({ pathname: '/special-day/add', params: { personId: person.id } } as any)}
@@ -334,7 +332,7 @@ export default function PersonDetail() {
               <Button
                 variant="quiet"
                 icon="edit"
-                label="Edit person"
+                label={t('edit_person_action')}
                 fullWidth
                 onPress={() => {
                   setPersonActionsVisible(false);
@@ -345,7 +343,7 @@ export default function PersonDetail() {
                 <Button
                   variant="quiet"
                   icon="person-search"
-                  label={openingContact ? 'Opening…' : 'Open in Contacts'}
+                  label={openingContact ? t('opening') : t('open_in_contacts')}
                   fullWidth
                   disabled={openingContact}
                   onPress={() => {
@@ -357,7 +355,7 @@ export default function PersonDetail() {
               <Button
                 variant="danger"
                 icon="delete-outline"
-                label="Delete person"
+                label={t('delete_person')}
                 fullWidth
                 onPress={() => {
                   setPersonActionsVisible(false);
@@ -382,9 +380,9 @@ export default function PersonDetail() {
               floatShadow,
             ]}
           >
-            <Txt variant="heading" style={{ marginBottom: 24 }}>Options</Txt>
+            <Txt variant="heading" style={{ marginBottom: 24 }}>{t('options')}</Txt>
             <Button
-              label="Delete special day"
+              label={t('delete_special_day')}
               variant="danger"
               icon="delete-outline"
               fullWidth
@@ -394,7 +392,7 @@ export default function PersonDetail() {
                 setDayConfirmVisible(true);
               }}
             />
-            <Button label="Cancel" variant="quiet" fullWidth onPress={() => setDayActionVisible(false)} />
+            <Button label={t('cancel')} variant="quiet" fullWidth onPress={() => setDayActionVisible(false)} />
           </Animated.View>
         </Animated.View>
       </Modal>
@@ -410,20 +408,19 @@ export default function PersonDetail() {
             <View style={[styles.modalIconWrap, { backgroundColor: c.dangerWash }]}>
               <Icon name="delete-outline" size={30} color={c.danger} />
             </View>
-            <Txt variant="heading" style={{ marginTop: 16 }}>Delete special day</Txt>
+            <Txt variant="heading" style={{ marginTop: 16 }}>{t('delete_special_day')}</Txt>
             <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center' }}>
-              This removes the day and its reminders. You&apos;ll have a moment to undo it.
-            </Txt>
+              {t('this_removes_the_day_and')}</Txt>
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, width: '100%' }}>
-              <Button label="Cancel" onPress={() => setDayConfirmVisible(false)} variant="quiet" style={{ flex: 1 }} />
+              <Button label={t('cancel')} onPress={() => setDayConfirmVisible(false)} variant="quiet" style={{ flex: 1 }} />
               <Button
-                label="Delete"
+                label={t('delete')}
                 variant="dangerSolid"
                 onPress={() => {
                   if (!selectedDayId) return;
                   {
                     const day = person.specialDays?.find((d) => d.id === selectedDayId);
-                    deleteSpecialDayWithUndo(selectedDayId, day?.title ?? 'Special day');
+                    deleteSpecialDayWithUndo(selectedDayId, day?.title ?? i18n.t('special_day'));
                     setDayConfirmVisible(false);
                     setSelectedDayId(null);
                   }
@@ -446,14 +443,12 @@ export default function PersonDetail() {
             <View style={[styles.modalIconWrap, { backgroundColor: c.dangerWash }]}>
               <Icon name="delete-outline" size={30} color={c.danger} />
             </View>
-            <Txt variant="heading" style={{ marginTop: 16 }}>Delete person</Txt>
+            <Txt variant="heading" style={{ marginTop: 16 }}>{t('delete_person')}</Txt>
             <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center' }}>
-              This removes {person.name} along with their days and notes. You&apos;ll have a moment to
-              undo it.
-            </Txt>
+              {t('delete_person_body', { name: person.name })}</Txt>
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, width: '100%' }}>
-              <Button label="Cancel" onPress={() => setDeleteConfirmVisible(false)} variant="quiet" style={{ flex: 1 }} />
-              <Button label="Delete" onPress={executeDelete} variant="dangerSolid" style={{ flex: 1 }} />
+              <Button label={t('cancel')} onPress={() => setDeleteConfirmVisible(false)} variant="quiet" style={{ flex: 1 }} />
+              <Button label={t('delete')} onPress={executeDelete} variant="dangerSolid" style={{ flex: 1 }} />
             </View>
           </Animated.View>
         </View>
@@ -470,13 +465,12 @@ export default function PersonDetail() {
             <View style={[styles.modalIconWrap, { backgroundColor: c.dangerWash }]}>
               <Icon name="delete-outline" size={30} color={c.danger} />
             </View>
-            <Txt variant="heading" style={{ marginTop: 16 }}>Delete note</Txt>
+            <Txt variant="heading" style={{ marginTop: 16 }}>{t('delete_note')}</Txt>
             <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center' }}>
-              The note disappears right away, with a moment to undo it.
-            </Txt>
+              {t('the_note_disappears_right_away')}</Txt>
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, width: '100%' }}>
-              <Button label="Cancel" onPress={() => setDeleteNoteConfirmVisible(false)} variant="quiet" style={{ flex: 1 }} />
-              <Button label="Delete" onPress={executeDeleteNote} variant="dangerSolid" style={{ flex: 1 }} />
+              <Button label={t('cancel')} onPress={() => setDeleteNoteConfirmVisible(false)} variant="quiet" style={{ flex: 1 }} />
+              <Button label={t('delete')} onPress={executeDeleteNote} variant="dangerSolid" style={{ flex: 1 }} />
             </View>
           </Animated.View>
         </View>

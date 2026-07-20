@@ -6,14 +6,15 @@ import { radius } from '@/theme/tokens';
 import { useTheme } from '@/theme/ThemeContext';
 import { Icon } from '@/components/Icon';
 import { Txt } from '@/components/Txt';
+import { useTranslation } from 'react-i18next';
 
 type TabDef = { name: string; label: string; icon: React.ComponentProps<typeof Icon>['name'] };
 
-const TABS: TabDef[] = [
-  { name: 'home', label: 'Home', icon: 'home' },
-  { name: 'add', label: 'People', icon: 'people' },
-  { name: 'events', label: 'Events', icon: 'event' },
-  { name: 'settings', label: 'Settings', icon: 'settings' },
+const TABS: (Omit<TabDef, 'label'> & { labelKey: string })[] = [
+  { name: 'home', labelKey: 'tab_home', icon: 'home' },
+  { name: 'add', labelKey: 'tab_people', icon: 'people' },
+  { name: 'events', labelKey: 'tab_events', icon: 'event' },
+  { name: 'settings', labelKey: 'tab_settings', icon: 'settings' },
 ];
 
 // How the active pill and its neighbours resize when the tab changes. One
@@ -25,6 +26,7 @@ const SLIDE = LinearTransition.springify().damping(20).stiffness(180);
 // quiet icons. That keeps the bar from being a row of cramped micro-captions,
 // and gives switching tabs something that moves.
 function TabBar({ state, navigation }: any) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { c, floatShadow } = useTheme();
 
@@ -47,7 +49,7 @@ function TabBar({ state, navigation }: any) {
               onPress={onPress}
               accessibilityRole="tab"
               accessibilityState={{ selected: focused }}
-              accessibilityLabel={def.label}
+              accessibilityLabel={t(def.labelKey)}
               hitSlop={6}
             >
               <Animated.View
@@ -61,7 +63,7 @@ function TabBar({ state, navigation }: any) {
                 {focused && (
                   <Animated.View entering={FadeIn.duration(160)}>
                     <Txt variant="label" color={c.onFlame} numberOfLines={1}>
-                      {def.label}
+                      {t(def.labelKey)}
                     </Txt>
                   </Animated.View>
                 )}

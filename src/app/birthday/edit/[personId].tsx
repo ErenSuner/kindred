@@ -19,6 +19,8 @@ import { showHeld } from '@/components/HeldNotice';
 import { usePeople } from '@/context/PeopleContext';
 import { Nudge, parseNudges, serializeNudges } from '@/utils/nudges';
 import { SKIPPED_YEAR } from '@/utils/dates';
+import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   const { c } = useTheme();
@@ -30,6 +32,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 }
 
 export default function EditBirthday() {
+    const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c, floatShadow } = useTheme();
@@ -92,7 +95,7 @@ export default function EditBirthday() {
     setError(null);
 
     if (!day || !month) {
-      setError('Pick a day and a month.');
+      setError(i18n.t('pick_a_day_and_a_month'));
       return;
     }
     if (!birthday) return;
@@ -119,7 +122,7 @@ export default function EditBirthday() {
         `${person?.name ?? 'Their'}'s birthday is remembered`,
         reminders.length > 0
           ? `On the day, plus ${reminders.length} earlier ${reminders.length === 1 ? 'reminder' : 'reminders'}`
-          : "We'll remind you on the day",
+          : i18n.t('we_ll_remind_you_on_the_day'),
       );
     } catch (e) {
       console.error(e);
@@ -140,7 +143,7 @@ export default function EditBirthday() {
   if (!birthday) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg }}>
-        <Txt variant="body" color={c.muted}>Loading…</Txt>
+        <Txt variant="body" color={c.muted}>{t('loading')}</Txt>
       </View>
     );
   }
@@ -152,8 +155,7 @@ export default function EditBirthday() {
           <Icon name="arrow-back" size={24} color={c.muted} />
         </Pressable>
         <Txt variant="title" style={{ flex: 1, textAlign: 'center' }}>
-          Edit birthday
-        </Txt>
+          {t('edit_birthday')}</Txt>
         <Pressable onPress={() => setDeleteConfirmVisible(true)} hitSlop={8}>
           <Icon name="delete-outline" size={24} color={c.danger} />
         </Pressable>
@@ -169,12 +171,12 @@ export default function EditBirthday() {
             <Animated.View entering={FadeInDown.duration(500).delay(100)}>
               <Card style={{ gap: spacing.stackMd }}>
                 <View style={styles.cardHeader}>
-                  <Txt variant="heading">Birthday</Txt>
+                  <Txt variant="heading">{t('birthday')}</Txt>
                   <Icon name="cake" size={22} color={c.flameDeep} />
                 </View>
 
                 <View style={{ gap: 6 }}>
-                  <FieldLabel>Date · year optional</FieldLabel>
+                  <FieldLabel>{t('date_year_optional')}</FieldLabel>
                   <DateFields value={date} onChange={setDate} yearMode="past" />
                 </View>
 
@@ -183,7 +185,7 @@ export default function EditBirthday() {
                 <NotesEditor
                   notes={notes}
                   onChange={setNotes}
-                  blurb="Gift ideas, plans, anything you want to remember for this birthday."
+                  blurb={i18n.t('gift_ideas_plans_anything_you_')}
                 />
               </Card>
             </Animated.View>
@@ -193,7 +195,7 @@ export default function EditBirthday() {
 
           <Animated.View entering={FadeInDown.duration(500).delay(200)} style={{ alignItems: 'center' }}>
             <Button
-              label={saving ? 'Saving…' : 'Save changes'}
+              label={saving ? i18n.t('saving') : i18n.t('save_changes')}
               icon="check"
               onPress={handleSubmit}
               disabled={saving}
@@ -212,14 +214,12 @@ export default function EditBirthday() {
             <View style={[styles.deleteIconWrap, { backgroundColor: c.dangerWash }]}>
               <Icon name="delete-outline" size={30} color={c.danger} />
             </View>
-            <Txt variant="heading" style={{ marginTop: 16 }}>Delete birthday</Txt>
+            <Txt variant="heading" style={{ marginTop: 16 }}>{t('delete_birthday')}</Txt>
             <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center' }}>
-              This removes {person?.name ?? 'their'}&apos;s birthday and any notes kept with it.
-              You&apos;ll have a moment to undo it.
-            </Txt>
+              {t('delete_birthday_body', { name: person?.name ?? 'their' })}</Txt>
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, width: '100%' }}>
-              <Button label="Cancel" onPress={() => setDeleteConfirmVisible(false)} variant="quiet" style={{ flex: 1 }} />
-              <Button label="Delete" onPress={executeDelete} variant="dangerSolid" style={{ flex: 1 }} />
+              <Button label={t('cancel')} onPress={() => setDeleteConfirmVisible(false)} variant="quiet" style={{ flex: 1 }} />
+              <Button label={t('delete')} onPress={executeDelete} variant="dangerSolid" style={{ flex: 1 }} />
             </View>
           </Animated.View>
         </View>

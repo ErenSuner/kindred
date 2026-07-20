@@ -3,6 +3,7 @@ import { StyleSheet, Pressable, TextInput } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { radius } from '@/theme/tokens';
 import { useTheme } from '@/theme/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import { fonts } from '@/theme/type';
 import { Icon } from '@/components/Icon';
 
@@ -12,7 +13,9 @@ type Props = {
   placeholder?: string;
 };
 
-export function SearchBar({ value, onChange, placeholder = 'Search' }: Props) {
+export function SearchBar({ value, onChange, placeholder }: Props) {
+  const { t } = useTranslation();
+  const ph = placeholder ?? t('search');
   const inputRef = useRef<TextInput>(null);
   const { c } = useTheme();
 
@@ -26,7 +29,7 @@ export function SearchBar({ value, onChange, placeholder = 'Search' }: Props) {
         ref={inputRef}
         value={value}
         onChangeText={onChange}
-        placeholder={placeholder}
+        placeholder={ph}
         placeholderTextColor={c.faint}
         style={[styles.input, { color: c.text }]}
         autoCorrect={false}

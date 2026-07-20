@@ -25,13 +25,8 @@ import { useHolidays } from '@/context/HolidaysContext';
 import { useAuth } from '@/context/AuthContext';
 import { formatTimeOfDay } from '@/utils/eventTime';
 import { TimelineEntry, buildTimeline } from '@/utils/timeline';
-
-// A countdown is anticipation, not a deadline.
-function countdown(daysAway: number): string {
-  if (daysAway === 0) return 'Today';
-  if (daysAway === 1) return 'Tomorrow';
-  return `${daysAway} days`;
-}
+import { daysChipLabel, daysLongLabel } from '@/utils/countdownLabel';
+import { useTranslation } from "react-i18next";
 
 // The candle mark: a small amber dot that breathes gently when something is
 // happening today. The same mark the Held notice uses — the lamp is lit.
@@ -63,6 +58,7 @@ function FlameDot({ today }: { today: boolean }) {
 // not list people or reminders — those are whole tabs of their own, and having
 // them here too meant the same thing appeared twice under different headings.
 export default function Home() {
+    const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
@@ -98,6 +94,7 @@ export default function Home() {
   // identically sized rows is honest about the order but says nothing about
   // weight, and the one thing you actually need to know is what's next.
   const hero = groups[0]?.entries[0];
+  const heroKey = groups[0]?.key;
   const heroLabel = groups[0]?.label;
 
   // The timeline below picks up where the hero left off, so it isn't shown
@@ -127,14 +124,14 @@ export default function Home() {
             orphaned wordmark, nothing competing on the right. */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.welcome}>
           <Txt variant="sub" color={c.muted} style={{ marginBottom: 6, textTransform: 'capitalize' }}>
-            Welcome back, {userName}
+            {t('home_welcome', { name: userName })}
           </Txt>
           <Txt variant="display">
-            {total === 0 ? 'All quiet for now.' : 'Coming up.'}
+            {total === 0 ? t('all_quiet') : t('coming_up_headline')}
           </Txt>
         </Animated.View>
 
-        <FormError message={loadError} onRetry={refreshPeople} retryLabel="Retry" />
+        <FormError message={loadError} onRetry={refreshPeople} retryLabel={t('try_again')} />
 
         {/* An empty list on a failed load means "couldn't fetch", not "you have
             nobody", so the invitation is held back until the load succeeded. */}
@@ -146,12 +143,12 @@ export default function Home() {
                   <Icon name={nothingAtAll ? 'people' : 'event'} size={30} color={c.flameDeep} />
                 </View>
                 <Txt variant="heading" style={{ textAlign: 'center', marginTop: 20 }}>
-                  {nothingAtAll ? 'Nobody here yet' : 'No dates yet'}
+                  {nothingAtAll ? t('nobody_here_yet') : t('no_dates_yet')}
                 </Txt>
                 <Txt variant="body" color={c.muted} style={styles.emptyBlurb}>
                   {nothingAtAll
-                    ? 'Add the people you care about and their days will show up here, soonest first.'
-                    : 'Add a birthday or a special day to someone, and it will appear here.'}
+                    ? t('home_empty_people')
+                    : t('home_empty_dates')}
                 </Txt>
                 <Pressable
                   onPress={() => router.push('/add')}
@@ -161,7 +158,7 @@ export default function Home() {
                     pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
                   ]}
                 >
-                  <Txt variant="bodySemi" color={c.onFlame}>Go to your people</Txt>
+                  <Txt variant="bodySemi" color={c.onFlame}>{t('go_to_your_people')}</Txt>
                   <Icon name="arrow-forward" size={18} color={c.onFlame} />
                 </Pressable>
               </View>
@@ -180,7 +177,7 @@ export default function Home() {
               <View style={styles.heroEyebrowRow}>
                 <FlameDot today={hero.daysAway === 0} />
                 <Txt variant="eyebrow" color={c.flame}>
-                  {heroLabel === 'Today' ? 'Today' : `Next up · ${heroLabel}`}
+                  {heroKey === 'today' ? t('today') : t('next_up_group', { label: heroLabel })}
                 </Txt>
               </View>
 
@@ -210,11 +207,7 @@ export default function Home() {
                   color={c.flame}
                   style={{ fontFamily: fonts.frauncesSemiBold, fontSize: 30, lineHeight: 36 }}
                 >
-                  {hero.daysAway === 0
-                    ? 'Today'
-                    : hero.daysAway === 1
-                    ? 'Tomorrow'
-                    : `in ${hero.daysAway} days`}
+                  {daysLongLabel(hero.daysAway)}
                 </Txt>
               </View>
 
@@ -284,7 +277,7 @@ export default function Home() {
                       color={entry.daysAway === 0 ? c.flameDeep : c.muted}
                       style={{ fontSize: 13, lineHeight: 17 }}
                     >
-                      {countdown(entry.daysAway)}
+                      {daysChipLabel(entry.daysAway)}
                     </Txt>
                   </View>
                 </Card>

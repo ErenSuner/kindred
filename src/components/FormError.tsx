@@ -2,6 +2,7 @@ import { StyleSheet, Pressable } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { radius } from '@/theme/tokens';
 import { useTheme } from '@/theme/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 
@@ -13,7 +14,9 @@ type Props = {
 
 // Inline replacement for alert(): stays on screen next to the thing that failed
 // instead of interrupting, and can offer a way out.
-export function FormError({ message, onRetry, retryLabel = 'Try again' }: Props) {
+export function FormError({ message, onRetry, retryLabel }: Props) {
+  const { t } = useTranslation();
+  const retry = retryLabel ?? t('try_again');
   const { c } = useTheme();
   if (!message) return null;
 
@@ -37,7 +40,7 @@ export function FormError({ message, onRetry, retryLabel = 'Try again' }: Props)
             pressed && { opacity: 0.7 },
           ]}
         >
-          <Txt variant="subMed" color={c.danger}>{retryLabel}</Txt>
+          <Txt variant="subMed" color={c.danger}>{retry}</Txt>
         </Pressable>
       )}
     </Animated.View>

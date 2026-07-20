@@ -15,9 +15,11 @@ import {
   PRESET_OFFSET_DAYS,
   PRESET_REMINDERS,
   leadLabel,
+  nudgeLabel,
   leadValue,
   offsetDaysFor,
 } from '@/utils/nudges';
+import { useTranslation } from "react-i18next";
 
 export const MAX_REMINDERS = 4;
 
@@ -37,6 +39,7 @@ type Props = {
 const ALL_PRESETS = PRESET_REMINDERS.filter((p) => p.value !== DAY_OF);
 
 export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
+    const { t } = useTranslation();
   const { c, floatShadow } = useTheme();
   const [pickerVisible, setPickerVisible] = useState(false);
   const [leadAmount, setLeadAmount] = useState(4);
@@ -84,15 +87,14 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
     <View style={[styles.box, { backgroundColor: c.surface, borderColor: c.line }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Icon name="notifications-active" size={16} color={c.flameDeep} />
-        <Txt variant="subMed">Gentle nudges</Txt>
+        <Txt variant="subMed">{t('gentle_nudges')}</Txt>
       </View>
 
       {/* Stated, not offered — the day itself is not something to switch off. */}
       <View style={styles.guaranteed}>
         <Icon name="check-circle" size={16} color={c.good} />
         <Txt variant="sub" color={c.muted} style={{ flex: 1 }}>
-          You&apos;ll always be reminded on the day itself.
-        </Txt>
+          {t('you_apos_ll_always_be')}</Txt>
       </View>
 
       {sorted.length > 0 && (
@@ -107,7 +109,7 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
                 pressed && { opacity: 0.75 },
               ]}
             >
-              <Txt variant="label" color={c.flameDeep}>{r.label}</Txt>
+              <Txt variant="label" color={c.flameDeep}>{nudgeLabel(r.value)}</Txt>
               <Icon name="close" size={13} color={c.flameDeep} />
             </Pressable>
           ))}
@@ -128,7 +130,7 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
       >
         <Icon name="add" size={18} color={c.flameDeep} />
         <Txt variant="label" color={c.flameDeep}>
-          {sorted.length > 0 ? `Earlier reminders (${sorted.length}/${MAX_REMINDERS})` : 'Remind me earlier too'}
+          {sorted.length > 0 ? t('earlier_reminders_count', { n: sorted.length, max: MAX_REMINDERS }) : t('remind_earlier_too')}
         </Txt>
       </Pressable>
 
@@ -143,10 +145,9 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
                 <View style={[styles.handle, { backgroundColor: c.lineStrong }]} />
               </View>
 
-              <Txt variant="heading">Remind me earlier</Txt>
+              <Txt variant="heading">{t('remind_me_earlier')}</Txt>
               <Txt variant="sub" color={c.muted} style={{ marginTop: 4, marginBottom: 20 }}>
-                Tap to turn one on or off. Up to {MAX_REMINDERS}, on top of the day itself.
-              </Txt>
+                {t('reminders_help', { max: MAX_REMINDERS })}</Txt>
 
               {/* Toggles, not checkboxes: on is solid, off is faded. */}
               <View style={styles.optionWrap}>
@@ -156,7 +157,7 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
                   return (
                     <Pressable
                       key={preset.value}
-                      onPress={() => toggle({ type: 'preset', label: preset.label, value: preset.value })}
+                      onPress={() => toggle({ type: 'preset', label: nudgeLabel(preset.value), value: preset.value })}
                       style={({ pressed }) => [
                         styles.option,
                         {
@@ -169,7 +170,7 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
                       ]}
                     >
                       <Txt variant="subMed" color={on ? c.onInk : c.muted}>
-                        {preset.label}
+                        {nudgeLabel(preset.value)}
                       </Txt>
                     </Pressable>
                   );
@@ -185,7 +186,7 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
               >
                 <View style={[styles.rule, { backgroundColor: c.line }]} />
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Txt variant="eyebrow" color={c.faint}>Or a specific amount</Txt>
+                  <Txt variant="eyebrow" color={c.faint}>{t('or_a_specific_amount')}</Txt>
                   <Icon
                     name={customOpen ? 'expand-less' : 'expand-more'}
                     size={16}
@@ -222,13 +223,13 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
                 >
                   <Txt variant="body">
                     {leadAmount === 1
-                      ? LEAD_UNITS.find((u) => u.value === leadUnit)?.label
-                      : LEAD_UNITS.find((u) => u.value === leadUnit)?.plural}
+                      ? t(`unit_${leadUnit}`)
+                      : t(`unit_${leadUnit}s`)}
                   </Txt>
                   <Icon name="expand-more" size={16} color={c.muted} />
                 </Pressable>
 
-                <Txt variant="body" color={c.muted}>before</Txt>
+                <Txt variant="body" color={c.muted}>{t('before')}</Txt>
               </View>
 
               <Pressable
@@ -243,7 +244,7 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
               >
                 <Icon name={customChosen ? 'check' : 'add'} size={18} color={c.onFlame} />
                 <Txt variant="label" color={c.onFlame}>
-                  {customChosen ? 'Already added' : customMatchesPreset ? 'Already an option above' : `Add ${leadLabel(leadAmount, leadUnit)}`}
+                  {customChosen ? t('already_added') : customMatchesPreset ? t('already_option') : t('add_lead', { label: leadLabel(leadAmount, leadUnit) })}
                 </Txt>
               </Pressable>
                 </Animated.View>
@@ -252,13 +253,12 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
               {atLimit && (
                 <Animated.View entering={FadeIn.duration(180)}>
                   <Txt variant="sub" color={c.muted} style={styles.limitNote}>
-                    That&apos;s {MAX_REMINDERS} — turn one off to add another.
-                  </Txt>
+                    {t('reminders_limit', { max: MAX_REMINDERS })}</Txt>
                 </Animated.View>
               )}
 
               <Pressable onPress={() => setPickerVisible(false)} style={styles.doneBtn}>
-                <Txt variant="label" color={c.flameDeep}>Done</Txt>
+                <Txt variant="label" color={c.flameDeep}>{t('done')}</Txt>
               </Pressable>
             </Pressable>
           </Animated.View>
@@ -268,7 +268,7 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
       <ScrollPickerModal
         visible={amountPickerVisible}
         onClose={() => setAmountPickerVisible(false)}
-        title="How many?"
+        title={t('how_many')}
         options={Array.from({ length: MAX_LEAD_PICK }, (_, i) => ({ label: String(i + 1), value: i + 1 }))}
         selectedValue={leadAmount}
         onSelect={(v) => {
@@ -280,8 +280,8 @@ export function ReminderEditor({ reminders, onChange, maxLeadDays }: Props) {
       <ScrollPickerModal
         visible={unitPickerVisible}
         onClose={() => setUnitPickerVisible(false)}
-        title={LEAD_UNIT_OPTIONS.length === 1 ? 'How far ahead?' : 'Days, weeks or months?'}
-        options={LEAD_UNIT_OPTIONS.map((u) => ({ label: u.plural, value: u.value }))}
+        title={LEAD_UNIT_OPTIONS.length === 1 ? t('how_far_ahead') : t('days_weeks_months')}
+        options={LEAD_UNIT_OPTIONS.map((u) => ({ label: t(`unit_${u.value}s`), value: u.value }))}
         selectedValue={leadUnit}
         onSelect={(v) => {
           setLeadUnit(v as LeadUnit);

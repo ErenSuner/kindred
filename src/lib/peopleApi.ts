@@ -10,6 +10,7 @@ import type { Note, Relationship } from '@/data/mock';
 import { removeAvatarByUrl } from '@/utils/avatars';
 import { MEMORY, NOTEBOOK } from '@/utils/notes';
 import { Recurrence, YEARLY, serializeRecurrence } from '@/utils/recurrence';
+import i18n from "@/lib/i18n";
 
 // Which occasion a note hangs off, if any. Omitting it writes a general note
 // about the person. Birthdays are special days now, so they use the same target.
@@ -183,7 +184,7 @@ export async function insertSpecialDay(
       .single(),
   );
 
-  await attachNotes(personId, inserted.id, data.notes, 'Special day');
+  await attachNotes(personId, inserted.id, data.notes, i18n.t('special_day'));
 }
 
 export async function updateSpecialDayRow(

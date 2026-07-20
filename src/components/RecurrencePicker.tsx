@@ -16,14 +16,15 @@ import {
   recurrenceDescription,
   recurrenceIcon,
 } from '@/utils/recurrence';
+import { useTranslation } from "react-i18next";
 
-type Quick = { label: string; value: Recurrence };
+type Quick = { labelKey: string; value: Recurrence };
 
 const QUICK_OPTIONS: Quick[] = [
-  { label: 'Once', value: ONE_TIME },
-  { label: 'Weekly', value: WEEKLY },
-  { label: 'Monthly', value: MONTHLY },
-  { label: 'Yearly', value: YEARLY },
+  { labelKey: 'rec_once', value: ONE_TIME },
+  { labelKey: 'rec_weekly_opt', value: WEEKLY },
+  { labelKey: 'rec_monthly_opt', value: MONTHLY },
+  { labelKey: 'rec_yearly_opt', value: YEARLY },
 ];
 
 // Custom is for the short cycles the quick chips don't cover. "Every N years"
@@ -31,10 +32,10 @@ const QUICK_OPTIONS: Quick[] = [
 // on a multi-year cycle.
 type CustomUnit = 'day' | 'week' | 'month';
 
-const UNIT_OPTIONS: { label: string; value: CustomUnit }[] = [
-  { label: 'Days', value: 'day' },
-  { label: 'Weeks', value: 'week' },
-  { label: 'Months', value: 'month' },
+const UNIT_OPTIONS: { labelKey: string; value: CustomUnit }[] = [
+  { labelKey: 'opt_days', value: 'day' },
+  { labelKey: 'opt_weeks', value: 'week' },
+  { labelKey: 'opt_months', value: 'month' },
 ];
 
 function matchesQuick(r: Recurrence, quick: Recurrence) {
@@ -57,6 +58,7 @@ type Props = {
 };
 
 export function RecurrencePicker({ value, onChange }: Props) {
+    const { t } = useTranslation();
   const { c } = useTheme();
   const [customMode, setCustomMode] = useState(() => isCustom(value));
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -89,7 +91,7 @@ export function RecurrencePicker({ value, onChange }: Props) {
     <View style={[styles.box, { backgroundColor: c.surface, borderColor: c.line }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Icon name={recurrenceIcon(value)} size={16} color={c.flameDeep} />
-        <Txt variant="subMed">Repeats</Txt>
+        <Txt variant="subMed">{t('repeats')}</Txt>
       </View>
       <Txt variant="sub" color={c.muted} style={{ marginTop: 4, marginBottom: 12 }}>
         {recurrenceDescription(value)}
@@ -100,12 +102,12 @@ export function RecurrencePicker({ value, onChange }: Props) {
           const active = !showCustom && matchesQuick(value, option.value);
           return (
             <Pressable
-              key={option.label}
+              key={option.labelKey}
               onPress={() => selectQuick(option.value)}
               style={({ pressed }) => [styles.chip, chipLook(active), pressed && { opacity: 0.8 }]}
             >
               <Txt variant="label" color={active ? c.onInk : c.muted}>
-                {option.label}
+                {t(option.labelKey)}
               </Txt>
             </Pressable>
           );
@@ -117,14 +119,13 @@ export function RecurrencePicker({ value, onChange }: Props) {
         >
           <Icon name="tune" size={12} color={showCustom ? c.onInk : c.muted} />
           <Txt variant="label" color={showCustom ? c.onInk : c.muted}>
-            Custom
-          </Txt>
+            {t('custom')}</Txt>
         </Pressable>
       </View>
 
       {showCustom && (
         <Animated.View entering={FadeIn.duration(200)} style={styles.customRow}>
-          <Txt variant="body" color={c.muted}>Every</Txt>
+          <Txt variant="body" color={c.muted}>{t('every')}</Txt>
           <Pressable
             onPress={() => { setPickerType('interval'); setPickerVisible(true); }}
             style={[styles.stepper, { minWidth: 64, backgroundColor: c.surfaceAlt, borderColor: c.line }]}
@@ -137,7 +138,7 @@ export function RecurrencePicker({ value, onChange }: Props) {
             style={[styles.stepper, { flex: 1, backgroundColor: c.surfaceAlt, borderColor: c.line }]}
           >
             <Txt variant="body">
-              {UNIT_OPTIONS.find((u) => u.value === customUnit)?.label}
+              {t(UNIT_OPTIONS.find((u) => u.value === customUnit)?.labelKey ?? '')}
             </Txt>
             <Icon name="expand-more" size={16} color={c.muted} />
           </Pressable>
@@ -147,11 +148,11 @@ export function RecurrencePicker({ value, onChange }: Props) {
       <ScrollPickerModal
         visible={pickerVisible}
         onClose={() => setPickerVisible(false)}
-        title={pickerType === 'interval' ? 'Repeat Every' : 'Repeat Unit'}
+        title={pickerType === 'interval' ? t('repeat_every_title') : t('repeat_unit_title')}
         options={
           pickerType === 'interval'
             ? Array.from({ length: MAX_INTERVAL }, (_, i) => ({ label: String(i + 1), value: i + 1 }))
-            : UNIT_OPTIONS
+            : UNIT_OPTIONS.map((u) => ({ label: t(u.labelKey), value: u.value }))
         }
         selectedValue={pickerType === 'interval' ? customInterval : customUnit}
         onSelect={(val) => {

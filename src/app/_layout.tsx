@@ -5,6 +5,8 @@ import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Notifications from 'expo-notifications';
+import i18n from '../lib/i18n';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   useFonts,
   Fraunces_500Medium,
@@ -143,6 +145,14 @@ export default function RootLayout() {
       }
     }
     reqPerm();
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.getItem('app_language').then((lang) => {
+      if (lang) {
+        i18n.changeLanguage(lang);
+      }
+    });
   }, []);
 
   if (!loaded) return null;

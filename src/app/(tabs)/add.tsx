@@ -16,9 +16,13 @@ import { FormError } from '@/components/FormError';
 import { NotePreview } from '@/components/NotePreview';
 import { usePeople } from '@/context/PeopleContext';
 import { searchPeople } from '@/utils/search';
+import { daysChipLabel } from '@/utils/countdownLabel';
+import { relationshipLabel } from '@/utils/relationshipLabel';
 import type { Person } from '@/data/mock';
+import { useTranslation } from "react-i18next";
 
 export default function Connections() {
+    const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c, floatShadow } = useTheme();
@@ -68,7 +72,7 @@ export default function Connections() {
             <Txt variant="bodySemi" numberOfLines={1}>{person.name}</Txt>
             {person.isPinned && <Icon name="push-pin" size={15} color={c.flameDeep} />}
           </View>
-          <Chip label={person.eventTag} />
+          <Chip label={relationshipLabel(person.eventTag)} />
         </View>
       </View>
 
@@ -85,11 +89,7 @@ export default function Connections() {
               color={person.daysAway === 0 ? c.flameDeep : c.muted}
               style={{ fontSize: 13, lineHeight: 17 }}
             >
-              {person.daysAway === 0
-                ? 'Today'
-                : person.daysAway === 1
-                ? 'Tomorrow'
-                : `${person.daysAway} days`}
+              {daysChipLabel(person.daysAway)}
             </Txt>
           </View>
         )}
@@ -120,7 +120,7 @@ export default function Connections() {
         {/* Title row with the two ways in: importing is the faster path for
             most people, so it sits beside the manual one, quieter. */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.titleRow}>
-          <Txt variant="display" style={{ flex: 1 }}>People</Txt>
+          <Txt variant="display" style={{ flex: 1 }}>{t('people')}</Txt>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Pressable
               onPress={() => router.push('/import-contacts' as any)}
@@ -131,7 +131,7 @@ export default function Connections() {
               ]}
             >
               <Icon name="contacts" size={17} color={c.muted} />
-              <Txt variant="label" color={c.muted}>Import</Txt>
+              <Txt variant="label" color={c.muted}>{t('import')}</Txt>
             </Pressable>
 
             <Pressable
@@ -143,29 +143,30 @@ export default function Connections() {
               ]}
             >
               <Icon name="person-add" size={17} color={c.onFlame} />
-              <Txt variant="label" color={c.onFlame}>New</Txt>
+              <Txt variant="label" color={c.onFlame}>{t('new')}</Txt>
             </Pressable>
           </View>
         </Animated.View>
 
-        <FormError message={loadError} onRetry={refreshPeople} retryLabel="Retry" />
-
-        {/* Browsing birthdays by month is a view onto these same people, so its
-            way in lives here rather than as a shortcut competing on Home. A
-            surface row, like the person cards below — not a heavy amber bar. */}
-        {people.length > 0 && (
-          <Card onPress={() => router.push('/birthdays')} style={styles.birthdaysStrip}>
-            <View style={[styles.birthdaysIcon, { backgroundColor: c.flameWash }]}>
-              <Icon name="cake" size={18} color={c.flameDeep} />
-            </View>
-            <Txt variant="bodyMed" style={{ flex: 1 }}>Birthdays by month</Txt>
-            <Icon name="chevron-right" size={20} color={c.faint} />
-          </Card>
-        )}
+        <FormError message={loadError} onRetry={refreshPeople} retryLabel={t('try_again')} />
 
         {/* Search — hidden until there's something to search through */}
         {people.length > 0 && (
-          <SearchBar value={query} onChange={setQuery} placeholder="Search people, days, notes" />
+          <SearchBar value={query} onChange={setQuery} placeholder={t('search_people_days_notes')} />
+        )}
+
+        {/* Browsing birthdays by month is a quiet, secondary way into the same
+            people — a small link under search, not a bar above it. */}
+        {people.length > 0 && !searching && (
+          <Pressable
+            onPress={() => router.push('/birthdays')}
+            hitSlop={8}
+            style={({ pressed }) => [styles.birthdaysLink, pressed && { opacity: 0.6 }]}
+          >
+            <Icon name="cake" size={15} color={c.flameDeep} />
+            <Txt variant="label" color={c.flameDeep}>{t('birthdays_by_month')}</Txt>
+            <Icon name="chevron-right" size={16} color={c.flameDeep} />
+          </Pressable>
         )}
 
         {/* Search results replace the list while a query is active */}
@@ -173,19 +174,17 @@ export default function Connections() {
           <Animated.View entering={FadeIn.duration(200)} style={{ gap: spacing.stackSm }}>
             <Txt variant="eyebrow" color={c.faint}>
               {hits.length === 0
-                ? 'No matches'
-                : `${hits.length} ${hits.length === 1 ? 'result' : 'results'}`}
+                ? t('no_matches_short')
+                : t('results_count', { count: hits.length })}
             </Txt>
 
             {hits.length === 0 ? (
               <View style={styles.noResults}>
                 <Icon name="search-off" size={32} color={c.lineStrong} />
                 <Txt variant="body" color={c.muted} style={{ marginTop: 12, textAlign: 'center' }}>
-                  Nothing matches &ldquo;{query.trim()}&rdquo;.
-                </Txt>
+                  {t('no_matches', { q: query.trim() })}</Txt>
                 <Txt variant="sub" color={c.faint} style={{ marginTop: 6, textAlign: 'center' }}>
-                  Try a name, an occasion, or something you wrote in a note.
-                </Txt>
+                  {t('try_a_name_an_occasion')}</Txt>
               </View>
             ) : (
               hits.map((hit) => {
@@ -241,7 +240,7 @@ export default function Connections() {
                           color={day.daysAway === 0 ? c.flameDeep : c.muted}
                           style={{ fontSize: 13, lineHeight: 17 }}
                         >
-                          {day.daysAway === 0 ? 'Today' : `${day.daysAway} days`}
+                          {daysChipLabel(day.daysAway)}
                         </Txt>
                       </View>
                     )}
@@ -258,11 +257,9 @@ export default function Connections() {
           <Animated.View entering={FadeInDown.duration(500).delay(100)} style={styles.emptyState}>
             <Icon name="people" size={44} color={c.lineStrong} />
             <Txt variant="heading" style={{ marginTop: 16, textAlign: 'center' }}>
-              Nobody here yet
-            </Txt>
+              {t('nobody_here_yet')}</Txt>
             <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center', maxWidth: 280 }}>
-              Add someone you care about, or import them from your contacts.
-            </Txt>
+              {t('add_someone_you_care_about')}</Txt>
           </Animated.View>
         )}
 
@@ -300,13 +297,13 @@ export default function Connections() {
                   <Button
                     variant="quiet"
                     icon="push-pin"
-                    label={selectedPerson.isPinned ? 'Unpin from top' : 'Pin to top'}
+                    label={selectedPerson.isPinned ? t('unpin_from_top') : t('pin_to_top')}
                     onPress={handleTogglePin}
                   />
                   <Button
                     variant="danger"
                     icon="delete-outline"
-                    label="Delete person"
+                    label={t('delete_person')}
                     onPress={handleDeletePress}
                   />
                 </View>
@@ -327,14 +324,12 @@ export default function Connections() {
             <View style={[styles.modalIconWrap, { backgroundColor: c.dangerWash }]}>
               <Icon name="delete-outline" size={30} color={c.danger} />
             </View>
-            <Txt variant="heading" style={{ marginTop: 16 }}>Delete person</Txt>
+            <Txt variant="heading" style={{ marginTop: 16 }}>{t('delete_person')}</Txt>
             <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center' }}>
-              This removes {selectedPerson?.name} along with their days and notes. You&apos;ll have a
-              moment to undo it.
-            </Txt>
+              {t('delete_person_body', { name: selectedPerson?.name })}</Txt>
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, width: '100%' }}>
-              <Button label="Cancel" onPress={() => setDeleteConfirmVisible(false)} variant="quiet" style={{ flex: 1 }} />
-              <Button label="Delete" onPress={executeDelete} variant="dangerSolid" style={{ flex: 1 }} />
+              <Button label={t('cancel')} onPress={() => setDeleteConfirmVisible(false)} variant="quiet" style={{ flex: 1 }} />
+              <Button label={t('delete')} onPress={executeDelete} variant="dangerSolid" style={{ flex: 1 }} />
             </View>
           </Animated.View>
         </View>
@@ -359,18 +354,12 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: radius.full,
   },
-  birthdaysStrip: {
+  birthdaysLink: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    padding: 14,
-  },
-  birthdaysIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
+    alignSelf: 'flex-end',
+    paddingVertical: 2,
   },
   emptyState: {
     alignItems: 'center',

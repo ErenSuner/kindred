@@ -4,6 +4,7 @@ import { useTheme } from '@/theme/ThemeContext';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { WEEKDAYS, Weekday, sortWeekdays, weekdaysLabel } from '@/utils/routines';
+import { useTranslation } from "react-i18next";
 
 type Props = {
   value: Weekday[];
@@ -12,6 +13,7 @@ type Props = {
 
 // The days a routine falls on. Monday first, so it reads like a timetable.
 export function WeekdayPicker({ value, onChange }: Props) {
+    const { t } = useTranslation();
   const { c } = useTheme();
   const selected = new Set(value);
 
@@ -24,10 +26,10 @@ export function WeekdayPicker({ value, onChange }: Props) {
     <View style={[styles.box, { backgroundColor: c.surface, borderColor: c.line }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Icon name="repeat" size={16} color={c.flameDeep} />
-        <Txt variant="subMed">Which days</Txt>
+        <Txt variant="subMed">{t('which_days')}</Txt>
       </View>
       <Txt variant="sub" color={c.muted} style={{ marginTop: 4, marginBottom: 12 }}>
-        {value.length === 0 ? 'Pick the days this happens on.' : `${weekdaysLabel(value)}, every week.`}
+        {value.length === 0 ? t('pick_days') : t('days_every_week', { days: weekdaysLabel(value) })}
       </Txt>
 
       <View style={styles.row}>

@@ -5,6 +5,7 @@ import { spacing, radius } from '@/theme/tokens';
 import { useTheme } from '@/theme/ThemeContext';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
+import { useTranslation } from "react-i18next";
 
 type Choice = 'once' | 'weekly';
 
@@ -18,12 +19,13 @@ type Props = {
 // does it come round every week — asked once, so a single "Add" button can lead
 // to either the dated form or the weekly one. Keeps the two entry points from
 // splitting a single intent in two.
-const OPTIONS: { choice: Choice; icon: React.ComponentProps<typeof Icon>['name']; title: string; sub: string }[] = [
-  { choice: 'once', icon: 'event', title: 'On a date', sub: 'An appointment, a renewal, a one-off' },
-  { choice: 'weekly', icon: 'repeat', title: 'Every week', sub: 'A class or a routine, on set days' },
+const OPTIONS: { choice: Choice; icon: React.ComponentProps<typeof Icon>['name']; titleKey: string; subKey: string }[] = [
+  { choice: 'once', icon: 'event', titleKey: 'add_on_a_date', subKey: 'add_on_a_date_sub' },
+  { choice: 'weekly', icon: 'repeat', titleKey: 'add_every_week', subKey: 'add_every_week_sub' },
 ];
 
 export function AddEventSheet({ visible, onClose, onChoose }: Props) {
+    const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
 
@@ -46,7 +48,7 @@ export function AddEventSheet({ visible, onClose, onChoose }: Props) {
       >
         <View style={[styles.handle, { backgroundColor: c.lineStrong }]} />
 
-        <Txt variant="heading" style={styles.title}>Add something</Txt>
+        <Txt variant="heading" style={styles.title}>{t('add_something')}</Txt>
 
         <View style={styles.options}>
           {OPTIONS.map((opt) => (
@@ -66,8 +68,8 @@ export function AddEventSheet({ visible, onClose, onChoose }: Props) {
                 <Icon name={opt.icon} size={22} color={c.flameDeep} />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Txt variant="bodySemi">{opt.title}</Txt>
-                <Txt variant="sub" color={c.muted} style={{ marginTop: 2 }}>{opt.sub}</Txt>
+                <Txt variant="bodySemi">{t(opt.titleKey)}</Txt>
+                <Txt variant="sub" color={c.muted} style={{ marginTop: 2 }}>{t(opt.subKey)}</Txt>
               </View>
               <Icon name="chevron-right" size={20} color={c.faint} />
             </Pressable>

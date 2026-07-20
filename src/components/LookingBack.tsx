@@ -13,6 +13,8 @@ import { usePeople } from '@/context/PeopleContext';
 import { buildHistory, PastOccurrence } from '@/utils/history';
 import { NOTE_MAX_LENGTH } from '@/components/NotesEditor';
 import type { Person } from '@/data/mock';
+import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 
 // How many entries to show before collapsing behind "Show more". A person with
 // several yearly dates racks these up quickly and the section shouldn't take
@@ -21,6 +23,7 @@ const COLLAPSED_COUNT = 4;
 
 // A date that has passed is something to look back on, never a failure.
 export function LookingBack({ person }: { person: Person }) {
+    const { t } = useTranslation();
   const { c, cardShadow, floatShadow } = useTheme();
   const { saveMemory } = usePeople();
   const history = useMemo(() => buildHistory(person), [person]);
@@ -45,7 +48,7 @@ export function LookingBack({ person }: { person: Person }) {
     if (!editing) return;
     const trimmed = body.trim();
     if (!trimmed) {
-      setError('Write something first.');
+      setError(t('write_something_first'));
       return;
     }
 
@@ -64,7 +67,7 @@ export function LookingBack({ person }: { person: Person }) {
   return (
     <Animated.View entering={FadeInDown.duration(500).delay(300)} style={{ gap: spacing.stackMd }}>
       <View style={styles.sectionHead}>
-        <Txt variant="eyebrow" color={c.faint}>Looking back</Txt>
+        <Txt variant="eyebrow" color={c.faint}>{t('looking_back')}</Txt>
         <View style={[styles.sectionRule, { backgroundColor: c.line }]} />
       </View>
 
@@ -110,7 +113,7 @@ export function LookingBack({ person }: { person: Person }) {
                 ) : (
                   <View style={styles.emptyRow}>
                     <Icon name="add" size={14} color={c.flameDeep} />
-                    <Txt variant="sub" color={c.flameDeep}>What happened?</Txt>
+                    <Txt variant="sub" color={c.flameDeep}>{t('what_happened')}</Txt>
                   </View>
                 )}
               </View>
@@ -125,7 +128,7 @@ export function LookingBack({ person }: { person: Person }) {
           style={({ pressed }) => [styles.moreBtn, pressed && { opacity: 0.7 }]}
         >
           <Txt variant="label" color={c.flameDeep}>
-            {expanded ? 'Show less' : `Show ${history.length - COLLAPSED_COUNT} more`}
+            {expanded ? t('show_less') : t('show_more_count', { n: history.length - COLLAPSED_COUNT })}
           </Txt>
           <Icon name={expanded ? 'expand-less' : 'expand-more'} size={18} color={c.flameDeep} />
         </Pressable>
@@ -153,7 +156,7 @@ export function LookingBack({ person }: { person: Person }) {
                 value={body}
                 onChangeText={setBody}
                 maxLength={NOTE_MAX_LENGTH}
-                placeholder="What did you do? What did you give? How did it go?"
+                placeholder={t('what_did_you_do_what')}
                 placeholderTextColor={c.faint}
                 style={[
                   styles.input,
@@ -166,9 +169,9 @@ export function LookingBack({ person }: { person: Person }) {
               </View>
 
               <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
-                <Button label="Cancel" variant="quiet" style={{ flex: 1 }} onPress={() => setEditing(null)} />
+                <Button label={t('cancel')} variant="quiet" style={{ flex: 1 }} onPress={() => setEditing(null)} />
                 <Button
-                  label={saving ? 'Saving…' : 'Save'}
+                  label={saving ? t('saving') : t('save')}
                   icon="check"
                   style={{ flex: 1 }}
                   onPress={handleSave}

@@ -28,6 +28,7 @@ import { formatOccurrenceDate } from '@/utils/dates';
 import { serializeNudges } from '@/utils/nudges';
 import { normalize } from '@/utils/search';
 import type { Relationship } from '@/data/mock';
+import { useTranslation } from "react-i18next";
 
 // What an imported person gets until the user says otherwise. Every other
 // relationship is a guess Kindred has no business making.
@@ -49,10 +50,11 @@ function birthdayLabel(iso: string): string {
   const formatted = formatOccurrenceDate(new Date(y, m - 1, d));
   // A contact with no birth year still has a day worth knowing; drop the
   // placeholder year rather than claiming they were born in the year 1000.
-  return y <= 1000 ? formatted.replace(/,\s*\d+$/, '') : formatted;
+  return y <= 1000 ? formatted.replace(new RegExp(`[,\s]*${y}$`), '') : formatted;
 }
 
 export default function ImportContacts() {
+    const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
@@ -90,7 +92,7 @@ export default function ImportContacts() {
         }
       } catch (e) {
         console.error('Could not read contacts', e);
-        if (!cancelled) setError("Couldn't read your contacts. Try again in a moment.");
+        if (!cancelled) setError(t('couldnt_read_contacts'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -173,12 +175,12 @@ export default function ImportContacts() {
       const count = await importPeople(entries);
       router.back();
       showHeld(
-        `${count} ${count === 1 ? 'person' : 'people'} in your circle`,
-        'Their birthdays are remembered — reminders are set',
+        t('in_your_circle', { count }),
+        t('contacts_birthdays_set'),
       );
     } catch (e) {
       console.error('Import failed', e);
-      setError("Couldn't add them. Check your connection and try again.");
+      setError(t('couldnt_add_them'));
     } finally {
       setImporting(false);
     }
@@ -190,8 +192,7 @@ export default function ImportContacts() {
         <Icon name="arrow-back" size={24} color={c.muted} />
       </Pressable>
       <Txt variant="title" style={{ flex: 1, textAlign: 'center', marginRight: 24 }}>
-        From Contacts
-      </Txt>
+        {t('from_contacts')}</Txt>
     </View>
   );
 
@@ -202,8 +203,7 @@ export default function ImportContacts() {
         <View style={styles.centered}>
           <Icon name="contacts" size={40} color={c.lineStrong} />
           <Txt variant="body" color={c.muted} style={styles.centeredText}>
-            Contacts are only available in the Kindred app on your phone.
-          </Txt>
+            {t('contacts_are_only_available_in')}</Txt>
         </View>
       </View>
     );
@@ -217,21 +217,17 @@ export default function ImportContacts() {
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={c.flame} />
           <Txt variant="body" color={c.muted} style={styles.centeredText}>
-            Reading your contacts…
-          </Txt>
+            {t('reading_your_contacts')}</Txt>
         </View>
       ) : denied ? (
         <View style={styles.centered}>
           <Icon name="lock" size={40} color={c.lineStrong} />
           <Txt variant="heading" style={{ marginTop: 16 }}>
-            No access to contacts
-          </Txt>
+            {t('no_access_to_contacts')}</Txt>
           <Txt variant="body" color={c.muted} style={styles.centeredText}>
-            Kindred can&apos;t read your address book. You can allow it in your phone&apos;s settings, or
-            add people by hand instead.
-          </Txt>
+            {t('kindred_can_apos_t_read')}</Txt>
           <Button
-            label="Add someone by hand"
+            label={t('add_someone_by_hand')}
             variant="quiet"
             style={{ marginTop: 24 }}
             onPress={() => router.replace('/new-connection' as any)}
@@ -240,7 +236,7 @@ export default function ImportContacts() {
       ) : (
         <>
           <View style={{ paddingHorizontal: spacing.containerMobile, gap: spacing.stackSm }}>
-            <SearchBar value={query} onChange={setQuery} placeholder="Search contacts" />
+            <SearchBar value={query} onChange={setQuery} placeholder={t('search_contacts')} />
 
             <View style={styles.summaryRow}>
               <Txt variant="sub" color={c.muted}>
@@ -252,14 +248,13 @@ export default function ImportContacts() {
               {withBirthdays.length > 0 && selected.size === 0 && (
                 <Pressable onPress={selectAllWithBirthdays} hitSlop={8}>
                   <Txt variant="label" color={c.flameDeep}>
-                    Select all {withBirthdays.length} with birthdays
-                  </Txt>
+                    {t('select_all_birthdays', { count: withBirthdays.length })}</Txt>
                 </Pressable>
               )}
 
               {selected.size > 0 && (
                 <Pressable onPress={() => setSelected(new Set())} hitSlop={8}>
-                  <Txt variant="label" color={c.flameDeep}>Clear</Txt>
+                  <Txt variant="label" color={c.flameDeep}>{t('clear')}</Txt>
                 </Pressable>
               )}
             </View>
@@ -278,8 +273,8 @@ export default function ImportContacts() {
             ListEmptyComponent={
               <Txt variant="body" color={c.muted} style={styles.emptyList}>
                 {query
-                  ? 'No contacts match that.'
-                  : 'Everyone in your address book is already in Kindred.'}
+                  ? t('no_contacts_match')
+                  : t('everyone_already_in')}
               </Txt>
             }
             renderItem={({ item }) => {
@@ -314,8 +309,7 @@ export default function ImportContacts() {
                       </View>
                     ) : (
                       <Txt variant="sub" color={c.faint} style={styles.noBirthday}>
-                        No birthday saved
-                      </Txt>
+                        {t('no_birthday_saved')}</Txt>
                     )}
                   </View>
 
@@ -342,9 +336,9 @@ export default function ImportContacts() {
                 label={
                   importing
                     ? progress < selected.size
-                      ? `Preparing ${progress} of ${selected.size}…`
-                      : 'Adding…'
-                    : `Add ${selected.size} ${selected.size === 1 ? 'person' : 'people'}`
+                      ? t('preparing_progress', { n: progress, total: selected.size })
+                      : t('adding_ellipsis')
+                    : t('add_n_people', { count: selected.size })
                 }
                 icon="person-add"
                 fullWidth
@@ -352,8 +346,7 @@ export default function ImportContacts() {
                 onPress={handleImport}
               />
               <Txt variant="sub" color={c.faint} style={styles.footerNote}>
-                Names, photos and birthdays only. Phone numbers are never read.
-              </Txt>
+                {t('names_photos_and_birthdays_onl')}</Txt>
             </Animated.View>
           )}
         </>

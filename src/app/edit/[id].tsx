@@ -16,10 +16,13 @@ import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from "react-i18next";
+import { relationshipLabel } from '@/utils/relationshipLabel';
 
 const RELATIONSHIPS: Relationship[] = ['Family', 'Friend', 'Partner', 'Colleague', 'Acquaintance'];
 
 export default function EditConnection() {
+    const { t } = useTranslation();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
@@ -48,7 +51,7 @@ export default function EditConnection() {
   const handleSubmit = async () => {
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setNameError('Please enter a name');
+      setNameError(t('please_enter_name'));
       return;
     }
 
@@ -56,7 +59,7 @@ export default function EditConnection() {
       (p) => p.id !== person?.id && p.name.toLowerCase().trim() === trimmedName.toLowerCase()
     );
     if (nameExists) {
-      setNameError('Someone with this name is already here.');
+      setNameError(t('name_already_here'));
       setDuplicateAlertVisible(true);
       return;
     }
@@ -69,7 +72,7 @@ export default function EditConnection() {
       });
 
       router.back();
-      showHeld('Changes saved');
+      showHeld(t('changes_saved'));
     } catch (e) {
       // This used to fail silently: the button did nothing and the screen
       // stayed put with no explanation.
@@ -84,7 +87,7 @@ export default function EditConnection() {
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <Icon name="close" size={26} color={c.muted} />
         </Pressable>
-        <Txt variant="heading">Edit {person?.name ?? 'person'}</Txt>
+        <Txt variant="heading">{t('edit_person', { name: person?.name ?? 'person' })}</Txt>
         <View style={{ width: 26 }} />
       </View>
 
@@ -113,11 +116,11 @@ export default function EditConnection() {
           <Animated.View entering={FadeInDown.duration(500).delay(100)}>
             <Card style={{ gap: spacing.stackMd }}>
               <View style={{ gap: 6 }}>
-                <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>Their name</Txt>
+                <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>{t('their_name')}</Txt>
                 <TextInput
                   value={name}
                   onChangeText={(t) => { setName(t); setNameError(''); }}
-                  placeholder="e.g., Eleanor"
+                  placeholder={t('e_g_eleanor')}
                   placeholderTextColor={c.faint}
                   style={[
                     styles.input,
@@ -132,12 +135,12 @@ export default function EditConnection() {
                 )}
               </View>
               <View style={{ gap: 8 }}>
-                <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>Relationship</Txt>
+                <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>{t('relationship')}</Txt>
                 <View style={styles.chipWrap}>
                   {RELATIONSHIPS.map((r) => (
                     <SelectableChip
                       key={r}
-                      label={r}
+                      label={relationshipLabel(r)}
                       active={relationship === r}
                       onPress={() => setRelationship(r)}
                     />
@@ -149,7 +152,7 @@ export default function EditConnection() {
 
           {/* Submit */}
           <Animated.View entering={FadeInDown.duration(500).delay(200)} style={{ alignItems: 'center' }}>
-            <Button label="Save changes" icon="check" onPress={handleSubmit} />
+            <Button label={t('save_changes')} icon="check" onPress={handleSubmit} />
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -165,12 +168,10 @@ export default function EditConnection() {
             <View style={[styles.modalIconWrap, { backgroundColor: c.dangerWash }]}>
               <Icon name="error-outline" size={30} color={c.danger} />
             </View>
-            <Txt variant="heading" style={{ marginTop: 16 }}>Already here</Txt>
+            <Txt variant="heading" style={{ marginTop: 16 }}>{t('already_here')}</Txt>
             <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center' }}>
-              You already have someone named &ldquo;{name.trim()}&rdquo;. Use a different name or add
-              a last initial.
-            </Txt>
-            <Button label="Got it" onPress={() => setDuplicateAlertVisible(false)} fullWidth style={{ marginTop: 24 }} />
+              {t('duplicate_name_body', { name: name.trim() })}</Txt>
+            <Button label={t('got_it')} onPress={() => setDuplicateAlertVisible(false)} fullWidth style={{ marginTop: 24 }} />
           </Animated.View>
         </View>
       </Modal>

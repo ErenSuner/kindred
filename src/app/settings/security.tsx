@@ -11,8 +11,11 @@ import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
 import { showHeld } from '@/components/HeldNotice';
 import { supabase } from '@/lib/supabase';
+import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 
 export default function SecuritySettings() {
+    const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
@@ -23,17 +26,17 @@ export default function SecuritySettings() {
 
   const handleSave = async () => {
     if (!password.trim() || !confirmPassword.trim()) {
-      Alert.alert('Error', 'Please fill in all fields.');
+      Alert.alert(t('error_title'), t('fill_all_fields'));
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match.');
+      Alert.alert(t('error_title'), t('passwords_no_match'));
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters.');
+      Alert.alert(t('error_title'), t('password_min'));
       return;
     }
 
@@ -43,10 +46,10 @@ export default function SecuritySettings() {
       if (error) throw error;
 
       router.back();
-      showHeld('Password updated');
+      showHeld(t('password_updated'));
     } catch (error: any) {
       console.error(error);
-      Alert.alert('Error', error.message || 'Failed to update password.');
+      Alert.alert(t('error_title'), error.message || t('password_update_failed'));
     } finally {
       setLoading(false);
     }
@@ -60,7 +63,7 @@ export default function SecuritySettings() {
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <Icon name="arrow-back" size={26} color={c.muted} />
         </Pressable>
-        <Txt variant="title">Security</Txt>
+        <Txt variant="title">{t('security')}</Txt>
         <View style={{ width: 26 }} />
       </View>
 
@@ -76,12 +79,12 @@ export default function SecuritySettings() {
           showsVerticalScrollIndicator={false}
         >
           <Animated.View entering={FadeInDown.duration(400)}>
-            <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>New password</Txt>
+            <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>{t('new_password')}</Txt>
             <View style={inputWrap}>
               <Icon name="lock" size={20} color={c.faint} style={styles.inputIcon} />
               <TextInput
                 style={[styles.input, { color: c.text }]}
-                placeholder="Enter new password"
+                placeholder={t('enter_new_password')}
                 placeholderTextColor={c.faint}
                 value={password}
                 onChangeText={setPassword}
@@ -91,12 +94,12 @@ export default function SecuritySettings() {
           </Animated.View>
 
           <Animated.View entering={FadeInDown.duration(400).delay(50)}>
-            <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>Confirm new password</Txt>
+            <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>{t('confirm_new_password')}</Txt>
             <View style={inputWrap}>
               <Icon name="lock" size={20} color={c.faint} style={styles.inputIcon} />
               <TextInput
                 style={[styles.input, { color: c.text }]}
-                placeholder="Confirm new password"
+                placeholder={t('confirm_new_password')}
                 placeholderTextColor={c.faint}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
@@ -115,7 +118,7 @@ export default function SecuritySettings() {
         ]}
       >
         <Button
-          label={loading ? 'Saving…' : 'Update password'}
+          label={loading ? t('saving') : t('update_password')}
           onPress={handleSave}
           disabled={loading || !password.trim() || !confirmPassword.trim()}
           icon="shield"

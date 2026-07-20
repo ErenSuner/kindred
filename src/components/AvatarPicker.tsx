@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import i18n from '@/lib/i18n';
 import { View, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { radius } from '@/theme/tokens';
@@ -51,7 +52,7 @@ export function AvatarPicker({
   const handlePress = async () => {
     if (busy) return;
     if (!user) {
-      onError?.('You need to be signed in to add a photo.');
+      onError?.(i18n.t('need_sign_in_photo'));
       return;
     }
 
@@ -59,7 +60,7 @@ export function AvatarPicker({
       const picked = await pickAvatarImage();
 
       if (picked.status === 'denied') {
-        onError?.('Kindred needs access to your photos to set a picture.');
+        onError?.(i18n.t('photos_access_picture'));
         return;
       }
       if (picked.status === 'cancelled') return;
@@ -69,7 +70,7 @@ export function AvatarPicker({
       await onUploaded(publicUrl);
     } catch (e) {
       console.error('Avatar upload failed', e);
-      onError?.('Could not upload that photo. Check your connection and try again.');
+      onError?.(i18n.t('photo_upload_failed'));
     } finally {
       setBusy(false);
     }

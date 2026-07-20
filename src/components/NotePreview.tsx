@@ -4,6 +4,7 @@ import { useTheme } from '@/theme/ThemeContext';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import type { Note } from '@/data/mock';
+import { useTranslation } from "react-i18next";
 
 type Props = {
   notes?: Note[];
@@ -19,6 +20,7 @@ type Props = {
 // note stretch the card. numberOfLines does the trimming, so the ellipsis lands
 // wherever the text actually runs out of room at the current font size.
 export function NotePreview({ notes, lines = 2, compact = false, onInk = false }: Props) {
+    const { t } = useTranslation();
   const { c } = useTheme();
   if (!notes || notes.length === 0) return null;
 
@@ -45,7 +47,7 @@ export function NotePreview({ notes, lines = 2, compact = false, onInk = false }
         </Txt>
         {rest.length > 0 && (
           <Txt variant="sub" color={fg} style={styles.more}>
-            +{rest.length} more {rest.length === 1 ? 'note' : 'notes'}
+            {t('notes_more', { count: rest.length })}
           </Txt>
         )}
       </View>

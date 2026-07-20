@@ -13,10 +13,13 @@ import { ScrollPickerModal } from '@/components/ScrollPickerModal';
 import { showHeld } from '@/components/HeldNotice';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 
 export default function ProfileSettings() {
+    const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
@@ -61,13 +64,13 @@ export default function ProfileSettings() {
 
   const handleSave = async () => {
     if ((day && !month) || (month && !day)) {
-      Alert.alert('Incomplete Date', 'Please provide both Day and Month for the birth date.');
+      Alert.alert(t('incomplete_date'), t('provide_day_month'));
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (email.trim() !== user?.email && !emailRegex.test(email.trim())) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address format.');
+      Alert.alert(t('invalid_email'), t('invalid_email_format'));
       return;
     }
 
@@ -95,16 +98,16 @@ export default function ProfileSettings() {
       if (error) {
         // More friendly error for email issues
         if (error.message.includes('invalid') && error.message.toLowerCase().includes('email')) {
-          throw new Error('This email address is invalid or not accepted by the server.');
+          throw new Error(t('email_rejected'));
         }
         throw error;
       }
 
       router.back();
-      showHeld('Profile updated');
+      showHeld(t('profile_updated'));
     } catch (error: any) {
       console.error(error);
-      Alert.alert('Error', error.message || 'Failed to update profile.');
+      Alert.alert(t('error_title'), error.message || t('profile_update_failed'));
     } finally {
       setLoading(false);
     }
@@ -118,7 +121,7 @@ export default function ProfileSettings() {
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <Icon name="arrow-back" size={26} color={c.muted} />
         </Pressable>
-        <Txt variant="title">Profile</Txt>
+        <Txt variant="title">{t('profile')}</Txt>
         <View style={{ width: 26 }} />
       </View>
 
@@ -134,12 +137,12 @@ export default function ProfileSettings() {
           showsVerticalScrollIndicator={false}
         >
           <Animated.View entering={FadeInDown.duration(400)}>
-            <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>Name</Txt>
+            <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>{t('name')}</Txt>
             <View style={inputWrap}>
               <Icon name="person" size={20} color={c.faint} style={styles.inputIcon} />
               <TextInput
                 style={[styles.input, { color: c.text }]}
-                placeholder="Name"
+                placeholder={t('name')}
                 placeholderTextColor={c.faint}
                 value={name}
                 onChangeText={setName}
@@ -149,12 +152,12 @@ export default function ProfileSettings() {
           </Animated.View>
 
           <Animated.View entering={FadeInDown.duration(400).delay(50)}>
-            <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>Surname</Txt>
+            <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>{t('surname')}</Txt>
             <View style={inputWrap}>
               <Icon name="person-outline" size={20} color={c.faint} style={styles.inputIcon} />
               <TextInput
                 style={[styles.input, { color: c.text }]}
-                placeholder="Surname"
+                placeholder={t('surname')}
                 placeholderTextColor={c.faint}
                 value={surname}
                 onChangeText={setSurname}
@@ -164,27 +167,27 @@ export default function ProfileSettings() {
           </Animated.View>
 
           <Animated.View entering={FadeInDown.duration(400).delay(100)}>
-            <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>Birth date · year optional</Txt>
+            <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>{t('birth_date_year_optional')}</Txt>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <Pressable
                 onPress={() => { setPickerType('day'); setPickerVisible(true); }}
                 style={[...inputWrap, { flex: 1, paddingHorizontal: 0, justifyContent: 'center' }]}
               >
-                <Txt variant="body" color={day ? c.text : c.faint}>{day || 'Day'}</Txt>
+                <Txt variant="body" color={day ? c.text : c.faint}>{day || t('day')}</Txt>
               </Pressable>
               <Pressable
                 onPress={() => { setPickerType('month'); setPickerVisible(true); }}
                 style={[...inputWrap, { flex: 1.5, paddingHorizontal: 0, justifyContent: 'center' }]}
               >
                 <Txt variant="body" color={month ? c.text : c.faint}>
-                  {month ? MONTHS[month - 1] : 'Month'}
+                  {month ? t(`month_sh_${month - 1}`) : t('month')}
                 </Txt>
               </Pressable>
               <Pressable
                 onPress={() => { setPickerType('year'); setPickerVisible(true); }}
                 style={[...inputWrap, { flex: 1.2, paddingHorizontal: 0, justifyContent: 'center' }]}
               >
-                <Txt variant="body" color={year ? c.text : c.faint}>{year || 'Year'}</Txt>
+                <Txt variant="body" color={year ? c.text : c.faint}>{year || t('year')}</Txt>
               </Pressable>
 
               {(day || month || year) && (
@@ -199,12 +202,12 @@ export default function ProfileSettings() {
           </Animated.View>
 
           <Animated.View entering={FadeInDown.duration(400).delay(200)}>
-            <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>Email</Txt>
+            <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>{t('email')}</Txt>
             <View style={inputWrap}>
               <Icon name="email" size={20} color={c.faint} style={styles.inputIcon} />
               <TextInput
                 style={[styles.input, { color: c.text }]}
-                placeholder="Email address"
+                placeholder={t('email_address')}
                 placeholderTextColor={c.faint}
                 value={email}
                 onChangeText={setEmail}
@@ -223,7 +226,7 @@ export default function ProfileSettings() {
         ]}
       >
         <Button
-          label={loading ? 'Saving…' : 'Save changes'}
+          label={loading ? i18n.t('saving') : i18n.t('save_changes')}
           onPress={handleSave}
           disabled={loading}
           icon="check"
@@ -234,12 +237,12 @@ export default function ProfileSettings() {
       <ScrollPickerModal
         visible={pickerVisible}
         onClose={() => setPickerVisible(false)}
-        title={`Select ${pickerType}`}
+        title={pickerType === 'day' ? t('select_day') : pickerType === 'month' ? t('select_month') : t('select_year')}
         options={
           pickerType === 'day'
             ? Array.from({ length: 31 }, (_, i) => ({ label: `${i + 1}`, value: i + 1 }))
             : pickerType === 'month'
-            ? MONTHS.map((m, i) => ({ label: m, value: i + 1 }))
+            ? Array.from({ length: 12 }, (_, i) => ({ label: t(`month_sh_${i}`), value: i + 1 }))
             : Array.from({ length: 100 }, (_, i) => ({
                 label: `${new Date().getFullYear() - i}`,
                 value: new Date().getFullYear() - i,

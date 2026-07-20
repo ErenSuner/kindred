@@ -21,6 +21,8 @@ import { useEvents } from '@/context/EventsContext';
 import { useHolidays } from '@/context/HolidaysContext';
 import { HOLIDAYS } from '@/data/holidays';
 import { Toggle } from '@/components/Toggle';
+import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 
 type RowProps = {
   icon: React.ComponentProps<typeof Icon>['name'];
@@ -37,6 +39,7 @@ type RowProps = {
 };
 
 function Row({ icon, label, sublabel, value, trailingIcon = 'chevron-right', right, last, onPress, soon }: RowProps) {
+    const { t } = useTranslation();
   const { c } = useTheme();
   return (
     <>
@@ -71,7 +74,7 @@ function Row({ icon, label, sublabel, value, trailingIcon = 'chevron-right', rig
           )}
           {soon ? (
             <View style={[styles.soonBadge, { borderColor: c.lineStrong }]}>
-              <Txt variant="eyebrow" color={c.faint} style={{ fontSize: 9 }}>Soon</Txt>
+              <Txt variant="eyebrow" color={c.faint} style={{ fontSize: 9 }}>{t('soon')}</Txt>
             </View>
           ) : (
             !right && <Icon name={trailingIcon} size={20} color={c.faint} />
@@ -100,12 +103,13 @@ function SectionTitle({ children }: { children: string }) {
 }
 
 const THEME_LABELS: Record<ThemePref, string> = {
-  system: 'Match phone',
-  light: 'Light',
-  dark: 'Dark',
+  system: i18n.t('match_phone'),
+  light: i18n.t('light'),
+  dark: i18n.t('dark'),
 };
 
 export default function Settings() {
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c, cardShadow, floatShadow, pref, setPref } = useTheme();
@@ -114,6 +118,7 @@ export default function Settings() {
   const [reminderHour, setReminderHour] = useState(DEFAULT_REMINDER_HOUR);
   const [hourPickerVisible, setHourPickerVisible] = useState(false);
   const [themePickerVisible, setThemePickerVisible] = useState(false);
+  const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
   const permission = useNotificationPermission();
   const { user, signOut } = useAuth();
   const { people } = usePeople();
@@ -171,8 +176,8 @@ export default function Settings() {
       // act on. It goes to the console; they get a plain apology.
       console.error('Account deletion failed', e);
       Alert.alert(
-        'Delete Failed',
-        "We couldn't delete your account just now. Nothing has been changed. Please try again in a moment.",
+        t('delete_failed'),
+        t('delete_failed_body'),
       );
     } finally {
       setIsDeleting(false);
@@ -191,7 +196,7 @@ export default function Settings() {
     const { error } = await supabase.auth.updateUser({ data: { avatar_url: publicUrl } });
     if (error) {
       console.error('Could not save avatar', error);
-      setAvatarError('Photo uploaded, but saving it to your profile failed.');
+      setAvatarError(t('avatar_save_failed'));
     }
   };
 
@@ -228,15 +233,15 @@ export default function Settings() {
         </Animated.View>
 
         <View style={{ gap: spacing.stackSm }}>
-          <SectionTitle>Account</SectionTitle>
+          <SectionTitle>{t('account')}</SectionTitle>
           <View style={[styles.group, { backgroundColor: c.surface, borderColor: c.line }, cardShadow]}>
-            <Row icon="person" label="Profile information" onPress={() => router.push('/settings/profile')} />
-            <Row icon="shield" label="Security" last onPress={() => router.push('/settings/security')} />
+            <Row icon="person" label={t('profile_information')} onPress={() => router.push('/settings/profile')} />
+            <Row icon="shield" label={t('security')} last onPress={() => router.push('/settings/security')} />
           </View>
         </View>
 
         <View style={{ gap: spacing.stackSm }}>
-          <SectionTitle>Notifications</SectionTitle>
+          <SectionTitle>{t('notifications')}</SectionTitle>
 
           {/* The one alarm this app earns: without permission, the promise
               cannot be kept. Without this, someone can set up a dozen reminders,
@@ -248,10 +253,9 @@ export default function Settings() {
             >
               <Icon name="notifications-off" size={20} color={c.danger} />
               <View style={{ flex: 1 }}>
-                <Txt variant="subMed" color={c.danger}>Notifications are turned off</Txt>
+                <Txt variant="subMed" color={c.danger}>{t('notifications_are_turned_off')}</Txt>
                 <Txt variant="sub" color={c.danger} style={{ marginTop: 2 }}>
-                  Nudges won&apos;t reach you until you allow them. Tap to fix.
-                </Txt>
+                  {t('nudges_won_apos_t_reach')}</Txt>
               </View>
               <Icon name="chevron-right" size={20} color={c.danger} />
             </Pressable>
@@ -260,22 +264,22 @@ export default function Settings() {
           <View style={[styles.group, { backgroundColor: c.surface, borderColor: c.line }, cardShadow]}>
             <Row
               icon="notifications-active"
-              label="Gentle nudges"
-              sublabel="Soft reminders for important moments"
+              label={t('gentle_nudges')}
+              sublabel={i18n.t('soft_reminders_for_important_m')}
               right={<Toggle value={nudges} onChange={handleToggleNudges} />}
               onPress={() => handleToggleNudges(!nudges)}
             />
             <Row
               icon="public"
-              label="Shared occasions"
-              sublabel="Mother's Day, Valentine's Day and more"
-              value={`${enabledIds.length} on`}
+              label={t('shared_occasions')}
+              sublabel={i18n.t('mother_s_day_valentine_s_day_a')}
+              value={t('n_on', { count: enabledIds.length })}
               onPress={() => router.push('/settings/holidays')}
             />
             <Row
               icon="schedule"
-              label="Reminder time"
-              sublabel="When nudges arrive each day"
+              label={t('reminder_time')}
+              sublabel={i18n.t('when_nudges_arrive_each_day')}
               value={formatHour(reminderHour)}
               onPress={() => setHourPickerVisible(true)}
               last
@@ -284,30 +288,36 @@ export default function Settings() {
         </View>
 
         <View style={{ gap: spacing.stackSm }}>
-          <SectionTitle>Appearance</SectionTitle>
+          <SectionTitle>{t('appearance')}</SectionTitle>
           <View style={[styles.group, { backgroundColor: c.surface, borderColor: c.line }, cardShadow]}>
             <Row
               icon="palette"
-              label="Theme"
-              sublabel="Lamplight in light or dark"
+              label={t('theme')}
+              sublabel={i18n.t('lamplight_in_light_or_dark')}
               value={THEME_LABELS[pref]}
               onPress={() => setThemePickerVisible(true)}
             />
-            <Row icon="language" label="Language" soon last />
+            <Row 
+              icon="language" 
+              label={t('language')} 
+              value={i18n.language.startsWith('tr') ? 'Türkçe' : 'English'} 
+              onPress={() => setLanguagePickerVisible(true)} 
+              last 
+            />
           </View>
         </View>
 
         <View style={{ gap: spacing.stackSm }}>
-          <SectionTitle>Support</SectionTitle>
+          <SectionTitle>{t('support')}</SectionTitle>
           <View style={[styles.group, { backgroundColor: c.surface, borderColor: c.line }, cardShadow]}>
-            <Row icon="help" label="Help center" soon />
-            <Row icon="chat-bubble" label="Feedback" soon />
-            <Row icon="privacy-tip" label="Privacy policy" soon last />
+            <Row icon="help" label={t('help_center')} soon />
+            <Row icon="chat-bubble" label={t('feedback')} soon />
+            <Row icon="privacy-tip" label={t('privacy_policy')} soon last />
           </View>
         </View>
 
         <Button
-          label="Log out"
+          label={t('log_out')}
           variant="quiet"
           icon="logout"
           fullWidth
@@ -316,7 +326,7 @@ export default function Settings() {
         />
 
         <Button
-          label="Delete account"
+          label={t('delete_account')}
           variant="danger"
           icon="delete-forever"
           fullWidth
@@ -341,17 +351,17 @@ export default function Settings() {
               <Icon name="warning" size={30} color={c.danger} />
             </View>
             <Txt variant="heading" style={{ marginTop: 16 }}>
-              {deleteStep === 1 ? 'Delete account' : 'Final warning'}
+              {deleteStep === 1 ? i18n.t('delete_account') : i18n.t('final_warning')}
             </Txt>
             <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center', marginBottom: 24 }}>
               {deleteStep === 1
-                ? 'Are you absolutely sure? This will permanently delete your account, your people, and all saved memories. This action cannot be undone.'
-                : 'This is your last chance. All your data will be permanently erased. Are you sure you want to proceed?'}
+                ? i18n.t('are_you_absolutely_sure_this_w')
+                : i18n.t('this_is_your_last_chance_all_y')}
             </Txt>
 
             <View style={{ width: '100%', gap: 12 }}>
               <Button
-                label={deleteStep === 1 ? 'Delete everything' : 'Yes, delete my account'}
+                label={deleteStep === 1 ? i18n.t('delete_everything') : i18n.t('yes_delete_my_account')}
                 variant="dangerSolid"
                 onPress={() => {
                   if (deleteStep === 1) setDeleteStep(2);
@@ -361,7 +371,7 @@ export default function Settings() {
                 fullWidth
               />
               <Button
-                label="Cancel"
+                label={t('cancel')}
                 variant="quiet"
                 onPress={() => setDeleteModalVisible(false)}
                 disabled={isDeleting}
@@ -375,7 +385,7 @@ export default function Settings() {
       <ScrollPickerModal
         visible={hourPickerVisible}
         onClose={() => setHourPickerVisible(false)}
-        title="Reminder time"
+        title={t('reminder_time')}
         options={Array.from({ length: 24 }, (_, h) => ({ label: formatHour(h), value: h }))}
         selectedValue={reminderHour}
         onSelect={(val) => handlePickHour(val as number)}
@@ -384,7 +394,7 @@ export default function Settings() {
       <ScrollPickerModal
         visible={themePickerVisible}
         onClose={() => setThemePickerVisible(false)}
-        title="Theme"
+        title={t('theme')}
         options={(['system', 'light', 'dark'] as ThemePref[]).map((p) => ({
           label: THEME_LABELS[p],
           value: p,
@@ -393,6 +403,23 @@ export default function Settings() {
         onSelect={(val) => {
           setPref(val as ThemePref);
           setThemePickerVisible(false);
+        }}
+      />
+
+      <ScrollPickerModal
+        visible={languagePickerVisible}
+        onClose={() => setLanguagePickerVisible(false)}
+        title={t('language')}
+        options={[
+          { label: 'English', value: 'en' },
+          { label: 'Türkçe', value: 'tr' },
+        ]}
+        selectedValue={i18n.language.startsWith('tr') ? 'tr' : 'en'}
+        onSelect={async (val) => {
+          const lang = val as string;
+          await i18n.changeLanguage(lang);
+          await AsyncStorage.setItem('app_language', lang);
+          setLanguagePickerVisible(false);
         }}
       />
     </View>

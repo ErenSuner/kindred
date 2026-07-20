@@ -15,3 +15,9 @@ jest.mock('expo-notifications', () => ({
   setNotificationHandler: jest.fn(),
   addNotificationReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
 }));
+
+// Date, weekday and label formatting is locale-aware now. Pin the device to
+// English so the assertions (which use English formatting) stay stable.
+jest.mock('expo-localization', () => ({
+  getLocales: () => [{ languageCode: 'en' }],
+}));

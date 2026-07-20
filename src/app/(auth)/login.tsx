@@ -11,8 +11,10 @@ import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { supabase } from '@/lib/supabase';
+import { useTranslation } from 'react-i18next';
 
 export default function Login() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
@@ -23,7 +25,7 @@ export default function Login() {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      setErrorMsg('Please fill in all fields.');
+      setErrorMsg(t('error_fill_fields'));
       return;
     }
     setLoading(true);
@@ -39,7 +41,7 @@ export default function Login() {
 
       // router.replace('/home') will be handled by the route guard in _layout.tsx
     } catch (err: any) {
-      setErrorMsg(err.message || 'An error occurred during sign in.');
+      setErrorMsg(err.message || t('error_sign_in'));
     } finally {
       setLoading(false);
     }
@@ -63,10 +65,10 @@ export default function Login() {
         <Animated.View entering={FadeInDown.duration(500)} style={{ alignItems: 'center', marginBottom: spacing.stackXl }}>
           <View style={styles.brandRow}>
             <View style={[styles.flameDot, { backgroundColor: c.flame }]} />
-            <Txt variant="display">Kindred</Txt>
+            <Txt variant="display">{t('welcome_brand')}</Txt>
           </View>
           <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center', maxWidth: 300 }}>
-            Welcome back.
+            {t('welcome_back')}
           </Txt>
         </Animated.View>
 
@@ -82,11 +84,11 @@ export default function Login() {
             ) : null}
 
             <View style={{ gap: spacing.stackSm }}>
-              <Txt variant="eyebrow" color={c.faint} style={styles.label}>Email address</Txt>
+              <Txt variant="eyebrow" color={c.faint} style={styles.label}>{t('email_address')}</Txt>
               <TextInput
                 value={email}
                 onChangeText={setEmail}
-                placeholder="e.g. sarah@example.com"
+                placeholder={t('email_placeholder')}
                 placeholderTextColor={c.faint}
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -96,7 +98,7 @@ export default function Login() {
             </View>
 
             <View style={{ gap: spacing.stackSm, marginTop: spacing.stackMd }}>
-              <Txt variant="eyebrow" color={c.faint} style={styles.label}>Password</Txt>
+              <Txt variant="eyebrow" color={c.faint} style={styles.label}>{t('password')}</Txt>
               <TextInput
                 value={password}
                 onChangeText={setPassword}
@@ -110,7 +112,7 @@ export default function Login() {
             </View>
 
             <Button
-              label={loading ? 'Signing in…' : 'Sign in'}
+              label={loading ? t('signing_in') : t('sign_in')}
               onPress={handleLogin}
               fullWidth
               style={{ marginTop: spacing.stackLg }}
@@ -120,11 +122,11 @@ export default function Login() {
 
         <Animated.View entering={FadeInDown.duration(500).delay(200)} style={styles.footer}>
           <Txt variant="body" color={c.muted}>
-            Don&apos;t have an account?{' '}
+            {t('no_account')}
           </Txt>
           <Pressable onPress={() => router.push('/register')}>
             <Txt variant="bodySemi" color={c.flameDeep} style={{ textDecorationLine: 'underline' }}>
-              Sign up
+              {t('sign_up')}
             </Txt>
           </Pressable>
         </Animated.View>

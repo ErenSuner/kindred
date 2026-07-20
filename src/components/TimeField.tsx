@@ -7,6 +7,7 @@ import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
 import { HEADS_UP_HOURS, TimeOfDay, formatTimeOfDay } from '@/utils/eventTime';
+import { useTranslation } from "react-i18next";
 
 // Five-minute steps. Nothing in this app starts at 18:37, and a 60-row picker
 // to prove otherwise is worse than the constraint.
@@ -20,6 +21,7 @@ type Props = {
 // Optional time of day. Off by default, because most things Kindred tracks —
 // a birthday, a renewal — happen on a day rather than at a moment.
 export function TimeField({ value, onChange }: Props) {
+    const { t } = useTranslation();
   const { c } = useTheme();
   const [picking, setPicking] = useState<'hour' | 'minute' | null>(null);
 
@@ -29,7 +31,7 @@ export function TimeField({ value, onChange }: Props) {
     <View style={[styles.box, { backgroundColor: c.surface, borderColor: c.line }]}>
       <Pressable onPress={toggle} style={({ pressed }) => [styles.headerRow, pressed && { opacity: 0.8 }]}>
         <Icon name="schedule" size={16} color={c.flameDeep} />
-        <Txt variant="subMed" style={{ flex: 1 }}>Time of day</Txt>
+        <Txt variant="subMed" style={{ flex: 1 }}>{t('time_of_day')}</Txt>
         <Icon
           name={value ? 'check-box' : 'check-box-outline-blank'}
           size={20}
@@ -70,20 +72,18 @@ export function TimeField({ value, onChange }: Props) {
           {/* Says what setting a time actually buys you, which is not obvious
               from a pair of steppers. */}
           <Txt variant="sub" color={c.muted} style={styles.blurb}>
-            You&apos;ll hear about it in the morning, and again {HEADS_UP_HOURS} hours before —
-            at {formatTimeOfDay(minus(value, HEADS_UP_HOURS))}.
+            {t('timefield_blurb', { hours: HEADS_UP_HOURS, time: formatTimeOfDay(minus(value, HEADS_UP_HOURS)) })}
           </Txt>
         </Animated.View>
       ) : (
         <Txt variant="sub" color={c.muted} style={{ marginTop: 4 }}>
-          Set one if this happens at a particular time, like a class or an appointment.
-        </Txt>
+          {t('set_one_if_this_happens')}</Txt>
       )}
 
       <ScrollPickerModal
         visible={picking !== null}
         onClose={() => setPicking(null)}
-        title={picking === 'hour' ? 'Hour' : 'Minute'}
+        title={picking === 'hour' ? t('hour') : t('minute')}
         options={
           picking === 'hour'
             ? Array.from({ length: 24 }, (_, h) => ({ label: String(h).padStart(2, '0'), value: h }))

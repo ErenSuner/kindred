@@ -7,9 +7,8 @@ import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
 import { SKIPPED_YEAR } from '@/utils/dates';
+import { useTranslation } from 'react-i18next';
 
-const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const MONTHS_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 const PAST_YEARS = 101; // far enough back for any birthday
 const FUTURE_YEARS = 6;
@@ -39,7 +38,10 @@ const now = () => {
 // field opens the shared scroll picker rather than a keyboard, which keeps the
 // input impossible to get into an invalid state.
 export function DateFields({ value, onChange, yearMode = 'past', allowSkipYear = true }: Props) {
+  const { t } = useTranslation();
   const { c } = useTheme();
+  const monthShort = (m: number) => t(`month_sh_${m}`);
+  const monthFull = (m: number) => t(`month_${m}`);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerType, setPickerType] = useState<'day' | 'month' | 'year'>('day');
   // Set when a choice was quietly moved forward, so the change is at least
@@ -60,7 +62,7 @@ export function DateFields({ value, onChange, yearMode = 'past', allowSkipYear =
       ? Array.from({ length: FUTURE_YEARS }, (_, i) => ({ label: String(currentYear + i), value: currentYear + i }))
       : Array.from({ length: PAST_YEARS }, (_, i) => ({ label: String(currentYear - i), value: currentYear - i }));
 
-  const yearOptions = allowSkipYear ? [{ label: 'Skip Year', value: SKIPPED_YEAR }, ...years] : years;
+  const yearOptions = allowSkipYear ? [{ label: t('skip_year'), value: SKIPPED_YEAR }, ...years] : years;
 
   // Days are capped to the selected month so February can't offer the 31st.
   // Without a year, February allows 29 — the picker shouldn't rule out a leap
@@ -77,7 +79,7 @@ export function DateFields({ value, onChange, yearMode = 'past', allowSkipYear =
   const firstMonth = blocksPast ? today.getMonth() + 1 : 1;
   const firstDay = blocksPast && month === today.getMonth() + 1 ? today.getDate() : 1;
 
-  const noticeFor = (m: number, d: number) => `Moved to ${MONTHS_SHORT[m - 1]} ${d} — that date has passed.`;
+  const noticeFor = (m: number, d: number) => t('moved_to', { date: `${monthShort(m - 1)} ${d}` });
 
   const handleSelect = (val: string | number) => {
     const n = val as number;
@@ -122,15 +124,15 @@ export function DateFields({ value, onChange, yearMode = 'past', allowSkipYear =
     <>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <Pressable onPress={() => open('day')} style={[styles.input, styles.center, field, { flex: 1 }]}>
-          <Txt variant="body" color={day ? c.text : c.faint}>{day || 'Day'}</Txt>
+          <Txt variant="body" color={day ? c.text : c.faint}>{day || t('day')}</Txt>
         </Pressable>
         <Pressable onPress={() => open('month')} style={[styles.input, styles.center, field, { flex: 1.5 }]}>
           <Txt variant="body" color={month ? c.text : c.faint}>
-            {month ? MONTHS_SHORT[month - 1] : 'Month'}
+            {month ? monthShort(month - 1) : t('month')}
           </Txt>
         </Pressable>
         <Pressable onPress={() => open('year')} style={[styles.input, styles.center, field, { flex: 1.2 }]}>
-          <Txt variant="body" color={hasYear ? c.text : c.faint}>{hasYear ? year : 'Year'}</Txt>
+          <Txt variant="body" color={hasYear ? c.text : c.faint}>{hasYear ? year : t('year')}</Txt>
         </Pressable>
       </View>
 
@@ -146,7 +148,7 @@ export function DateFields({ value, onChange, yearMode = 'past', allowSkipYear =
       <ScrollPickerModal
         visible={pickerVisible}
         onClose={() => setPickerVisible(false)}
-        title={pickerType === 'day' ? 'Select Day' : pickerType === 'month' ? 'Select Month' : 'Select Year'}
+        title={pickerType === 'day' ? t('select_day') : pickerType === 'month' ? t('select_month') : t('select_year')}
         options={
           pickerType === 'day'
             ? Array.from({ length: daysInMonth - firstDay + 1 }, (_, i) => ({
@@ -154,7 +156,7 @@ export function DateFields({ value, onChange, yearMode = 'past', allowSkipYear =
                 value: i + firstDay,
               }))
             : pickerType === 'month'
-            ? MONTHS_FULL.slice(firstMonth - 1).map((m, i) => ({ label: m, value: i + firstMonth }))
+            ? Array.from({ length: 12 - (firstMonth - 1) }, (_, i) => ({ label: monthFull(firstMonth - 1 + i), value: firstMonth + i }))
             : yearOptions
         }
         selectedValue={

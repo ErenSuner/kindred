@@ -7,6 +7,7 @@ import { useTheme } from '@/theme/ThemeContext';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { usePeople } from '@/context/PeopleContext';
+import { useTranslation } from "react-i18next";
 
 // Says what the app is holding on to, and what it dropped.
 //
@@ -15,6 +16,7 @@ import { usePeople } from '@/context/PeopleContext';
 // yet. It also carries the failures nobody was watching: a staged delete
 // finishing in the background, or a pin that quietly slid back.
 export function PendingWrites() {
+    const { t } = useTranslation();
   const { pendingWrites, retryPendingWrites, writeError, clearWriteError } = usePeople();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
@@ -55,11 +57,7 @@ export function PendingWrites() {
         />
 
         <Txt variant="sub" color={showingError ? c.danger : c.muted} style={styles.text}>
-          {showingError
-            ? writeError
-            : pendingWrites === 1
-            ? '1 change waiting to sync'
-            : `${pendingWrites} changes waiting to sync`}
+          {showingError ? writeError : t('change_waiting', { count: pendingWrites })}
         </Txt>
 
         {showingError ? (
@@ -71,7 +69,7 @@ export function PendingWrites() {
             {retrying ? (
               <ActivityIndicator size="small" color={c.flameDeep} />
             ) : (
-              <Txt variant="label" color={c.flameDeep}>Retry</Txt>
+              <Txt variant="label" color={c.flameDeep}>{t('retry')}</Txt>
             )}
           </Pressable>
         )}

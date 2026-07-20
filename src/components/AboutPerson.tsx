@@ -21,6 +21,7 @@ import { usePeople } from '@/context/PeopleContext';
 import { pickPhoto, uploadPhoto } from '@/utils/avatars';
 import { GIFT_IDEA, MEMORY, NOTEBOOK } from '@/utils/notes';
 import type { Note, Person } from '@/data/mock';
+import { useTranslation } from "react-i18next";
 
 // A gift idea is a line, not an essay — the cap is what keeps the list
 // scannable.
@@ -53,6 +54,7 @@ function Section({ icon, title, children }: { icon: string; title: string; child
 // short, and hiding two thirds of what you know about someone behind a tab was
 // more chrome than the content deserved.
 export function AboutPerson({ person, onDeleteNote }: Props) {
+    const { t } = useTranslation();
   const { c, cardShadow } = useTheme();
   const notes = person.notes ?? [];
   const gifts = notes.filter((n) => !n.photoUrl && n.kind === GIFT_IDEA);
@@ -63,19 +65,19 @@ export function AboutPerson({ person, onDeleteNote }: Props) {
     <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.line }, cardShadow]}>
       <View style={[styles.headerRow, { borderBottomColor: c.line }]}>
         <Icon name="auto-stories" size={22} color={c.flameDeep} />
-        <Txt variant="heading">About {person.name}</Txt>
+        <Txt variant="heading">{t('about_person', { name: person.name })}</Txt>
       </View>
 
       <View style={{ gap: spacing.stackLg }}>
-        <Section icon="card-giftcard" title="Gift ideas">
+        <Section icon="card-giftcard" title={t('gift_ideas')}>
           <GiftIdeas person={person} gifts={gifts} onDelete={onDeleteNote} />
         </Section>
 
-        <Section icon="photo-library" title="Memories">
+        <Section icon="photo-library" title={t('memories')}>
           <Memories person={person} photos={photos} onDelete={onDeleteNote} />
         </Section>
 
-        <Section icon="menu-book" title="Notebook">
+        <Section icon="menu-book" title={t('notebook')}>
           <Notebook person={person} note={notebookNote} />
         </Section>
       </View>
@@ -86,10 +88,12 @@ export function AboutPerson({ person, onDeleteNote }: Props) {
 // --- Gift ideas --------------------------------------------------------------
 
 function GiftIdeas({ person, gifts, onDelete }: { person: Person; gifts: Note[]; onDelete: (id: string) => void }) {
+    const { t } = useTranslation();
   const { c } = useTheme();
   const { addNoteToPerson } = usePeople();
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [showBought, setShowBought] = useState(false);
 
   const trimmed = body.trim();
@@ -122,8 +126,8 @@ function GiftIdeas({ person, gifts, onDelete }: { person: Person; gifts: Note[];
         <Animated.View entering={FadeIn.duration(160)} style={styles.emptyWrap}>
           <Txt variant="sub" color={c.muted} style={styles.empty}>
             {bought.length > 0
-              ? 'All caught up — everything has been bought.'
-              : 'Anything they mention wanting, jot it here.'}
+              ? t('all_bought')
+              : t('jot_here')}
           </Txt>
         </Animated.View>
       ) : (
@@ -134,31 +138,46 @@ function GiftIdeas({ person, gifts, onDelete }: { person: Person; gifts: Note[];
         </Animated.View>
       )}
 
-      <View style={styles.giftInputRow}>
-        <TextInput
-          value={body}
-          onChangeText={setBody}
-          maxLength={GIFT_MAX_LENGTH}
-          placeholder="e.g., that camera lens she mentioned"
-          placeholderTextColor={c.faint}
-          style={[styles.giftInput, { backgroundColor: c.surfaceAlt, color: c.text }]}
-          returnKeyType="done"
-          onSubmitEditing={add}
-          editable={!busy}
-        />
+      {/* The input only appears while adding — an always-on text field made the
+          section look like a form even when you were only reading. */}
+      {adding ? (
+        <Animated.View entering={FadeIn.duration(140)} style={styles.giftInputRow}>
+          <TextInput
+            autoFocus
+            value={body}
+            onChangeText={setBody}
+            maxLength={GIFT_MAX_LENGTH}
+            placeholder={t('e_g_that_camera_lens')}
+            placeholderTextColor={c.faint}
+            style={[styles.giftInput, { backgroundColor: c.surfaceAlt, color: c.text }]}
+            returnKeyType="done"
+            onSubmitEditing={add}
+            onBlur={() => { if (!trimmed) setAdding(false); }}
+            editable={!busy}
+          />
+          <Pressable
+            onPress={add}
+            disabled={!trimmed || busy}
+            style={({ pressed }) => [
+              styles.giftAddBtn,
+              { backgroundColor: c.flame },
+              (!trimmed || busy) && { opacity: 0.4 },
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <Icon name="add" size={20} color={c.onFlame} />
+          </Pressable>
+        </Animated.View>
+      ) : (
         <Pressable
-          onPress={add}
-          disabled={!trimmed || busy}
-          style={({ pressed }) => [
-            styles.giftAddBtn,
-            { backgroundColor: c.flame },
-            (!trimmed || busy) && { opacity: 0.4 },
-            pressed && { opacity: 0.85 },
-          ]}
+          onPress={() => setAdding(true)}
+          hitSlop={8}
+          style={({ pressed }) => [styles.addInline, pressed && { opacity: 0.6 }]}
         >
-          <Icon name="add" size={20} color={c.onFlame} />
+          <Icon name="add" size={17} color={c.flameDeep} />
+          <Txt variant="label" color={c.flameDeep}>{t('add_idea')}</Txt>
         </Pressable>
-      </View>
+      )}
 
       {bought.length > 0 && (
         <Animated.View
@@ -173,7 +192,7 @@ function GiftIdeas({ person, gifts, onDelete }: { person: Person; gifts: Note[];
           >
             <Icon name={showBought ? 'expand-less' : 'expand-more'} size={16} color={c.muted} />
             <Txt variant="eyebrow" color={c.faint}>
-              Bought ({bought.length})
+              {t('bought_count', { count: bought.length })}
             </Txt>
           </Pressable>
 
@@ -253,6 +272,7 @@ function GiftRow({ gift, onDelete }: { gift: Note; onDelete: (id: string) => voi
 // --- Memories ----------------------------------------------------------------
 
 function Memories({ person, photos, onDelete }: { person: Person; photos: Note[]; onDelete: (id: string) => void }) {
+    const { t } = useTranslation();
   const { c } = useTheme();
   const { user } = useAuth();
   const { addNoteToPerson } = usePeople();
@@ -263,7 +283,7 @@ function Memories({ person, photos, onDelete }: { person: Person; photos: Note[]
   const addPhoto = async () => {
     if (busy) return;
     if (!user) {
-      setError('You need to be signed in to add a photo.');
+      setError(t('need_sign_in_photo'));
       return;
     }
     setError(null);
@@ -271,7 +291,7 @@ function Memories({ person, photos, onDelete }: { person: Person; photos: Note[]
     try {
       const picked = await pickPhoto();
       if (picked.status === 'denied') {
-        setError('Kindred needs access to your photos to add a memory.');
+        setError(t('photos_access_memory'));
         return;
       }
       if (picked.status === 'cancelled') return;
@@ -282,7 +302,7 @@ function Memories({ person, photos, onDelete }: { person: Person; photos: Note[]
       await addNoteToPerson(person.id, MEMORY, '', undefined, url);
     } catch (e) {
       console.error('Failed to add memory:', e);
-      setError('Could not upload that photo. Check your connection and try again.');
+      setError(t('photo_upload_failed'));
     } finally {
       setBusy(false);
     }
@@ -292,8 +312,7 @@ function Memories({ person, photos, onDelete }: { person: Person; photos: Note[]
     <View style={{ gap: spacing.stackSm }}>
       {photos.length === 0 ? (
         <Txt variant="sub" color={c.muted} style={styles.empty}>
-          Pictures of the two of you, things you did together.
-        </Txt>
+          {t('pictures_of_the_two_of')}</Txt>
       ) : (
         <View style={styles.grid}>
           {photos.map((photo) => (
@@ -337,7 +356,7 @@ function Memories({ person, photos, onDelete }: { person: Person; photos: Note[]
         ) : (
           <>
             <Icon name="add-a-photo" size={18} color={c.flameDeep} />
-            <Txt variant="label" color={c.flameDeep}>Add a photo</Txt>
+            <Txt variant="label" color={c.flameDeep}>{t('add_a_photo')}</Txt>
           </>
         )}
       </Pressable>
@@ -355,26 +374,37 @@ function Memories({ person, photos, onDelete }: { person: Person; photos: Note[]
 // --- Notebook ----------------------------------------------------------------
 
 function Notebook({ person, note }: { person: Person; note?: Note }) {
+  const { t } = useTranslation();
   const { c } = useTheme();
   const { saveNotebook } = usePeople();
-  const [body, setBody] = useState(note?.body ?? '');
+  const savedBody = note?.body ?? '';
+  const [editing, setEditing] = useState(false);
+  const [body, setBody] = useState(savedBody);
   const [saving, setSaving] = useState(false);
-  const [savedAt, setSavedAt] = useState<number | null>(null);
 
-  // Pull in whatever the server has whenever it changes underneath — but not
-  // while the user is mid-edit, which is what the dirty check protects.
+  // Keep the draft in step with the server whenever we're not mid-edit.
   useEffect(() => {
-    setBody((current) => (current === '' ? note?.body ?? '' : current));
-  }, [note?.body]);
+    if (!editing) setBody(savedBody);
+  }, [savedBody, editing]);
 
-  const dirty = body !== (note?.body ?? '');
+  const dirty = body !== savedBody;
+
+  const startEditing = () => {
+    setBody(savedBody);
+    setEditing(true);
+  };
+
+  const cancel = () => {
+    setBody(savedBody);
+    setEditing(false);
+  };
 
   const save = async () => {
-    if (!dirty || saving) return;
+    if (saving) return;
     setSaving(true);
     try {
       await saveNotebook(person.id, body, note?.id);
-      setSavedAt(Date.now());
+      setEditing(false);
     } catch (e) {
       console.error('Failed to save notebook:', e);
     } finally {
@@ -382,48 +412,68 @@ function Notebook({ person, note }: { person: Person; note?: Note }) {
     }
   };
 
-  return (
-    <View style={{ gap: spacing.stackSm }}>
-      <TextInput
-        multiline
-        value={body}
-        onChangeText={setBody}
-        placeholder={`Anything about ${person.name} — sizes, allergies, what they love, what they said last time.`}
-        placeholderTextColor={c.faint}
-        style={[styles.notebook, { backgroundColor: c.surfaceAlt, color: c.text }]}
-        textAlignVertical="top"
-      />
-
-      {/* Save only shows up when there's something to save — a permanently
-          faded button read as broken. When clean, a quiet status sits alone. */}
-      <View style={styles.notebookFooter}>
-        {dirty ? (
-          <>
-            <Txt variant="sub" color={c.muted}>Unsaved changes</Txt>
-            <Pressable
-              onPress={save}
-              disabled={saving}
-              style={({ pressed }) => [
-                styles.saveBtn,
-                { backgroundColor: c.flame },
-                saving && { opacity: 0.6 },
-                pressed && { opacity: 0.85 },
-              ]}
-            >
-              <Icon name="check" size={16} color={c.onFlame} />
-              <Txt variant="label" color={c.onFlame}>{saving ? 'Saving…' : 'Save'}</Txt>
-            </Pressable>
-          </>
-        ) : (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Icon name={savedAt ? 'check-circle' : 'menu-book'} size={14} color={c.faint} />
-            <Txt variant="sub" color={c.faint}>
-              {savedAt ? 'Saved' : 'Your private notebook for them'}
-            </Txt>
-          </View>
-        )}
+  // Editing: a real textarea with save/cancel. This is the only time the
+  // notebook looks like an input.
+  if (editing) {
+    return (
+      <View style={{ gap: spacing.stackSm }}>
+        <TextInput
+          autoFocus
+          multiline
+          value={body}
+          onChangeText={setBody}
+          placeholder={t('notebook_placeholder', { name: person.name })}
+          placeholderTextColor={c.faint}
+          style={[styles.notebook, { backgroundColor: c.surfaceAlt, color: c.text }]}
+          textAlignVertical="top"
+        />
+        <View style={styles.notebookFooter}>
+          <Pressable onPress={cancel} hitSlop={8} style={({ pressed }) => pressed && { opacity: 0.6 }}>
+            <Txt variant="label" color={c.muted}>{t('cancel')}</Txt>
+          </Pressable>
+          <Pressable
+            onPress={save}
+            disabled={!dirty || saving}
+            style={({ pressed }) => [
+              styles.saveBtn,
+              { backgroundColor: c.flame },
+              (!dirty || saving) && { opacity: 0.5 },
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <Icon name="check" size={16} color={c.onFlame} />
+            <Txt variant="label" color={c.onFlame}>{saving ? t('saving') : t('save')}</Txt>
+          </Pressable>
+        </View>
       </View>
-    </View>
+    );
+  }
+
+  // Empty: a quiet invitation, no input box sitting there.
+  if (!savedBody) {
+    return (
+      <Pressable
+        onPress={startEditing}
+        hitSlop={8}
+        style={({ pressed }) => [styles.addInline, pressed && { opacity: 0.6 }]}
+      >
+        <Icon name="add" size={17} color={c.flameDeep} />
+        <Txt variant="label" color={c.flameDeep}>{t('add_a_note')}</Txt>
+      </Pressable>
+    );
+  }
+
+  // Has content: read it as text. Tapping anywhere opens the editor.
+  return (
+    <Pressable onPress={startEditing} style={({ pressed }) => pressed && { opacity: 0.85 }}>
+      <View style={{ gap: spacing.stackSm }}>
+        <Txt variant="body" color={c.text} style={{ lineHeight: 24 }}>{savedBody}</Txt>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Icon name="edit" size={13} color={c.faint} />
+          <Txt variant="sub" color={c.faint}>{t('tap_to_edit')}</Txt>
+        </View>
+      </View>
+    </Pressable>
   );
 }
 
@@ -460,6 +510,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   giftTextDone: { textDecorationLine: 'line-through' },
+  addInline: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, alignSelf: 'flex-start' },
   emptyWrap: { paddingVertical: 4 },
   boughtToggle: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4 },
   giftInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },

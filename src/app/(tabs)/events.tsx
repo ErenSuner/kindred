@@ -19,22 +19,19 @@ import { recurrenceIcon, recurrenceShortLabel } from '@/utils/recurrence';
 import { weekdaysLabel } from '@/utils/routines';
 import { formatTimeOfDay } from '@/utils/eventTime';
 import type { MyEvent } from '@/data/mock';
+import { useTranslation } from "react-i18next";
 
-function countdown(daysAway: number): string {
-  if (daysAway === 0) return 'Today';
-  if (daysAway === 1) return 'Tomorrow';
-  return `${daysAway} days`;
-}
+import { daysChipLabel, daysLongLabel, daysAgoLabel } from '@/utils/countdownLabel';
 
 function NudgeSummary({ event, onInk = false }: { event: MyEvent; onInk?: boolean }) {
+    const { t } = useTranslation();
   const { c } = useTheme();
   const fg = onInk ? c.onInkMuted : c.muted;
   const nudges = parseNudges(event.nudges);
   if (nudges.length === 0) {
     return (
       <Txt variant="sub" color={fg} style={{ opacity: 0.8 }}>
-        Reminded on the day
-      </Txt>
+        {t('reminded_on_the_day')}</Txt>
     );
   }
   return (
@@ -45,6 +42,7 @@ function NudgeSummary({ event, onInk = false }: { event: MyEvent; onInk?: boolea
 }
 
 export default function MyEvents() {
+    const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
@@ -76,11 +74,9 @@ export default function MyEvents() {
         <Animated.View entering={FadeInDown.duration(500)} style={styles.titleRow}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Txt variant="sub" color={c.muted} style={{ marginBottom: 6 }}>
-              {events.length === 0
-                ? 'Appointments, renewals, routines'
-                : `${events.length} ${events.length === 1 ? 'reminder' : 'reminders'}`}
+              {events.length === 0 ? t('events_sub') : t('reminders_count', { count: events.length })}
             </Txt>
-            <Txt variant="display">Just for you.</Txt>
+            <Txt variant="display">{t('just_for_you')}</Txt>
           </View>
           <Pressable
             onPress={openAdd}
@@ -91,13 +87,13 @@ export default function MyEvents() {
             ]}
           >
             <Icon name="add" size={17} color={c.onFlame} />
-            <Txt variant="label" color={c.onFlame}>Add</Txt>
+            <Txt variant="label" color={c.onFlame}>{t('add')}</Txt>
           </Pressable>
         </Animated.View>
 
         {loadError && (
           <View style={{ marginBottom: spacing.stackMd }}>
-            <FormError message={loadError} onRetry={refreshEvents} retryLabel="Retry" />
+            <FormError message={loadError} onRetry={refreshEvents} retryLabel={t('try_again')} />
           </View>
         )}
 
@@ -111,11 +107,9 @@ export default function MyEvents() {
                   <Icon name="self-improvement" size={30} color={c.flameDeep} />
                 </View>
                 <Txt variant="heading" style={{ textAlign: 'center', marginTop: 20 }}>
-                  Nothing for you yet
-                </Txt>
+                  {t('nothing_for_you_yet')}</Txt>
                 <Txt variant="body" color={c.muted} style={{ textAlign: 'center', marginTop: 8, maxWidth: 270 }}>
-                  Appointments, renewals, anything you&apos;d rather not carry in your head.
-                </Txt>
+                  {t('appointments_renewals_anything')}</Txt>
                 <Pressable
                   onPress={openAdd}
                   style={({ pressed }) => [
@@ -125,7 +119,7 @@ export default function MyEvents() {
                   ]}
                 >
                   <Icon name="add" size={18} color={c.onFlame} />
-                  <Txt variant="bodySemi" color={c.onFlame}>Add something</Txt>
+                  <Txt variant="bodySemi" color={c.onFlame}>{t('add_something')}</Txt>
                 </Pressable>
               </View>
             </Card>
@@ -138,7 +132,7 @@ export default function MyEvents() {
               <Card ink pressable onPress={() => router.push(`/my-event/edit/${featured.id}` as any)}>
                 <View style={styles.featuredEyebrowRow}>
                   <View style={[styles.flameDot, { backgroundColor: c.flame }]} />
-                  <Txt variant="eyebrow" color={c.flame}>Next up</Txt>
+                  <Txt variant="eyebrow" color={c.flame}>{t('next_up')}</Txt>
                   <View style={{ flex: 1 }} />
                   <View style={[styles.repeatChip, { backgroundColor: c.inkSoft }]}>
                     <Icon name={recurrenceIcon(featured.recurrence)} size={12} color={c.onInkMuted} />
@@ -162,11 +156,7 @@ export default function MyEvents() {
                   color={c.flame}
                   style={{ fontFamily: fonts.frauncesSemiBold, fontSize: 30, lineHeight: 36, marginTop: 18 }}
                 >
-                  {featured.daysAway === 0
-                    ? 'Today'
-                    : featured.daysAway === 1
-                    ? 'Tomorrow'
-                    : `in ${featured.daysAway} days`}
+                  {daysLongLabel(featured.daysAway)}
                 </Txt>
 
                 {/* The mechanism, quietly visible. */}
@@ -209,7 +199,7 @@ export default function MyEvents() {
                         color={event.daysAway === 0 ? c.flameDeep : c.muted}
                         style={{ fontSize: 13, lineHeight: 17 }}
                       >
-                        {countdown(event.daysAway)}
+                        {daysChipLabel(event.daysAway)}
                       </Txt>
                     </View>
                   </Card>
@@ -225,7 +215,7 @@ export default function MyEvents() {
         {routines.length > 0 && (
           <Animated.View entering={FadeInDown.duration(500).delay(300)} style={{ marginTop: spacing.stackLg, gap: spacing.stackSm }}>
             <View style={styles.sectionHead}>
-              <Txt variant="eyebrow" color={c.faint}>Every week</Txt>
+              <Txt variant="eyebrow" color={c.faint}>{t('every_week')}</Txt>
               <View style={[styles.sectionRule, { backgroundColor: c.line }]} />
             </View>
 
@@ -251,7 +241,7 @@ export default function MyEvents() {
                   </View>
                 </View>
                 <Txt variant="sub" color={c.muted}>
-                  {routine.daysAway === 0 ? 'Today' : routine.daysAway === 1 ? 'Tomorrow' : `in ${routine.daysAway} days`}
+                  {daysLongLabel(routine.daysAway)}
                 </Txt>
               </Card>
             ))}
@@ -262,7 +252,7 @@ export default function MyEvents() {
         {pastEvents.length > 0 && (
           <Animated.View entering={FadeInDown.duration(500).delay(320)} style={{ marginTop: spacing.stackLg, gap: spacing.stackSm }}>
             <View style={styles.sectionHead}>
-              <Txt variant="eyebrow" color={c.faint}>Looking back</Txt>
+              <Txt variant="eyebrow" color={c.faint}>{t('looking_back')}</Txt>
               <View style={[styles.sectionRule, { backgroundColor: c.line }]} />
             </View>
 
@@ -281,8 +271,7 @@ export default function MyEvents() {
                   </View>
                 </View>
                 <Txt variant="sub" color={c.faint}>
-                  {Math.abs(event.daysAway)} days ago
-                </Txt>
+                  {daysAgoLabel(event.daysAway)}</Txt>
               </Card>
             ))}
           </Animated.View>

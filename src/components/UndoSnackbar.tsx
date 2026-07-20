@@ -6,10 +6,12 @@ import { useTheme } from '@/theme/ThemeContext';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { useUndo } from '@/context/UndoContext';
+import { useTranslation } from "react-i18next";
 
 // Floats above the tab bar so it survives navigation — deleting from a detail
 // screen pops back to a list, and the offer to undo has to come along.
 export function UndoSnackbar() {
+    const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { c, floatShadow } = useTheme();
   const { pending, undo } = useUndo();
@@ -33,7 +35,7 @@ export function UndoSnackbar() {
           hitSlop={10}
           style={({ pressed }) => [styles.undo, pressed && { opacity: 0.7 }]}
         >
-          <Txt variant="label" color={c.flame}>Undo</Txt>
+          <Txt variant="label" color={c.flame}>{t('undo')}</Txt>
         </Pressable>
       </View>
     </Animated.View>

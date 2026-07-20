@@ -7,6 +7,7 @@ import { fonts } from '@/theme/type';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { NOTE } from '@/utils/notes';
+import { useTranslation } from "react-i18next";
 
 // Kept generous — the cap is about stopping a note from becoming an essay, not
 // about being stingy. Cards only ever preview the first couple of lines.
@@ -33,7 +34,9 @@ type Props = {
   blurb?: string;
 };
 
-export function NotesEditor({ notes, onChange, title = 'Notes', blurb }: Props) {
+export function NotesEditor({ notes, onChange, title, blurb }: Props) {
+    const { t } = useTranslation();
+  const heading = title ?? t('notes_title');
   const { c } = useTheme();
   const [body, setBody] = useState('');
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -73,10 +76,10 @@ export function NotesEditor({ notes, onChange, title = 'Notes', blurb }: Props) 
     <View style={[styles.box, { backgroundColor: c.surface, borderColor: c.line }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Icon name="edit-note" size={18} color={c.flameDeep} />
-        <Txt variant="subMed">{title}</Txt>
+        <Txt variant="subMed">{heading}</Txt>
       </View>
       <Txt variant="sub" color={c.muted} style={{ marginTop: 4, marginBottom: 12 }}>
-        {blurb ?? 'Plans, details, anything you want to remember for this day.'}
+        {blurb ?? t('notes_blurb')}
       </Txt>
 
       {notes.length > 0 && (
@@ -113,20 +116,19 @@ export function NotesEditor({ notes, onChange, title = 'Notes', blurb }: Props) 
         value={body}
         onChangeText={setBody}
         maxLength={NOTE_MAX_LENGTH}
-        placeholder="e.g., She mentioned wanting a new camera lens"
+        placeholder={t('e_g_she_mentioned_wanting')}
         placeholderTextColor={c.faint}
         style={[styles.input, { backgroundColor: c.surfaceAlt, borderColor: c.line, color: c.text }]}
       />
 
       <View style={styles.inputFooter}>
         <Txt variant="sub" color={remaining <= 20 ? c.danger : c.faint}>
-          {remaining} left
-        </Txt>
+          {remaining} {t('left')}</Txt>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           {editingKey && (
             <Pressable onPress={cancelEdit} hitSlop={8} style={{ paddingHorizontal: 8, paddingVertical: 6 }}>
-              <Txt variant="label" color={c.muted}>Cancel</Txt>
+              <Txt variant="label" color={c.muted}>{t('cancel')}</Txt>
             </Pressable>
           )}
           <Pressable
@@ -140,7 +142,7 @@ export function NotesEditor({ notes, onChange, title = 'Notes', blurb }: Props) 
             ]}
           >
             <Icon name={editingKey ? 'check' : 'add'} size={16} color={c.onFlame} />
-            <Txt variant="label" color={c.onFlame}>{editingKey ? 'Save note' : 'Add note'}</Txt>
+            <Txt variant="label" color={c.onFlame}>{editingKey ? t('save_note') : t('add_note')}</Txt>
           </Pressable>
         </View>
       </View>
@@ -148,8 +150,7 @@ export function NotesEditor({ notes, onChange, title = 'Notes', blurb }: Props) 
       {notes.length === 0 && !trimmed && (
         <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
           <Txt variant="sub" color={c.faint} style={styles.hint}>
-            Notes show up on this day&apos;s card, trimmed to a couple of lines.
-          </Txt>
+            {t('notes_show_up_on_this')}</Txt>
         </Animated.View>
       )}
     </View>

@@ -21,6 +21,8 @@ import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   const { c } = useTheme();
@@ -32,6 +34,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 }
 
 export default function EditSpecialDay() {
+    const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c, floatShadow } = useTheme();
@@ -89,11 +92,11 @@ export default function EditSpecialDay() {
     setError(null);
 
     if (!occasion.trim()) {
-      setError('Give this day a title.');
+      setError(i18n.t('give_this_day_a_title'));
       return;
     }
     if (!day || !month) {
-      setError('Pick a day and a month.');
+      setError(i18n.t('pick_a_day_and_a_month'));
       return;
     }
 
@@ -120,7 +123,7 @@ export default function EditSpecialDay() {
       });
 
       router.back();
-      showHeld(`${occasion.trim()} is remembered`, 'Reminders updated');
+      showHeld(t('is_remembered', { title: occasion.trim() }), i18n.t('reminders_updated'));
     } catch (e) {
       console.error(e);
       setError(describeWriteError(e));
@@ -133,7 +136,7 @@ export default function EditSpecialDay() {
     setDeleteConfirmVisible(false);
     // Leaves immediately; the snackbar carries the undo offer back to the person
     // screen, where the day is already hidden from the list.
-    deleteSpecialDayWithUndo(dayId ?? '', specialDay?.title ?? 'Special day');
+    deleteSpecialDayWithUndo(dayId ?? '', specialDay?.title ?? i18n.t('special_day'));
     router.back();
   };
 
@@ -144,8 +147,7 @@ export default function EditSpecialDay() {
           <Icon name="arrow-back" size={24} color={c.muted} />
         </Pressable>
         <Txt variant="title" style={{ flex: 1, textAlign: 'center' }}>
-          Edit special day
-        </Txt>
+          {t('edit_special_day')}</Txt>
         <Pressable onPress={() => setDeleteConfirmVisible(true)} hitSlop={8}>
           <Icon name="delete-outline" size={24} color={c.danger} />
         </Pressable>
@@ -161,18 +163,18 @@ export default function EditSpecialDay() {
             <Card style={{ gap: spacing.stackMd }}>
               <View style={{ gap: spacing.stackMd }}>
                 <View style={{ gap: 6 }}>
-                  <FieldLabel>Title</FieldLabel>
+                  <FieldLabel>{t('title')}</FieldLabel>
                   <TextInput
                     value={occasion}
                     onChangeText={setOccasion}
-                    placeholder="e.g., Anniversary, Graduation"
+                    placeholder={t('e_g_anniversary_graduation')}
                     placeholderTextColor={c.faint}
                     style={[styles.input, { backgroundColor: c.surfaceAlt, color: c.text }]}
                   />
                 </View>
 
                 <View style={{ gap: 6 }}>
-                  <FieldLabel>Date · year optional</FieldLabel>
+                  <FieldLabel>{t('date_year_optional')}</FieldLabel>
                   <DateFields value={date} onChange={setDate} yearMode="future" />
                 </View>
               </View>
@@ -189,7 +191,7 @@ export default function EditSpecialDay() {
 
           <Animated.View entering={FadeInDown.duration(500).delay(200)} style={{ alignItems: 'center' }}>
             <Button
-              label={saving ? 'Saving…' : 'Save changes'}
+              label={saving ? i18n.t('saving') : i18n.t('save_changes')}
               icon="check"
               onPress={handleSubmit}
               disabled={saving}
@@ -208,13 +210,12 @@ export default function EditSpecialDay() {
             <View style={[styles.deleteIconWrap, { backgroundColor: c.dangerWash }]}>
               <Icon name="delete-outline" size={30} color={c.danger} />
             </View>
-            <Txt variant="heading" style={{ marginTop: 16 }}>Delete special day</Txt>
+            <Txt variant="heading" style={{ marginTop: 16 }}>{t('delete_special_day')}</Txt>
             <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center' }}>
-              This removes the day and any notes kept with it. You&apos;ll have a moment to undo it.
-            </Txt>
+              {t('this_removes_the_day_and_1')}</Txt>
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, width: '100%' }}>
-              <Button label="Cancel" onPress={() => setDeleteConfirmVisible(false)} variant="quiet" style={{ flex: 1 }} />
-              <Button label="Delete" onPress={executeDelete} variant="dangerSolid" style={{ flex: 1 }} />
+              <Button label={t('cancel')} onPress={() => setDeleteConfirmVisible(false)} variant="quiet" style={{ flex: 1 }} />
+              <Button label={t('delete')} onPress={executeDelete} variant="dangerSolid" style={{ flex: 1 }} />
             </View>
           </Animated.View>
         </View>

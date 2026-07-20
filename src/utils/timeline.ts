@@ -10,6 +10,7 @@ import type { MyEvent, Note, Person } from '@/data/mock';
 import type { TimeOfDay } from '@/utils/eventTime';
 import { NO_UPCOMING_DAYS } from '@/utils/upcoming';
 import { weekdaysLabel } from '@/utils/routines';
+import i18n from '@/lib/i18n';
 
 export type TimelineSource = 'person' | 'event' | 'routine' | 'holiday';
 
@@ -38,12 +39,12 @@ export type TimelineGroup = { key: string; label: string; entries: TimelineEntry
 
 // Anything further out than this is "later" — a precise day count stops being
 // useful once it's months away.
-const BUCKETS: { key: string; label: string; upTo: number }[] = [
-  { key: 'today', label: 'Today', upTo: 0 },
-  { key: 'tomorrow', label: 'Tomorrow', upTo: 1 },
-  { key: 'week', label: 'This week', upTo: 7 },
-  { key: 'month', label: 'This month', upTo: 31 },
-  { key: 'later', label: 'Later', upTo: Infinity },
+const BUCKETS: { key: string; labelKey: string; upTo: number }[] = [
+  { key: 'today', labelKey: 'grp_today', upTo: 0 },
+  { key: 'tomorrow', labelKey: 'grp_tomorrow', upTo: 1 },
+  { key: 'week', labelKey: 'grp_week', upTo: 7 },
+  { key: 'month', labelKey: 'grp_month', upTo: 31 },
+  { key: 'later', labelKey: 'grp_later', upTo: Infinity },
 ];
 
 function bucketFor(daysAway: number) {
@@ -72,9 +73,12 @@ export function buildTimeline(
         daysAway: day.daysAway,
         date: day.date,
         title: day.isBirthday
-          ? `${person.name}'s Birthday${day.turningAge ? ` (${day.turningAge})` : ''}`
-          : `${person.name} — ${day.title}`,
-        subtitle: person.role,
+          ? i18n.t('timeline_birthday', {
+              name: person.name,
+              age: day.turningAge ? i18n.t('age_paren', { age: day.turningAge }) : '',
+            })
+          : i18n.t('timeline_person_day', { name: person.name, title: day.title }),
+        subtitle: i18n.t(`rel_${person.role}`, { defaultValue: person.role }),
         icon: day.icon,
         notes: day.notes,
         personId: person.id,
@@ -92,7 +96,7 @@ export function buildTimeline(
       daysAway: event.daysAway,
       date: event.date,
       title: event.title,
-      subtitle: 'For you',
+      subtitle: i18n.t('for_you'),
       icon: event.icon,
       timeOfDay: event.timeOfDay,
       eventId: event.id,
@@ -120,7 +124,7 @@ export function buildTimeline(
       daysAway: holiday.daysAway,
       date: holiday.formattedDate,
       title: holiday.name,
-      subtitle: 'Shared occasion',
+      subtitle: i18n.t('shared_occasion'),
       icon: holiday.icon,
     });
   }
@@ -140,7 +144,7 @@ export function buildTimeline(
     const bucket = bucketFor(entry.daysAway);
     const existing = groups.get(bucket.key);
     if (existing) existing.entries.push(entry);
-    else groups.set(bucket.key, { key: bucket.key, label: bucket.label, entries: [entry] });
+    else groups.set(bucket.key, { key: bucket.key, label: i18n.t(bucket.labelKey), entries: [entry] });
   }
 
   // Map preserves insertion order, and entries were already sorted, so the

@@ -11,8 +11,10 @@ import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { supabase } from '@/lib/supabase';
+import { useTranslation } from 'react-i18next';
 
 export default function Register() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
@@ -26,17 +28,17 @@ export default function Register() {
 
   const handleRegister = async () => {
     if (!name.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
-      setErrorMsg('Please fill in all fields.');
+      setErrorMsg(t('error_fill_fields'));
       return;
     }
 
     if (password !== confirmPassword) {
-      setErrorMsg('Passwords do not match.');
+      setErrorMsg(t('error_password_match'));
       return;
     }
 
     if (password.length < 6) {
-      setErrorMsg('Password should be at least 6 characters.');
+      setErrorMsg(t('error_password_length'));
       return;
     }
 
@@ -70,13 +72,13 @@ export default function Register() {
 
       if (data?.session) {
         // Logged in immediately (email confirmation disabled)
-        setSuccessMsg('Account created successfully!');
+        setSuccessMsg(t('register_success'));
       } else {
         // Email confirmation enabled
-        setSuccessMsg('Registration successful! Please check your email inbox.');
+        setSuccessMsg(t('register_success_email'));
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'An error occurred during registration.');
+      setErrorMsg(err.message || t('error_register'));
     } finally {
       setLoading(false);
     }
@@ -103,10 +105,10 @@ export default function Register() {
         <Animated.View entering={FadeInDown.duration(500)} style={{ alignItems: 'center', marginBottom: spacing.stackXl }}>
           <View style={styles.brandRow}>
             <View style={[styles.flameDot, { backgroundColor: c.flame }]} />
-            <Txt variant="display">Join Kindred</Txt>
+            <Txt variant="display">{t('join_brand')}</Txt>
           </View>
           <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center', maxWidth: 300 }}>
-            Save the dates that matter, then stop worrying about them.
+            {t('join_sub')}
           </Txt>
         </Animated.View>
 
@@ -131,10 +133,10 @@ export default function Register() {
             ) : null}
 
             <View style={{ gap: spacing.stackSm }}>
-              {label('Full name')}
+              {label(t('full_name'))}
               <TextInput
                 style={input}
-                placeholder="Jane Doe"
+                placeholder={t('name_placeholder')}
                 placeholderTextColor={c.faint}
                 value={name}
                 onChangeText={setName}
@@ -144,11 +146,11 @@ export default function Register() {
             </View>
 
             <View style={{ gap: spacing.stackSm, marginTop: spacing.stackMd }}>
-              {label('Email address')}
+              {label(t('email_address'))}
               <TextInput
                 value={email}
                 onChangeText={setEmail}
-                placeholder="e.g. sarah@example.com"
+                placeholder={t('email_placeholder')}
                 placeholderTextColor={c.faint}
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -159,11 +161,11 @@ export default function Register() {
             </View>
 
             <View style={{ gap: spacing.stackSm, marginTop: spacing.stackMd }}>
-              {label('Password')}
+              {label(t('password'))}
               <TextInput
                 value={password}
                 onChangeText={setPassword}
-                placeholder="Min 6 characters"
+                placeholder={t('password_placeholder')}
                 placeholderTextColor={c.faint}
                 secureTextEntry
                 autoCapitalize="none"
@@ -174,11 +176,11 @@ export default function Register() {
             </View>
 
             <View style={{ gap: spacing.stackSm, marginTop: spacing.stackMd }}>
-              {label('Confirm password')}
+              {label(t('confirm_password'))}
               <TextInput
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
-                placeholder="Confirm password"
+                placeholder={t('confirm_password_placeholder')}
                 placeholderTextColor={c.faint}
                 secureTextEntry
                 autoCapitalize="none"
@@ -189,7 +191,7 @@ export default function Register() {
             </View>
 
             <Button
-              label={loading ? 'Creating account…' : 'Sign up'}
+              label={loading ? t('creating_account') : t('sign_up')}
               onPress={handleRegister}
               fullWidth
               style={{ marginTop: spacing.stackLg }}
@@ -200,11 +202,11 @@ export default function Register() {
 
         <Animated.View entering={FadeInDown.duration(500).delay(200)} style={styles.footer}>
           <Txt variant="body" color={c.muted}>
-            Already have an account?{' '}
+            {t('already_have_account')}
           </Txt>
           <Pressable onPress={() => router.push('/login')}>
             <Txt variant="bodySemi" color={c.flameDeep} style={{ textDecorationLine: 'underline' }}>
-              Sign in
+              {t('sign_in')}
             </Txt>
           </Pressable>
         </Animated.View>

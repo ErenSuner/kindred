@@ -10,8 +10,10 @@ import { Toggle } from '@/components/Toggle';
 import { HOLIDAYS } from '@/data/holidays';
 import { HOLIDAY_HORIZON_DAYS, useHolidays } from '@/context/HolidaysContext';
 import { resolveHoliday } from '@/utils/holidays';
+import { useTranslation } from "react-i18next";
 
 export default function HolidaySettings() {
+    const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c, cardShadow } = useTheme();
@@ -24,8 +26,7 @@ export default function HolidaySettings() {
           <Icon name="arrow-back" size={24} color={c.muted} />
         </Pressable>
         <Txt variant="title" style={{ flex: 1, textAlign: 'center', marginRight: 24 }}>
-          Shared occasions
-        </Txt>
+          {t('shared_occasions')}</Txt>
       </View>
 
       <ScrollView
@@ -39,9 +40,7 @@ export default function HolidaySettings() {
       >
         <Animated.View entering={FadeInDown.duration(500)}>
           <Txt variant="sub" color={c.muted}>
-            Days everyone shares. The ones you keep appear on your home screen{' '}
-            {HOLIDAY_HORIZON_DAYS} days ahead, with a nudge a week and a day before.
-          </Txt>
+            {t('holidays_intro', { days: HOLIDAY_HORIZON_DAYS })}</Txt>
         </Animated.View>
 
         <View style={[styles.group, { backgroundColor: c.surface, borderColor: c.line }, cardShadow]}>
@@ -81,8 +80,7 @@ export default function HolidaySettings() {
           <Animated.View entering={FadeInDown.duration(300)} style={[styles.emptyNote, { backgroundColor: c.surfaceAlt }]}>
             <Icon name="info-outline" size={16} color={c.muted} />
             <Txt variant="sub" color={c.muted} style={{ flex: 1 }}>
-              With none selected, shared occasions stay off your home screen entirely.
-            </Txt>
+              {t('with_none_selected_shared_occa')}</Txt>
           </Animated.View>
         )}
       </ScrollView>

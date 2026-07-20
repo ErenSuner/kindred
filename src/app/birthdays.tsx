@@ -11,27 +11,26 @@ import { Avatar } from '@/components/Avatar';
 import { Card } from '@/components/Card';
 import { usePeople } from '@/context/PeopleContext';
 import type { Person, SpecialDay } from '@/data/mock';
+import { useTranslation } from "react-i18next";
+import { daysChipLabel } from '@/utils/countdownLabel';
 
 type BirthdayItem = {
   person: Person;
   day: SpecialDay;
   nextDate: Date;
-  monthName: string;
+  monthIndex: number;
   isUpcoming: boolean;
 };
 
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
-];
 
 export default function Birthdays() {
+    const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const { people } = usePeople();
 
-  const [activeFilter, setActiveFilter] = useState('Upcoming');
+  const [activeFilter, setActiveFilter] = useState('upcoming');
 
   const { birthdays, availableMonths } = useMemo(() => {
     const items: BirthdayItem[] = [];
@@ -44,7 +43,7 @@ export default function Birthdays() {
         if (sd.title.toLowerCase().includes('birthday')) {
           const nextDate = new Date(now.getTime() + (sd.daysAway || 0) * 86400000);
           const m = nextDate.getMonth();
-          const monthName = MONTHS[m];
+
           // Upcoming = falls in current month or next month
           const isUpcoming = m === currentMonth || m === nextMonth;
 
@@ -52,7 +51,7 @@ export default function Birthdays() {
             person: p,
             day: sd,
             nextDate,
-            monthName,
+            monthIndex: m,
             isUpcoming,
           });
         }
@@ -61,21 +60,24 @@ export default function Birthdays() {
 
     items.sort((a, b) => (a.day.daysAway || 0) - (b.day.daysAway || 0));
 
-    const monthsSet = new Set<string>();
+    const monthsSet = new Set<number>();
     items.forEach((item) => {
       if (!item.isUpcoming) {
-        monthsSet.add(item.monthName);
+        monthsSet.add(item.monthIndex);
       }
     });
 
     return { birthdays: items, availableMonths: Array.from(monthsSet) };
   }, [people]);
 
-  const chips = ['Upcoming', ...availableMonths];
+  const chips: { key: string; label: string }[] = [
+    { key: 'upcoming', label: t('upcoming_word') },
+    ...availableMonths.map((m) => ({ key: String(m), label: t(`month_${m}`) })),
+  ];
 
   const filteredBirthdays = useMemo(() => {
-    if (activeFilter === 'Upcoming') return birthdays; // show all, but we group them
-    return birthdays.filter((b) => b.monthName === activeFilter);
+    if (activeFilter === 'upcoming') return birthdays; // show all, but we group them
+    return birthdays.filter((b) => String(b.monthIndex) === activeFilter);
   }, [activeFilter, birthdays]);
 
   const renderItem = (item: BirthdayItem, index: number) => {
@@ -95,7 +97,7 @@ export default function Birthdays() {
             </Txt>
             <Txt variant="sub" color={c.muted} numberOfLines={1} style={{ marginTop: 2 }}>
               {item.day.date.split(',')[0]}
-              {item.day.turningAge ? ` · turning ${item.day.turningAge}` : ''}
+              {item.day.turningAge ? ` · ${t('turning_n', { age: item.day.turningAge })}` : ''}
             </Txt>
           </View>
           <View
@@ -109,11 +111,7 @@ export default function Birthdays() {
               color={item.day.daysAway === 0 ? c.flameDeep : soon ? c.text : c.muted}
               style={{ fontSize: 13, lineHeight: 17 }}
             >
-              {item.day.daysAway === 0
-                ? 'Today'
-                : item.day.daysAway === 1
-                ? 'Tomorrow'
-                : `${item.day.daysAway} days`}
+              {daysChipLabel(item.day.daysAway ?? 0)}
             </Txt>
           </View>
         </Card>
@@ -129,8 +127,7 @@ export default function Birthdays() {
           <Icon name="arrow-back" size={24} />
         </Pressable>
         <Txt variant="title" style={{ flex: 1, paddingHorizontal: 12 }}>
-          Birthdays
-        </Txt>
+          {t('birthdays')}</Txt>
         <View style={{ width: 40 }} />
       </View>
 
@@ -151,11 +148,11 @@ export default function Birthdays() {
           }}
         >
           {chips.map((chip, i) => {
-            const active = activeFilter === chip;
+            const active = activeFilter === chip.key;
             return (
-              <Animated.View key={chip} entering={FadeInDown.duration(400).delay(i * 40)}>
+              <Animated.View key={chip.key} entering={FadeInDown.duration(400).delay(i * 40)}>
                 <Pressable
-                  onPress={() => setActiveFilter(chip)}
+                  onPress={() => setActiveFilter(chip.key)}
                   style={[
                     styles.chip,
                     {
@@ -165,7 +162,7 @@ export default function Birthdays() {
                   ]}
                 >
                   <Txt variant="subMed" color={active ? c.onInk : c.muted}>
-                    {chip}
+                    {chip.label}
                   </Txt>
                 </Pressable>
               </Animated.View>
@@ -178,17 +175,15 @@ export default function Birthdays() {
             <Animated.View entering={FadeInDown.duration(400)} style={{ alignItems: 'center', marginTop: 40 }}>
               <Icon name="cake" size={44} color={c.lineStrong} />
               <Txt variant="heading" style={{ marginTop: 16 }}>
-                {activeFilter === 'Upcoming' ? 'No birthdays saved yet' : `Nothing in ${activeFilter}`}
+                {activeFilter === 'upcoming' ? t('no_birthdays_saved') : t('nothing_in_month', { month: t(`month_${Number(activeFilter)}`) })}
               </Txt>
               <Txt variant="sub" color={c.muted} style={{ marginTop: 6, textAlign: 'center', maxWidth: 260 }}>
-                {activeFilter === 'Upcoming'
-                  ? 'Add a birthday to someone and it will land here, sorted by how soon it is.'
-                  : 'A quiet month. Every saved birthday still shows under Upcoming.'}
+                {activeFilter === 'upcoming' ? t('add_birthday_lands_here') : t('quiet_month')}
               </Txt>
             </Animated.View>
           ) : (
             <>
-              {activeFilter === 'Upcoming' ? (
+              {activeFilter === 'upcoming' ? (
                 // Grouped view
                 (() => {
                   const upcomingItems = filteredBirthdays.filter((b) => b.isUpcoming);
@@ -200,10 +195,10 @@ export default function Birthdays() {
                   upcomingItems.forEach((item, i) => elements.push(renderItem(item, i)));
 
                   // Render grouped by month for later items
-                  let currentMonthGroup = '';
+                  let currentMonthGroup = -1;
                   laterItems.forEach((item, i) => {
-                    if (item.monthName !== currentMonthGroup) {
-                      currentMonthGroup = item.monthName;
+                    if (item.monthIndex !== currentMonthGroup) {
+                      currentMonthGroup = item.monthIndex;
                       elements.push(
                         <Animated.View
                           key={`divider-${currentMonthGroup}`}
@@ -212,7 +207,7 @@ export default function Birthdays() {
                         >
                           <View style={[styles.dividerLine, { backgroundColor: c.line }]} />
                           <Txt variant="eyebrow" color={c.faint}>
-                            {currentMonthGroup}
+                            {t(`month_${currentMonthGroup}`)}
                           </Txt>
                           <View style={[styles.dividerLine, { backgroundColor: c.line }]} />
                         </Animated.View>

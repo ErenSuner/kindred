@@ -11,9 +11,11 @@ import { showHeld } from '@/components/HeldNotice';
 import { DateFields, DateValue } from '@/components/DateFields';
 import { ReminderEditor } from '@/components/ReminderEditor';
 import { usePeople } from '@/context/PeopleContext';
-import { Nudge, parseNudges, serializeNudges } from '@/utils/nudges';
+import { Nudge, nudgeLabel, parseNudges, serializeNudges } from '@/utils/nudges';
 import { SKIPPED_YEAR } from '@/utils/dates';
 import type { Person } from '@/data/mock';
+import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   const { c } = useTheme();
@@ -29,6 +31,7 @@ export type InlineBirthdayCardProps = {
 };
 
 export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
+    const { t } = useTranslation();
   const { c, cardShadow } = useTheme();
   const { addBirthday, updateBirthday, deleteSpecialDayWithUndo } = usePeople();
   const birthday = person.birthday;
@@ -75,7 +78,7 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
     setError(null);
 
     if (!day || !month) {
-      setError('Pick a day and a month.');
+      setError(i18n.t('pick_a_day_and_a_month'));
       return;
     }
 
@@ -93,14 +96,14 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
       setIsExpanded(false);
       // The reassurance is the product: say the job has been taken on.
       showHeld(
-        `${person.name}'s birthday is remembered`,
+        t('birthday_remembered', { name: person.name }),
         reminders.length > 0
-          ? `On the day, plus ${reminders.length} earlier ${reminders.length === 1 ? 'reminder' : 'reminders'}`
-          : "We'll remind you on the day",
+          ? t('on_day_plus', { count: reminders.length })
+          : t('we_ll_remind_you_on_the_day'),
       );
     } catch (e) {
       console.error(e);
-      setError('Could not save. Check your connection and try again.');
+      setError(t('could_not_save'));
     } finally {
       setIsSaving(false);
     }
@@ -132,7 +135,7 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
             ]}
           >
             <Icon name="add-circle-outline" size={22} color={c.flameDeep} />
-            <Txt variant="bodyMed" color={c.flameDeep}>Add birthday</Txt>
+            <Txt variant="bodyMed" color={c.flameDeep}>{t('add_birthday')}</Txt>
           </Pressable>
         ) : (
           <View style={[styles.savedCard, { backgroundColor: c.surface, borderColor: c.line }, cardShadow]}>
@@ -142,7 +145,7 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Txt variant="bodyMed">
-                  Birthday{bdayEvent?.turningAge ? ` (Turning ${bdayEvent.turningAge})` : ''}
+                  {t('birthday')}{bdayEvent?.turningAge ? t('turning_age', { age: bdayEvent.turningAge }) : ''}
                 </Txt>
                 <Txt variant="sub" color={c.muted} style={{ marginTop: 2 }}>
                   {bdayEvent?.date}
@@ -154,7 +157,7 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
                     {reminders.map((r, i) => (
                       <View key={`${r.value}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <Icon name={r.type === 'date' ? 'notifications-none' : 'schedule'} size={12} color={c.flameDeep} />
-                        <Txt variant="sub" color={c.faint}>{r.label}</Txt>
+                        <Txt variant="sub" color={c.faint}>{nudgeLabel(r.value)}</Txt>
                       </View>
                     ))}
                   </View>
@@ -175,7 +178,7 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
           <View style={styles.cardHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Icon name="cake" size={22} color={c.flameDeep} />
-              <Txt variant="heading">{birthday ? 'Edit birthday' : 'Add birthday'}</Txt>
+              <Txt variant="heading">{birthday ? t('edit_birthday') : t('add_birthday')}</Txt>
             </View>
             <Pressable onPress={() => setIsExpanded(false)} hitSlop={8}>
               <Icon name="close" size={24} color={c.muted} />
@@ -184,7 +187,7 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
 
           <View style={{ gap: spacing.stackMd }}>
             <View style={{ gap: 4 }}>
-              <FieldLabel>Date · year optional</FieldLabel>
+              <FieldLabel>{t('date_year_optional')}</FieldLabel>
               <DateFields value={date} onChange={setDate} yearMode="past" />
             </View>
 
@@ -193,7 +196,7 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
             <FormError message={error} />
 
             <Button
-              label={isSaving ? 'Saving…' : 'Save birthday'}
+              label={isSaving ? t('saving') : t('save_birthday')}
               icon="check"
               onPress={handleSave}
               disabled={isSaving}
@@ -208,7 +211,7 @@ export function InlineBirthdayCard({ person }: InlineBirthdayCardProps) {
                 style={({ pressed }) => [styles.clearBtn, pressed && { opacity: 0.7 }]}
               >
                 <Icon name="delete-outline" size={16} color={c.danger} />
-                <Txt variant="label" color={c.danger}>Clear birthday</Txt>
+                <Txt variant="label" color={c.danger}>{t('clear_birthday')}</Txt>
               </Pressable>
             )}
           </View>
