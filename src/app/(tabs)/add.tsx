@@ -155,17 +155,25 @@ export default function Connections() {
           <SearchBar value={query} onChange={setQuery} placeholder={t('search_people_days_notes')} />
         )}
 
-        {/* Browsing birthdays by month is a quiet, secondary way into the same
-            people — a small link under search, not a bar above it. */}
-        {people.length > 0 && !searching && (
+        {/* Birthdays are their own space — and you can keep one without adopting
+            a whole contact, so this stays visible even before anyone's added. */}
+        {!searching && (
           <Pressable
             onPress={() => router.push('/birthdays')}
-            hitSlop={8}
-            style={({ pressed }) => [styles.birthdaysLink, pressed && { opacity: 0.6 }]}
+            style={({ pressed }) => [pressed && { opacity: 0.7 }]}
           >
-            <Icon name="cake" size={15} color={c.flameDeep} />
-            <Txt variant="label" color={c.flameDeep}>{t('birthdays_by_month')}</Txt>
-            <Icon name="chevron-right" size={16} color={c.flameDeep} />
+            <Card style={styles.birthdaysRow}>
+              <View style={[styles.birthdaysIcon, { backgroundColor: c.flameWash }]}>
+                <Icon name="cake" size={20} color={c.flameDeep} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Txt variant="heading" style={{ fontSize: 16, lineHeight: 21 }}>{t('birthdays')}</Txt>
+                <Txt variant="sub" color={c.muted} numberOfLines={1} style={{ marginTop: 1 }}>
+                  {t('birthdays_row_sub')}
+                </Txt>
+              </View>
+              <Icon name="chevron-right" size={20} color={c.faint} />
+            </Card>
           </Pressable>
         )}
 
@@ -354,12 +362,18 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: radius.full,
   },
-  birthdaysLink: {
+  birthdaysRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-end',
-    paddingVertical: 2,
+    gap: 14,
+    padding: 14,
+  },
+  birthdaysIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyState: {
     alignItems: 'center',

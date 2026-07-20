@@ -451,5 +451,19 @@
   "birthday_takes_from_here2": "Add a birthday and Kindred takes it from there",
   "n_on": "{{count}} on",
   "notebook_placeholder": "Anything about {{name}} — sizes, allergies, what they love, what they said last time.",
-  "select_generic": "Select"
+  "select_generic": "Select",
+  "emoji": "Emoji",
+  "new_birthday": "New Birthday",
+  "edit_birthday": "Edit Birthday",
+  "save_birthday": "Save Birthday",
+  "give_the_birthday_a_name": "Give the birthday a name",
+  "e_g_aunt_ayse": "e.g. Aunt Ayşe, David from work",
+  "birthday_not_found": "This birthday couldn't be found",
+  "delete_this_birthday": "Delete this birthday?",
+  "delete_birthday_body": "{{name}}'s birthday will be removed from your list.",
+  "birthdays_row_sub": "Save a birthday without adding a contact",
+  "next_up": "Next up",
+  "all_upcoming": "All upcoming",
+  "filter": "Filter",
+  "on_the_day_plus_reminders": "On the day, plus {{count}} earlier {{count, plural, one {reminder} other {reminders}}}"
 }

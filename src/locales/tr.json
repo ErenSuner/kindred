@@ -451,5 +451,19 @@
   "birthday_takes_from_here2": "Doğum günü ekle, gerisini Kindred halletsin",
   "n_on": "{{count}} açık",
   "notebook_placeholder": "{{name}} hakkında her şey — bedenler, alerjiler, sevdikleri, son söyledikleri.",
-  "select_generic": "Seç"
+  "select_generic": "Seç",
+  "emoji": "Emoji",
+  "new_birthday": "Yeni Doğum Günü",
+  "edit_birthday": "Doğum Gününü Düzenle",
+  "save_birthday": "Doğum Gününü Kaydet",
+  "give_the_birthday_a_name": "Doğum gününe bir isim ver",
+  "e_g_aunt_ayse": "örn. Ayşe Teyze, işten David",
+  "birthday_not_found": "Bu doğum günü bulunamadı",
+  "delete_this_birthday": "Bu doğum günü silinsin mi?",
+  "delete_birthday_body": "{{name}} adlı kişinin doğum günü listenden kaldırılacak.",
+  "birthdays_row_sub": "Kişi eklemeden bir doğum günü kaydet",
+  "next_up": "En yakın",
+  "all_upcoming": "Tümü",
+  "filter": "Filtrele",
+  "on_the_day_plus_reminders": "Gününde, ayrıca {{count}} önceden hatırlatma"
 }

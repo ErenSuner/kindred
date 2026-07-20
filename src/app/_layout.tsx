@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -22,6 +22,7 @@ import { ThemeProvider, useTheme } from '@/theme/ThemeContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { PeopleProvider } from '@/context/PeopleContext';
 import { EventsProvider } from '@/context/EventsContext';
+import { BirthdaysProvider } from '@/context/BirthdaysContext';
 import { HolidaysProvider } from '@/context/HolidaysContext';
 import { NotificationSync } from '@/components/NotificationSync';
 import { UndoProvider } from '@/context/UndoContext';
@@ -100,17 +101,28 @@ function RootLayoutNav() {
       <Stack.Screen name="import-contacts" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="my-event/add" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="my-event/edit/[id]" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="birthday/add" options={{ animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="birthday/edit/[id]" options={{ animation: 'slide_from_right' }} />
     </Stack>
   );
 }
 
 function ThemedApp() {
   const { mode } = useTheme();
+  // Some strings come from util funcs that read i18n.t at compute time and
+  // aren't subscribed to language changes, so they stay stale until a remount.
+  // Remount the screen subtree on language change (data providers stay intact).
+  const [lang, setLang] = useState(i18n.language);
+  useEffect(() => {
+    const onChange = (lng: string) => setLang(lng);
+    i18n.on('languageChanged', onChange);
+    return () => i18n.off('languageChanged', onChange);
+  }, []);
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
       <NotificationSync />
-      <RootLayoutNav />
+      <RootLayoutNav key={lang} />
       <PendingWrites />
       <HeldNotice />
       <UndoSnackbar />
@@ -165,9 +177,11 @@ export default function RootLayout() {
           <UndoProvider>
             <PeopleProvider>
               <EventsProvider>
-                <HolidaysProvider>
-                  <ThemedApp />
-                </HolidaysProvider>
+                <BirthdaysProvider>
+                  <HolidaysProvider>
+                    <ThemedApp />
+                  </HolidaysProvider>
+                </BirthdaysProvider>
               </EventsProvider>
             </PeopleProvider>
           </UndoProvider>
