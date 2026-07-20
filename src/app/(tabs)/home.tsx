@@ -123,22 +123,8 @@ export default function Home() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Wordmark row: identity left, birthdays shortcut right. */}
-        <View style={styles.topRow}>
-          <Txt style={[styles.wordmark, { color: c.text }]}>Kindred</Txt>
-          <Pressable
-            onPress={() => router.push('/birthdays')}
-            style={({ pressed }) => [
-              styles.birthdaysBtn,
-              { backgroundColor: c.flameWash },
-              pressed && { opacity: 0.8 },
-            ]}
-          >
-            <Icon name="cake" size={18} color={c.flameDeep} />
-            <Txt variant="label" color={c.flameDeep}>Birthdays</Txt>
-          </Pressable>
-        </View>
-
+        {/* Greeting leads, like every other tab leads with its title — no
+            orphaned wordmark, nothing competing on the right. */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.welcome}>
           <Txt variant="sub" color={c.muted} style={{ marginBottom: 6, textTransform: 'capitalize' }}>
             Welcome back, {userName}
@@ -312,21 +298,7 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.stackLg,
-  },
-  wordmark: { fontFamily: fonts.frauncesSemiBold, fontSize: 22, lineHeight: 28, letterSpacing: -0.3 },
-  birthdaysBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: radius.full,
-  },
+  wordmark: { fontFamily: fonts.frauncesSemiBold, fontSize: 15, lineHeight: 20, letterSpacing: 0.3 },
   welcome: { marginBottom: spacing.stackLg },
   hero: { overflow: 'hidden' },
   heroEyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 18 },

@@ -12,6 +12,7 @@ import { Icon } from '@/components/Icon';
 import { Chip } from '@/components/Chip';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
+import { Avatar } from '@/components/Avatar';
 import { usePeople } from '@/context/PeopleContext';
 import { InlineBirthdayCard } from '@/components/InlineBirthdayCard';
 import { NotePreview } from '@/components/NotePreview';
@@ -73,7 +74,9 @@ export default function PersonDetail() {
 
   const person = getPerson(id ?? '');
 
-  // Delete state
+  // Person-level actions all live in one overflow sheet, so the destructive one
+  // isn't a bare icon in the top chrome next to Back.
+  const [personActionsVisible, setPersonActionsVisible] = useState(false);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
   const [dayActionVisible, setDayActionVisible] = useState(false);
   const [dayConfirmVisible, setDayConfirmVisible] = useState(false);
@@ -106,10 +109,6 @@ export default function PersonDetail() {
       </View>
     );
   }
-
-  const handleDelete = () => {
-    setDeleteConfirmVisible(true);
-  };
 
   const executeDelete = () => {
     setDeleteConfirmVisible(false);
@@ -149,15 +148,11 @@ export default function PersonDetail() {
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <Icon name="arrow-back" size={24} color={c.muted} />
         </Pressable>
-        {/* Edit and delete stay visible — nothing important behind a gesture. */}
-        <View style={{ flexDirection: 'row', gap: 18 }}>
-          <Pressable onPress={handleDelete} hitSlop={8}>
-            <Icon name="delete-outline" size={24} color={c.danger} />
-          </Pressable>
-          <Pressable hitSlop={8} onPress={() => router.push(('/edit/' + person.id) as any)}>
-            <Icon name="edit" size={24} color={c.muted} />
-          </Pressable>
-        </View>
+        {/* One overflow entry, so a destructive action isn't top-chrome next to
+            Back. Edit, Open in Contacts and Delete all live inside it. */}
+        <Pressable onPress={() => setPersonActionsVisible(true)} hitSlop={8}>
+          <Icon name="more-horiz" size={24} color={c.muted} />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -195,33 +190,17 @@ export default function PersonDetail() {
           <Txt variant="display" style={{ marginTop: 16, textAlign: 'center' }}>
             {person.name}
           </Txt>
+          {/* tags already carries the role, so filter it out — otherwise the
+              relationship shows up as two identical chips. */}
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
             <Chip label={person.role} />
-            {person.tags.map((t) => (
+            {person.tags.filter((t) => t !== person.role).map((t) => (
               <Chip key={t} label={t} />
             ))}
           </View>
 
-          {/* Kindred holds no way to reach anyone. This hands the phone back its
-              own contact id so calling and messaging happen where they already
-              live. Only appears for someone imported from the address book. */}
-          {person.contactId && Platform.OS !== 'web' && (
-            <Pressable
-              onPress={handleOpenContact}
-              disabled={openingContact}
-              style={({ pressed }) => [
-                styles.contactBtn,
-                { borderColor: c.lineStrong, backgroundColor: c.surface },
-                pressed && { opacity: 0.8 },
-              ]}
-            >
-              <Icon name="person-search" size={18} color={c.flameDeep} />
-              <Txt variant="label" color={c.flameDeep}>
-                {openingContact ? 'Opening…' : 'Open in Contacts'}
-              </Txt>
-            </Pressable>
-          )}
-
+          {/* Opening in Contacts now lives in the overflow sheet; only its
+              failure needs to surface here, where the tap happened. */}
           {contactError && (
             <Txt variant="sub" color={c.muted} style={styles.contactError}>
               {contactError}
@@ -332,6 +311,63 @@ export default function PersonDetail() {
         </Animated.View>
 
       </ScrollView>
+
+      {/* Person overflow: edit, open in contacts, delete — all in one place. */}
+      <Modal visible={personActionsVisible} transparent animationType="none" onRequestClose={() => setPersonActionsVisible(false)}>
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={[styles.modalOverlay, { backgroundColor: c.overlay }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setPersonActionsVisible(false)} />
+          <Animated.View
+            entering={SlideInDown.duration(300).springify()}
+            exiting={SlideOutDown.duration(200)}
+            style={[
+              styles.modalContent,
+              { backgroundColor: c.surface, marginTop: 'auto', marginBottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
+              floatShadow,
+            ]}
+          >
+            <View style={{ alignItems: 'center', marginBottom: 20, gap: 10 }}>
+              <Avatar uri={person.avatar} initials={person.initials} size={56} />
+              <Txt variant="heading">{person.name}</Txt>
+            </View>
+
+            <View style={{ gap: 12, width: '100%' }}>
+              <Button
+                variant="quiet"
+                icon="edit"
+                label="Edit person"
+                fullWidth
+                onPress={() => {
+                  setPersonActionsVisible(false);
+                  router.push(('/edit/' + person.id) as any);
+                }}
+              />
+              {person.contactId && Platform.OS !== 'web' && (
+                <Button
+                  variant="quiet"
+                  icon="person-search"
+                  label={openingContact ? 'Opening…' : 'Open in Contacts'}
+                  fullWidth
+                  disabled={openingContact}
+                  onPress={() => {
+                    setPersonActionsVisible(false);
+                    handleOpenContact();
+                  }}
+                />
+              )}
+              <Button
+                variant="danger"
+                icon="delete-outline"
+                label="Delete person"
+                fullWidth
+                onPress={() => {
+                  setPersonActionsVisible(false);
+                  setDeleteConfirmVisible(true);
+                }}
+              />
+            </View>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
 
       {/* Special day action sheet */}
       <Modal visible={dayActionVisible} transparent animationType="none" onRequestClose={() => setDayActionVisible(false)}>
@@ -471,16 +507,6 @@ const styles = StyleSheet.create({
     borderWidth: 4,
   },
   bigInitials: { alignItems: 'center', justifyContent: 'center' },
-  contactBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 16,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: radius.full,
-    borderWidth: 1,
-  },
   contactError: { opacity: 0.8, marginTop: 8, textAlign: 'center' },
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   flameDot: { width: 8, height: 8, borderRadius: 4 },

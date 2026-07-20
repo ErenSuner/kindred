@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { View, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +11,7 @@ import { Icon } from '@/components/Icon';
 import { Avatar } from '@/components/Avatar';
 import { useAuth } from '@/context/AuthContext';
 import { Card } from '@/components/Card';
+import { AddEventSheet } from '@/components/AddEventSheet';
 import { FormError } from '@/components/FormError';
 import { useEvents } from '@/context/EventsContext';
 import { parseNudges } from '@/utils/nudges';
@@ -54,6 +56,11 @@ export default function MyEvents() {
   const featured = events[0];
   const rest = events.slice(1);
 
+  const [addVisible, setAddVisible] = useState(false);
+  const openAdd = () => setAddVisible(true);
+  const goAdd = (choice: 'once' | 'weekly') =>
+    router.push((choice === 'weekly' ? '/my-event/routine' : '/my-event/add') as any);
+
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <ScrollView
@@ -64,13 +71,28 @@ export default function MyEvents() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View entering={FadeInDown.duration(500)} style={{ marginBottom: spacing.stackLg }}>
-          <Txt variant="sub" color={c.muted} style={{ marginBottom: 6 }}>
-            {events.length === 0
-              ? 'Appointments, renewals, routines'
-              : `${events.length} ${events.length === 1 ? 'reminder' : 'reminders'}`}
-          </Txt>
-          <Txt variant="display">Just for you.</Txt>
+        {/* Title left, primary add top-right — the same shape as People, so
+            "where do I add" has one answer across the app. */}
+        <Animated.View entering={FadeInDown.duration(500)} style={styles.titleRow}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Txt variant="sub" color={c.muted} style={{ marginBottom: 6 }}>
+              {events.length === 0
+                ? 'Appointments, renewals, routines'
+                : `${events.length} ${events.length === 1 ? 'reminder' : 'reminders'}`}
+            </Txt>
+            <Txt variant="display">Just for you.</Txt>
+          </View>
+          <Pressable
+            onPress={openAdd}
+            style={({ pressed }) => [
+              styles.headerBtn,
+              { backgroundColor: c.flame },
+              pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
+            ]}
+          >
+            <Icon name="add" size={17} color={c.onFlame} />
+            <Txt variant="label" color={c.onFlame}>Add</Txt>
+          </Pressable>
         </Animated.View>
 
         {loadError && (
@@ -95,7 +117,7 @@ export default function MyEvents() {
                   Appointments, renewals, anything you&apos;d rather not carry in your head.
                 </Txt>
                 <Pressable
-                  onPress={() => router.push('/my-event/add' as any)}
+                  onPress={openAdd}
                   style={({ pressed }) => [
                     styles.emptyBtn,
                     { backgroundColor: c.flame },
@@ -103,7 +125,7 @@ export default function MyEvents() {
                   ]}
                 >
                   <Icon name="add" size={18} color={c.onFlame} />
-                  <Txt variant="bodySemi" color={c.onFlame}>Add a reminder</Txt>
+                  <Txt variant="bodySemi" color={c.onFlame}>Add something</Txt>
                 </Pressable>
               </View>
             </Card>
@@ -195,66 +217,46 @@ export default function MyEvents() {
               </Animated.View>
             )}
 
-            <Animated.View entering={FadeInDown.duration(500).delay(280)}>
-              <Pressable
-                onPress={() => router.push('/my-event/add' as any)}
-                style={({ pressed }) => [
-                  styles.addBtn,
-                  { borderColor: c.lineStrong, backgroundColor: c.surfaceAlt },
-                  pressed && { opacity: 0.8 },
-                ]}
-              >
-                <Icon name="add" size={20} color={c.flameDeep} />
-                <Txt variant="label" color={c.flameDeep}>Add a reminder</Txt>
-              </Pressable>
-            </Animated.View>
           </>
         )}
 
-        {/* Weekly routines — no countdown, because there's always another one */}
-        <Animated.View entering={FadeInDown.duration(500).delay(300)} style={{ marginTop: spacing.stackLg, gap: spacing.stackSm }}>
-          <View style={styles.sectionHead}>
-            <Txt variant="eyebrow" color={c.faint}>Every week</Txt>
-            <View style={[styles.sectionRule, { backgroundColor: c.line }]} />
-          </View>
+        {/* Weekly routines — no countdown, because there's always another one.
+            Only shown once there are some; adding is the shared "Add" flow. */}
+        {routines.length > 0 && (
+          <Animated.View entering={FadeInDown.duration(500).delay(300)} style={{ marginTop: spacing.stackLg, gap: spacing.stackSm }}>
+            <View style={styles.sectionHead}>
+              <Txt variant="eyebrow" color={c.faint}>Every week</Txt>
+              <View style={[styles.sectionRule, { backgroundColor: c.line }]} />
+            </View>
 
-          {routines.map((routine) => (
-            <Card
-              key={routine.id}
-              pressable
-              onPress={() => router.push({ pathname: '/my-event/routine', params: { id: routine.id } } as any)}
-              style={styles.rowCard}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1, minWidth: 0 }}>
-                <View style={[styles.routineIcon, { backgroundColor: c.surfaceAlt }]}>
-                  <Icon name="repeat" size={20} color={c.muted} />
+            {routines.map((routine) => (
+              <Card
+                key={routine.id}
+                pressable
+                onPress={() => router.push({ pathname: '/my-event/routine', params: { id: routine.id } } as any)}
+                style={styles.rowCard}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1, minWidth: 0 }}>
+                  {/* Amber, like the repeat icon everywhere else routines appear
+                      — grey-on-grey left it invisible next to photo rows. */}
+                  <View style={[styles.routineIcon, { backgroundColor: c.flameWash }]}>
+                    <Icon name="repeat" size={20} color={c.flameDeep} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Txt variant="bodyMed">{routine.title}</Txt>
+                    <Txt variant="sub" color={c.muted} style={{ marginTop: 2 }}>
+                      {weekdaysLabel(routine.weekdays ?? [])}
+                      {routine.timeOfDay ? ` · ${formatTimeOfDay(routine.timeOfDay)}` : ''}
+                    </Txt>
+                  </View>
                 </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Txt variant="bodyMed">{routine.title}</Txt>
-                  <Txt variant="sub" color={c.muted} style={{ marginTop: 2 }}>
-                    {weekdaysLabel(routine.weekdays ?? [])}
-                    {routine.timeOfDay ? ` · ${formatTimeOfDay(routine.timeOfDay)}` : ''}
-                  </Txt>
-                </View>
-              </View>
-              <Txt variant="sub" color={c.muted}>
-                {routine.daysAway === 0 ? 'Today' : routine.daysAway === 1 ? 'Tomorrow' : `in ${routine.daysAway} days`}
-              </Txt>
-            </Card>
-          ))}
-
-          <Pressable
-            onPress={() => router.push('/my-event/routine' as any)}
-            style={({ pressed }) => [
-              styles.addBtn,
-              { marginTop: 0, borderColor: c.lineStrong, backgroundColor: c.surfaceAlt },
-              pressed && { opacity: 0.8 },
-            ]}
-          >
-            <Icon name="add" size={20} color={c.flameDeep} />
-            <Txt variant="label" color={c.flameDeep}>Add a weekly routine</Txt>
-          </Pressable>
-        </Animated.View>
+                <Txt variant="sub" color={c.muted}>
+                  {routine.daysAway === 0 ? 'Today' : routine.daysAway === 1 ? 'Tomorrow' : `in ${routine.daysAway} days`}
+                </Txt>
+              </Card>
+            ))}
+          </Animated.View>
+        )}
 
         {/* Already happened — something to look back on, never a failure. */}
         {pastEvents.length > 0 && (
@@ -286,6 +288,8 @@ export default function MyEvents() {
           </Animated.View>
         )}
       </ScrollView>
+
+      <AddEventSheet visible={addVisible} onClose={() => setAddVisible(false)} onChoose={goAdd} />
     </View>
   );
 }
@@ -313,19 +317,23 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: radius.full,
   },
-  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginLeft: 2 },
-  sectionRule: { flex: 1, height: 1 },
-  addBtn: {
-    marginTop: spacing.gutter,
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: spacing.stackLg,
+  },
+  headerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    paddingVertical: 18,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderStyle: 'dashed',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: radius.full,
   },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginLeft: 2 },
+  sectionRule: { flex: 1, height: 1 },
   routineIcon: {
     width: 44,
     height: 44,

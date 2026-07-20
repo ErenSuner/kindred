@@ -120,10 +120,10 @@ function GiftIdeas({ person, gifts, onDelete }: { person: Person; gifts: Note[];
     <Animated.View layout={ROW_MOTION} style={{ gap: spacing.stackSm }}>
       {open.length === 0 ? (
         <Animated.View entering={FadeIn.duration(160)} style={styles.emptyWrap}>
-          <Txt variant="body" color={c.muted} style={styles.empty}>
+          <Txt variant="sub" color={c.muted} style={styles.empty}>
             {bought.length > 0
-              ? 'All caught up — everything on the list has been bought.'
-              : 'Nothing yet. Anything they mention wanting, jot it here — a line is enough.'}
+              ? 'All caught up — everything has been bought.'
+              : 'Anything they mention wanting, jot it here.'}
           </Txt>
         </Animated.View>
       ) : (
@@ -291,8 +291,8 @@ function Memories({ person, photos, onDelete }: { person: Person; photos: Note[]
   return (
     <View style={{ gap: spacing.stackSm }}>
       {photos.length === 0 ? (
-        <Txt variant="body" color={c.muted} style={styles.empty}>
-          No photos yet. Pictures of the two of you, things you did together.
+        <Txt variant="sub" color={c.muted} style={styles.empty}>
+          Pictures of the two of you, things you did together.
         </Txt>
       ) : (
         <View style={styles.grid}>
@@ -394,25 +394,35 @@ function Notebook({ person, note }: { person: Person; note?: Note }) {
         textAlignVertical="top"
       />
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Txt variant="sub" color={c.faint}>
-          {dirty ? 'Unsaved changes' : savedAt ? 'Saved' : 'Your notebook for them'}
-        </Txt>
-        <Pressable
-          onPress={save}
-          disabled={!dirty || saving}
-          style={({ pressed }) => [
-            styles.saveBtn,
-            { backgroundColor: c.flame },
-            (!dirty || saving) && { opacity: 0.4 },
-            pressed && { opacity: 0.85 },
-          ]}
-        >
-          <Icon name="check" size={16} color={c.onFlame} />
-          <Txt variant="label" color={c.onFlame}>{saving ? 'Saving…' : 'Save'}</Txt>
-        </Pressable>
+      {/* Save only shows up when there's something to save — a permanently
+          faded button read as broken. When clean, a quiet status sits alone. */}
+      <View style={styles.notebookFooter}>
+        {dirty ? (
+          <>
+            <Txt variant="sub" color={c.muted}>Unsaved changes</Txt>
+            <Pressable
+              onPress={save}
+              disabled={saving}
+              style={({ pressed }) => [
+                styles.saveBtn,
+                { backgroundColor: c.flame },
+                saving && { opacity: 0.6 },
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <Icon name="check" size={16} color={c.onFlame} />
+              <Txt variant="label" color={c.onFlame}>{saving ? 'Saving…' : 'Save'}</Txt>
+            </Pressable>
+          </>
+        ) : (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Icon name={savedAt ? 'check-circle' : 'menu-book'} size={14} color={c.faint} />
+            <Txt variant="sub" color={c.faint}>
+              {savedAt ? 'Saved' : 'Your private notebook for them'}
+            </Txt>
+          </View>
+        )}
       </View>
-
     </View>
   );
 }
@@ -438,7 +448,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     paddingBottom: 6,
   },
-  empty: { fontStyle: 'italic', opacity: 0.9, paddingVertical: 4 },
+  empty: { paddingVertical: 2 },
 
   giftRow: {
     flexDirection: 'row',
@@ -498,10 +508,16 @@ const styles = StyleSheet.create({
   notebook: {
     borderRadius: radius.DEFAULT,
     padding: 14,
-    minHeight: 200,
+    minHeight: 140,
     fontFamily: fonts.figtreeRegular,
     fontSize: 16,
     lineHeight: 24,
+  },
+  notebookFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 36,
   },
   saveBtn: {
     flexDirection: 'row',

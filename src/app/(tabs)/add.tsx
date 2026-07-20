@@ -150,6 +150,19 @@ export default function Connections() {
 
         <FormError message={loadError} onRetry={refreshPeople} retryLabel="Retry" />
 
+        {/* Browsing birthdays by month is a view onto these same people, so its
+            way in lives here rather than as a shortcut competing on Home. A
+            surface row, like the person cards below — not a heavy amber bar. */}
+        {people.length > 0 && (
+          <Card onPress={() => router.push('/birthdays')} style={styles.birthdaysStrip}>
+            <View style={[styles.birthdaysIcon, { backgroundColor: c.flameWash }]}>
+              <Icon name="cake" size={18} color={c.flameDeep} />
+            </View>
+            <Txt variant="bodyMed" style={{ flex: 1 }}>Birthdays by month</Txt>
+            <Icon name="chevron-right" size={20} color={c.faint} />
+          </Card>
+        )}
+
         {/* Search — hidden until there's something to search through */}
         {people.length > 0 && (
           <SearchBar value={query} onChange={setQuery} placeholder="Search people, days, notes" />
@@ -345,6 +358,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: radius.full,
+  },
+  birthdaysStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 14,
+  },
+  birthdaysIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyState: {
     alignItems: 'center',
