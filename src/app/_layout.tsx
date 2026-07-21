@@ -30,6 +30,7 @@ import { UndoSnackbar } from '@/components/UndoSnackbar';
 import { AppErrorBoundary } from '@/components/AppErrorBoundary';
 import { PendingWrites } from '@/components/PendingWrites';
 import { HeldNotice } from '@/components/HeldNotice';
+import { Sentry } from '@/lib/sentry';
 
 import { Platform, LogBox } from 'react-native';
 
@@ -103,6 +104,7 @@ function RootLayoutNav() {
       <Stack.Screen name="my-event/edit/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="birthday/add" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="birthday/edit/[id]" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="birthday/person/[personId]" options={{ animation: 'slide_from_right' }} />
     </Stack>
   );
 }
@@ -130,7 +132,7 @@ function ThemedApp() {
   );
 }
 
-export default function RootLayout() {
+function RootLayout() {
   const [loaded] = useFonts({
     Fraunces_500Medium,
     Fraunces_600SemiBold,
@@ -148,6 +150,16 @@ export default function RootLayout() {
     async function reqPerm() {
       if (Platform.OS === 'web') return;
       try {
+        // Android 8+ ignores importance/sound unless a channel exists; without
+        // one, scheduled reminders land on a silent default channel. Create it
+        // before requesting permission so the very first notification uses it.
+        if (Platform.OS === 'android') {
+          await Notifications.setNotificationChannelAsync('reminders', {
+            name: 'Reminders',
+            importance: Notifications.AndroidImportance.HIGH,
+            lightColor: '#EDA33D',
+          });
+        }
         const { status } = await Notifications.getPermissionsAsync();
         if (status !== 'granted') {
           await Notifications.requestPermissionsAsync();
@@ -190,3 +202,5 @@ export default function RootLayout() {
     </AppErrorBoundary>
   );
 }
+
+export default Sentry.wrap(RootLayout);

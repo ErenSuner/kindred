@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, ScrollView, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -9,10 +9,11 @@ import { fonts } from '@/theme/type';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
+import { FormError } from '@/components/FormError';
 import { showHeld } from '@/components/HeldNotice';
+import { describeWriteError } from '@/utils/loadError';
 import { supabase } from '@/lib/supabase';
 import { useTranslation } from "react-i18next";
-import i18n from "@/lib/i18n";
 
 export default function SecuritySettings() {
     const { t } = useTranslation();
@@ -23,33 +24,36 @@ export default function SecuritySettings() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
+    setError(null);
+
     if (!password.trim() || !confirmPassword.trim()) {
-      Alert.alert(t('error_title'), t('fill_all_fields'));
+      setError(t('fill_all_fields'));
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert(t('error_title'), t('passwords_no_match'));
+      setError(t('passwords_no_match'));
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert(t('error_title'), t('password_min'));
+      setError(t('password_min'));
       return;
     }
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password: password.trim() });
-      if (error) throw error;
+      const { error: err } = await supabase.auth.updateUser({ password: password.trim() });
+      if (err) throw err;
 
       router.back();
       showHeld(t('password_updated'));
-    } catch (error: any) {
-      console.error(error);
-      Alert.alert(t('error_title'), error.message || t('password_update_failed'));
+    } catch (e) {
+      console.error(e);
+      setError(describeWriteError(e));
     } finally {
       setLoading(false);
     }
@@ -107,6 +111,8 @@ export default function SecuritySettings() {
               />
             </View>
           </Animated.View>
+
+          <FormError message={error} />
 
         </ScrollView>
       </KeyboardAvoidingView>

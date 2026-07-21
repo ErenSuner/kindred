@@ -465,19 +465,22 @@ export async function syncNotifications(
   }
 
   if (!isEnabled) {
-    console.log('[Notifications] Gentle Nudges disabled. Cancelled all notifications.');
     return;
   }
 
   const hour = await getReminderHour();
   const plan = planNotifications(people, myEvents, holidays, hour);
 
+  // Route everything through the 'reminders' channel created at startup so
+  // Android gives it the right importance and sound. No-op on iOS.
+  const channelId = Platform.OS === 'android' ? 'reminders' : undefined;
+
   // 2. The repeating slots
   for (const item of plan.routines) {
     try {
       await Notifications.scheduleNotificationAsync({
         content: { title: item.title, body: item.body, sound: true },
-        trigger: repeatTriggerInput(item),
+        trigger: { ...repeatTriggerInput(item), channelId } as any,
       });
     } catch (e) {
       console.warn(`Failed to schedule repeating reminder ${item.title}:`, e);
@@ -493,15 +496,10 @@ export async function syncNotifications(
           body: notification.body,
           sound: true,
         },
-        trigger: { date: notification.date } as any,
+        trigger: { date: notification.date, channelId } as any,
       });
     } catch (e) {
       console.warn(`Failed to schedule notification for ${notification.title}:`, e);
     }
   }
-
-  console.log(
-    `[Notifications] Synced ${plan.dated.length} dated reminders and ${plan.routines.length} weekly routines` +
-      (plan.dropped > 0 ? ` (${plan.dropped} didn't fit)` : '') + '.',
-  );
 }

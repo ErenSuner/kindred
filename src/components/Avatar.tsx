@@ -9,15 +9,22 @@ type Props = {
   initials?: string;
   size?: number;
   ring?: boolean; // surface-coloured border ring used on cards
+  // A name, when the avatar stands alone. Left off when it sits next to the
+  // person's name already, so screen readers don't say it twice.
+  label?: string;
 };
 
 // Circular avatar — the faces are the content. Falls back to Fraunces
 // initials on a warm amber wash.
-export function Avatar({ uri, initials, size = 48, ring = true }: Props) {
+export function Avatar({ uri, initials, size = 48, ring = true, label }: Props) {
   const { c } = useTheme();
   const dim = { width: size, height: size, borderRadius: size / 2 };
   return (
     <View
+      accessible={label ? true : undefined}
+      accessibilityRole={label ? 'image' : undefined}
+      accessibilityLabel={label}
+      importantForAccessibility={label ? 'yes' : 'no-hide-descendants'}
       style={[
         styles.wrap,
         dim,
