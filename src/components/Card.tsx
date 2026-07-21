@@ -1,22 +1,34 @@
 import { Pressable, View, StyleSheet, ViewStyle, PressableProps } from 'react-native';
-import { colors, radius, ambientShadow } from '@/theme/tokens';
+import { radius } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
 
 type Props = {
   children: React.ReactNode;
   style?: ViewStyle | ViewStyle[];
   onPress?: PressableProps['onPress'];
   pressable?: boolean;
+  /** Dark spruce anchor surface — one per screen at most. */
+  ink?: boolean;
 };
 
-// White surface lifted with a soft ambient shadow. When pressable it scales to
-// 98% on press, simulating a gentle physical press per DESIGN.md.
-export function Card({ children, style, onPress, pressable = false }: Props) {
+// Surface separated from the page by a real value step and a hairline,
+// grounded with a soft shadow in light mode. Presses sink gently.
+export function Card({ children, style, onPress, pressable = false, ink = false }: Props) {
+  const { c, cardShadow } = useTheme();
+  const base: ViewStyle = {
+    backgroundColor: ink ? c.ink : c.surface,
+    borderRadius: radius.lg,
+    borderWidth: ink ? 0 : 1,
+    borderColor: c.line,
+    padding: 20,
+  };
   if (pressable || onPress) {
     return (
       <Pressable
         onPress={onPress}
         style={({ pressed }) => [
-          styles.card,
+          base,
+          cardShadow,
           style,
           pressed && styles.pressed,
         ]}
@@ -25,18 +37,12 @@ export function Card({ children, style, onPress, pressable = false }: Props) {
       </Pressable>
     );
   }
-  return <View style={[styles.card, style]}>{children}</View>;
+  return <View style={[base, cardShadow, style]}>{children}</View>;
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radius.lg,
-    padding: 24,
-    ...ambientShadow,
-  },
   pressed: {
     transform: [{ scale: 0.98 }],
-    shadowOpacity: 0.04,
+    opacity: 0.96,
   },
 });

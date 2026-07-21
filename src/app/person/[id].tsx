@@ -4,11 +4,15 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeOut, FadeIn, SlideInDown, SlideOutDown } from 'react-native-reanimated';
-import { colors, spacing, radius, ambientShadow } from '@/theme/tokens';
+import { spacing, radius } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
+import { fonts } from '@/theme/type';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Chip } from '@/components/Chip';
 import { Button } from '@/components/Button';
+import { Card } from '@/components/Card';
+import { Avatar } from '@/components/Avatar';
 import { usePeople } from '@/context/PeopleContext';
 import { InlineBirthdayCard } from '@/components/InlineBirthdayCard';
 import { NotePreview } from '@/components/NotePreview';
@@ -16,21 +20,17 @@ import { LookingBack } from '@/components/LookingBack';
 import { PhotoViewer } from '@/components/PhotoViewer';
 import { AboutPerson } from '@/components/AboutPerson';
 import { openInContacts } from '@/utils/contacts';
+import { relationshipLabel } from '@/utils/relationshipLabel';
+import { daysLongLabel } from '@/utils/countdownLabel';
 import type { SpecialDay } from '@/data/mock';
+import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 
-const accentMap = {
-  primary: { bg: 'rgba(217,142,142,0.3)', fg: colors.primary },
-  tertiary: { bg: 'rgba(207,151,83,0.3)', fg: colors.tertiary },
-  secondary: { bg: 'rgba(206,234,207,0.5)', fg: colors.secondary },
-};
-
-function SpecialDayRow({ day, personId, onLongPress }: { day: SpecialDay, personId: string, onLongPress?: () => void }) {
+function SpecialDayRow({ day, personId, onLongPress, onMore }: { day: SpecialDay; personId: string; onLongPress?: () => void; onMore?: () => void }) {
   const router = useRouter();
-  const a = accentMap[day.accent as keyof typeof accentMap] || accentMap.primary;
+  const { c } = useTheme();
   return (
-    <Pressable 
-      style={({ pressed }) => [styles.dayRow, pressed && { backgroundColor: colors.surfaceContainerLow }]}
-      onLongPress={onLongPress}
+    <Card
       onPress={() => {
         if ((day as any).isBirthday) {
           router.push({ pathname: '/birthday/edit/[personId]', params: { personId } } as any);
@@ -38,16 +38,17 @@ function SpecialDayRow({ day, personId, onLongPress }: { day: SpecialDay, person
           router.push({ pathname: '/special-day/edit/[dayId]', params: { dayId: day.id, personId } } as any);
         }
       }}
+      style={styles.dayRow}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flex: 1 }}>
-        <View style={[styles.dayIcon, { backgroundColor: a.bg }]}>
-          <Icon name={day.icon as any} size={22} color={a.fg} />
+      <Pressable onLongPress={onLongPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flex: 1, minWidth: 0 }}>
+        <View style={[styles.dayIcon, { backgroundColor: c.flameWash }]}>
+          <Icon name={day.icon as any} size={22} color={c.flameDeep} />
         </View>
-        <View style={{ flex: 1 }}>
-          <Txt variant="bodyMd" color={colors.onSurface} style={{ fontFamily: 'Inter_500Medium' }}>
-            {day.title}{day.turningAge ? ` (Turning ${day.turningAge})` : ''}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Txt variant="bodyMed">
+            {day.title}{day.turningAge ? i18n.t('turning_age', { age: day.turningAge }) : ''}
           </Txt>
-          <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontFamily: 'Inter_400Regular' }}>
+          <Txt variant="sub" color={c.muted} style={{ marginTop: 2 }}>
             {day.date}
           </Txt>
           {day.notes && day.notes.length > 0 && (
@@ -56,21 +57,31 @@ function SpecialDayRow({ day, personId, onLongPress }: { day: SpecialDay, person
             </View>
           )}
         </View>
-      </View>
-      <Icon name="chevron-right" size={22} color={colors.onSurfaceVariant} style={{ opacity: 0.5 }} />
-    </Pressable>
+      </Pressable>
+      {onMore ? (
+        <Pressable onPress={onMore} hitSlop={8} style={({ pressed }) => [{ padding: 4 }, pressed && { opacity: 0.6 }]}>
+          <Icon name="more-horiz" size={20} color={c.faint} />
+        </Pressable>
+      ) : (
+        <Icon name="chevron-right" size={22} color={c.faint} />
+      )}
+    </Card>
   );
 }
 
 export default function PersonDetail() {
+    const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { c, floatShadow, cardShadow } = useTheme();
   const { getPerson, removePersonWithUndo, deleteNoteWithUndo, deleteSpecialDayWithUndo } = usePeople();
 
   const person = getPerson(id ?? '');
 
-  // Delete state
+  // Person-level actions all live in one overflow sheet, so the destructive one
+  // isn't a bare icon in the top chrome next to Back.
+  const [personActionsVisible, setPersonActionsVisible] = useState(false);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
   const [dayActionVisible, setDayActionVisible] = useState(false);
   const [dayConfirmVisible, setDayConfirmVisible] = useState(false);
@@ -86,30 +97,21 @@ export default function PersonDetail() {
 
   if (!person) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center' }}>
         <View style={[styles.header, { paddingTop: insets.top + 8, position: 'absolute', top: 0, left: 0, right: 0 }]}>
           <Pressable onPress={() => router.back()} hitSlop={8}>
-            <Icon name="arrow-back" size={24} color={colors.onSurfaceVariant} />
+            <Icon name="arrow-back" size={24} color={c.muted} />
           </Pressable>
-          <Txt variant="headlineMd" color={colors.primary}>
-            Kindred
-          </Txt>
           <View style={{ width: 24 }} />
         </View>
-        <Icon name="person-off" size={48} color={colors.outlineVariant} />
-        <Txt variant="headlineMd" color={colors.onSurface} style={{ marginTop: 16 }}>
-          Person not found
-        </Txt>
-        <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 8 }}>
-          This connection may have been removed.
-        </Txt>
+        <Icon name="person-off" size={44} color={c.lineStrong} />
+        <Txt variant="heading" style={{ marginTop: 16 }}>
+          {t('person_not_found')}</Txt>
+        <Txt variant="body" color={c.muted} style={{ marginTop: 8 }}>
+          {t('they_may_have_been_removed')}</Txt>
       </View>
     );
   }
-
-  const handleDelete = () => {
-    setDeleteConfirmVisible(true);
-  };
 
   const executeDelete = () => {
     setDeleteConfirmVisible(false);
@@ -125,7 +127,7 @@ export default function PersonDetail() {
       const opened = await openInContacts(person.contactId);
       // A contact id only means something on the phone it came from, so a
       // restored backup will have ids that resolve to nothing.
-      if (!opened) setContactError("They're no longer in this phone's contacts.");
+      if (!opened) setContactError(t('contact_gone'));
     } finally {
       setOpeningContact(false);
     }
@@ -144,22 +146,16 @@ export default function PersonDetail() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} hitSlop={8}>
-          <Icon name="arrow-back" size={24} color={colors.onSurfaceVariant} />
+          <Icon name="arrow-back" size={24} color={c.muted} />
         </Pressable>
-        <Txt variant="headlineMd" color={colors.primary}>
-          Kindred
-        </Txt>
-        <View style={{ flexDirection: 'row', gap: 16 }}>
-          <Pressable onPress={handleDelete} hitSlop={8}>
-            <Icon name="delete" size={24} color={colors.error} />
-          </Pressable>
-          <Pressable hitSlop={8} onPress={() => router.push(('/edit/' + person.id) as any)}>
-            <Icon name="edit" size={24} color={colors.onSurfaceVariant} />
-          </Pressable>
-        </View>
+        {/* One overflow entry, so a destructive action isn't top-chrome next to
+            Back. Edit, Open in Contacts and Delete all live inside it. */}
+        <Pressable onPress={() => setPersonActionsVisible(true)} hitSlop={8}>
+          <Icon name="more-horiz" size={24} color={c.muted} />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -181,117 +177,107 @@ export default function PersonDetail() {
               onPress={() => setPhotoVisible(true)}
               style={({ pressed }) => pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }}
             >
-              <Image source={{ uri: person.avatar }} style={styles.bigAvatar} contentFit="cover" />
+              <Image
+                source={{ uri: person.avatar }}
+                style={[styles.bigAvatar, { borderColor: c.surface }, cardShadow]}
+                contentFit="cover"
+              />
             </Pressable>
           ) : (
-            <View style={[styles.bigAvatar, styles.bigInitials]}>
-              <Txt variant="headlineXl" color={colors.onPrimaryContainer}>
+            <View style={[styles.bigAvatar, styles.bigInitials, { backgroundColor: c.flameWash, borderColor: c.surface }]}>
+              <Txt color={c.flameDeep} style={{ fontFamily: fonts.frauncesSemiBold, fontSize: 44, lineHeight: 54 }}>
                 {person.initials}
               </Txt>
             </View>
           )}
-          <Txt variant="headlineXl" color={colors.onSurface} style={{ marginTop: 16 }}>
+          <Txt variant="display" style={{ marginTop: 16, textAlign: 'center' }}>
             {person.name}
           </Txt>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
-            <Icon name="favorite" size={20} color={colors.secondary} />
-            <Txt variant="bodyLg" color={colors.onSurfaceVariant}>
-              {person.role}
-            </Txt>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
-            {person.tags.map((t) => (
-              <Chip key={t} label={t} tone={t === 'Local' ? 'tertiary' : 'primary'} role={t} />
+          {/* tags already carries the role, so filter it out — otherwise the
+              relationship shows up as two identical chips. */}
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <Chip label={relationshipLabel(person.role)} />
+            {person.tags.filter((t) => t !== person.role).map((t) => (
+              <Chip key={t} label={t} />
             ))}
           </View>
 
-          {/* Kindred holds no way to reach anyone. This hands the phone back its
-              own contact id so calling and messaging happen where they already
-              live. Only appears for someone imported from the address book. */}
-          {person.contactId && Platform.OS !== 'web' && (
-            <Pressable
-              onPress={handleOpenContact}
-              disabled={openingContact}
-              style={({ pressed }) => [styles.contactBtn, pressed && { opacity: 0.8 }]}
-            >
-              <Icon name="person-search" size={18} color={colors.primary} />
-              <Txt variant="labelMd" color={colors.primary}>
-                {openingContact ? 'Opening…' : 'Open in Contacts'}
-              </Txt>
-            </Pressable>
-          )}
-
+          {/* Opening in Contacts now lives in the overflow sheet; only its
+              failure needs to surface here, where the tap happened. */}
           {contactError && (
-            <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.contactError}>
+            <Txt variant="sub" color={c.muted} style={styles.contactError}>
               {contactError}
             </Txt>
           )}
         </Animated.View>
 
-        {/* Countdown */}
+        {/* Countdown — the one dark card on this screen. */}
         {person.countdown && (
-          <Animated.View entering={FadeInDown.duration(500).delay(100)} style={styles.countdownCard}>
-            <View style={[styles.blur, { pointerEvents: 'none' } as any]} />
-            <View style={styles.cardHeaderRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Icon name="celebration" size={24} color={colors.primary} />
-                <Txt variant="headlineMd" color={colors.onSurface}>
-                  Next Big Day
+          <Animated.View entering={FadeInDown.duration(500).delay(100)}>
+            <Card ink>
+              <View style={styles.cardHeaderRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={[styles.flameDot, { backgroundColor: c.flame }]} />
+                  <Txt variant="eyebrow" color={c.flame}>{t('next_big_day')}</Txt>
+                </View>
+                <Chip label={person.countdown.tag} tone="ink" />
+              </View>
+
+              <Txt
+                color={c.flame}
+                style={{ fontFamily: fonts.frauncesSemiBold, fontSize: 34, lineHeight: 42, marginTop: 14 }}
+              >
+{daysLongLabel(person.countdown.days)}
+              </Txt>
+
+              <View style={{ marginTop: 6 }}>
+                <Txt variant="bodyMed" color={c.onInk}>
+                  {person.countdown.title}
+                </Txt>
+                <Txt variant="sub" color={c.onInkMuted} style={{ marginTop: 3 }}>
+                  {person.countdown.date}
                 </Txt>
               </View>
-              <Chip label={person.countdown.tag} tone="primarySolid" />
-            </View>
-            
-            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 12, marginTop: 16 }}>
-              <Txt style={styles.bigNumber} color={colors.primary}>
-                {person.countdown.days === 0 ? 'Today!' : person.countdown.days}
-              </Txt>
-              {person.countdown.days !== 0 && (
-                <Txt variant="bodyLg" color={colors.onSurfaceVariant} style={{ marginBottom: 8 }}>
-                  days away
-                </Txt>
-              )}
-            </View>
-            <View style={{ marginTop: 8 }}>
-              <Txt variant="bodyMd" color={colors.onSurface}>
-                {person.countdown.title}
-              </Txt>
-              <Txt variant="labelMd" color={colors.onSurfaceVariant} style={{ marginTop: 4 }}>
-                {person.countdown.date}
-              </Txt>
-            </View>
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${person.countdown.progress * 100}%` }]} />
-            </View>
+              <View style={[styles.progressTrack, { backgroundColor: c.inkSoft }]}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    { backgroundColor: c.flame, width: `${person.countdown.progress * 100}%` },
+                  ]}
+                />
+              </View>
+            </Card>
           </Animated.View>
         )}
 
-        {/* Birthday Section */}
+        {/* Birthday */}
         <Animated.View entering={FadeInDown.duration(500).delay(140)} style={{ gap: spacing.stackMd }}>
-          <View style={[styles.cardHeaderRow, styles.sectionHeading]}>
-            <Txt variant="headlineMd" color={colors.onSurface}>
-              Birthday
-            </Txt>
+          <View style={styles.sectionHead}>
+            <Txt variant="eyebrow" color={c.faint}>{t('birthday')}</Txt>
+            <View style={[styles.sectionRule, { backgroundColor: c.line }]} />
           </View>
           <InlineBirthdayCard person={person as any} />
         </Animated.View>
 
-        {/* Special Days */}
+        {/* Special days */}
         <Animated.View entering={FadeInDown.duration(500).delay(180)} style={{ gap: spacing.stackMd }}>
-          <View style={[styles.cardHeaderRow, styles.sectionHeading]}>
-            <Txt variant="headlineMd" color={colors.onSurface}>
-              Special Days
-            </Txt>
+          <View style={styles.sectionHead}>
+            <Txt variant="eyebrow" color={c.faint}>{t('special_days')}</Txt>
+            <View style={[styles.sectionRule, { backgroundColor: c.line }]} />
           </View>
-          
+
           {person.specialDays && person.specialDays.filter((d: any) => !d.isBirthday).length > 0 ? (
             <View style={{ gap: 8 }}>
               {person.specialDays.filter((d: any) => !d.isBirthday).map((d) => (
-                <SpecialDayRow 
-                  key={d.id} 
-                  day={d} 
-                  personId={person.id} 
+                <SpecialDayRow
+                  key={d.id}
+                  day={d}
+                  personId={person.id}
                   onLongPress={() => {
+                    setSelectedDayId(d.id);
+                    setDayActionVisible(true);
+                  }}
+                  onMore={() => {
                     setSelectedDayId(d.id);
                     setDayActionVisible(true);
                   }}
@@ -299,17 +285,16 @@ export default function PersonDetail() {
               ))}
             </View>
           ) : (
-            <View style={{ padding: 20, alignItems: 'center', backgroundColor: colors.surfaceContainerLowest, borderRadius: radius.lg, ...ambientShadow }}>
-              <Txt variant="bodyMd" color={colors.onSurfaceVariant}>
-                No special days added yet.
-              </Txt>
-            </View>
+            <Card style={{ alignItems: 'center' }}>
+              <Txt variant="body" color={c.muted}>
+                {t('anniversaries_graduations_memo')}</Txt>
+            </Card>
           )}
 
           <Button
-            label="Add Special Day"
+            label={t('add_special_day')}
             icon="add"
-            variant="tonal"
+            variant="quiet"
             onPress={() => router.push({ pathname: '/special-day/add', params: { personId: person.id } } as any)}
             style={{ marginTop: spacing.stackSm }}
           />
@@ -325,111 +310,167 @@ export default function PersonDetail() {
 
       </ScrollView>
 
-      {/* Special Day Action Sheet */}
+      {/* Person overflow: edit, open in contacts, delete — all in one place. */}
+      <Modal visible={personActionsVisible} transparent animationType="none" onRequestClose={() => setPersonActionsVisible(false)}>
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={[styles.modalOverlay, { backgroundColor: c.overlay }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setPersonActionsVisible(false)} />
+          <Animated.View
+            entering={SlideInDown.duration(300).springify()}
+            exiting={SlideOutDown.duration(200)}
+            style={[
+              styles.modalContent,
+              { backgroundColor: c.surface, marginTop: 'auto', marginBottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
+              floatShadow,
+            ]}
+          >
+            <View style={{ alignItems: 'center', marginBottom: 20, gap: 10 }}>
+              <Avatar uri={person.avatar} initials={person.initials} size={56} />
+              <Txt variant="heading">{person.name}</Txt>
+            </View>
+
+            <View style={{ gap: 12, width: '100%' }}>
+              <Button
+                variant="quiet"
+                icon="edit"
+                label={t('edit_person_action')}
+                fullWidth
+                onPress={() => {
+                  setPersonActionsVisible(false);
+                  router.push(('/edit/' + person.id) as any);
+                }}
+              />
+              {person.contactId && Platform.OS !== 'web' && (
+                <Button
+                  variant="quiet"
+                  icon="person-search"
+                  label={openingContact ? t('opening') : t('open_in_contacts')}
+                  fullWidth
+                  disabled={openingContact}
+                  onPress={() => {
+                    setPersonActionsVisible(false);
+                    handleOpenContact();
+                  }}
+                />
+              )}
+              <Button
+                variant="danger"
+                icon="delete-outline"
+                label={t('delete_person')}
+                fullWidth
+                onPress={() => {
+                  setPersonActionsVisible(false);
+                  setDeleteConfirmVisible(true);
+                }}
+              />
+            </View>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
+
+      {/* Special day action sheet */}
       <Modal visible={dayActionVisible} transparent animationType="none" onRequestClose={() => setDayActionVisible(false)}>
-        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={styles.modalOverlay}>
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={[styles.modalOverlay, { backgroundColor: c.overlay }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setDayActionVisible(false)} />
-          <Animated.View entering={SlideInDown.duration(300).springify()} exiting={SlideOutDown.duration(200)} style={[styles.modalContent, { marginTop: 'auto', marginBottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }]}>
-            <Txt variant="headlineMd" color={colors.onSurface} style={{ marginBottom: 24 }}>
-              Options
-            </Txt>
-            <Button 
-              label="Delete Special Day" 
-              variant="error" 
-              icon="delete" 
-              fullWidth 
-              style={{ marginBottom: 12, backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.error }}
+          <Animated.View
+            entering={SlideInDown.duration(300).springify()}
+            exiting={SlideOutDown.duration(200)}
+            style={[
+              styles.modalContent,
+              { backgroundColor: c.surface, marginTop: 'auto', marginBottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
+              floatShadow,
+            ]}
+          >
+            <Txt variant="heading" style={{ marginBottom: 24 }}>{t('options')}</Txt>
+            <Button
+              label={t('delete_special_day')}
+              variant="danger"
+              icon="delete-outline"
+              fullWidth
+              style={{ marginBottom: 12 }}
               onPress={() => {
                 setDayActionVisible(false);
                 setDayConfirmVisible(true);
               }}
             />
-            <Button 
-              label="Cancel" 
-              variant="tonal" 
-              fullWidth 
-              onPress={() => setDayActionVisible(false)}
-            />
+            <Button label={t('cancel')} variant="quiet" fullWidth onPress={() => setDayActionVisible(false)} />
           </Animated.View>
         </Animated.View>
       </Modal>
 
-      {/* Special Day Delete Confirm Modal */}
+      {/* Special day delete confirm */}
       <Modal visible={dayConfirmVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <Animated.View entering={FadeInDown.duration(300)} exiting={FadeOut.duration(200)} style={styles.modalContent}>
-            <View style={styles.modalIconWrap}>
-              <Icon name="delete" size={32} color={colors.error} />
+        <View style={[styles.modalOverlay, { backgroundColor: c.overlay }]}>
+          <Animated.View
+            entering={FadeInDown.duration(300)}
+            exiting={FadeOut.duration(200)}
+            style={[styles.modalContent, { backgroundColor: c.surface }, floatShadow]}
+          >
+            <View style={[styles.modalIconWrap, { backgroundColor: c.dangerWash }]}>
+              <Icon name="delete-outline" size={30} color={c.danger} />
             </View>
-            <Txt variant="headlineMd" color={colors.onSurface} style={{ marginTop: 16 }}>
-              Delete Special Day
-            </Txt>
-            <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 8, textAlign: 'center' }}>
-              Are you sure you want to delete this special day? This action cannot be undone.
-            </Txt>
+            <Txt variant="heading" style={{ marginTop: 16 }}>{t('delete_special_day')}</Txt>
+            <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center' }}>
+              {t('this_removes_the_day_and')}</Txt>
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, width: '100%' }}>
-              <Button label="Cancel" onPress={() => setDayConfirmVisible(false)} variant="tonal" style={{ flex: 1 }} />
-              <Button 
-                label="Delete" 
-               
+              <Button label={t('cancel')} onPress={() => setDayConfirmVisible(false)} variant="quiet" style={{ flex: 1 }} />
+              <Button
+                label={t('delete')}
+                variant="dangerSolid"
                 onPress={() => {
                   if (!selectedDayId) return;
                   {
                     const day = person.specialDays?.find((d) => d.id === selectedDayId);
-                    deleteSpecialDayWithUndo(selectedDayId, day?.title ?? 'Special day');
+                    deleteSpecialDayWithUndo(selectedDayId, day?.title ?? i18n.t('special_day'));
                     setDayConfirmVisible(false);
                     setSelectedDayId(null);
                   }
-                }} 
-                style={{ flex: 1, backgroundColor: colors.error }} 
+                }}
+                style={{ flex: 1 }}
               />
             </View>
           </Animated.View>
         </View>
       </Modal>
 
-      {/* Delete Confirmation Modal */}
+      {/* Person delete confirm */}
       <Modal visible={deleteConfirmVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <Animated.View entering={FadeInDown.duration(300)} exiting={FadeOut.duration(200)} style={styles.modalContent}>
-            <View style={styles.modalIconWrap}>
-              <Icon name="delete" size={32} color={colors.error} />
+        <View style={[styles.modalOverlay, { backgroundColor: c.overlay }]}>
+          <Animated.View
+            entering={FadeInDown.duration(300)}
+            exiting={FadeOut.duration(200)}
+            style={[styles.modalContent, { backgroundColor: c.surface }, floatShadow]}
+          >
+            <View style={[styles.modalIconWrap, { backgroundColor: c.dangerWash }]}>
+              <Icon name="delete-outline" size={30} color={c.danger} />
             </View>
-            <Txt variant="headlineMd" color={colors.onSurface} style={{ marginTop: 16 }}>
-              Delete Connection
-            </Txt>
-            <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 8, textAlign: 'center' }}>
-              Are you sure you want to remove {person.name} from your connections? This action cannot be undone.
-            </Txt>
+            <Txt variant="heading" style={{ marginTop: 16 }}>{t('delete_person')}</Txt>
+            <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center' }}>
+              {t('delete_person_body', { name: person.name })}</Txt>
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, width: '100%' }}>
-              <Button label="Cancel" onPress={() => setDeleteConfirmVisible(false)} variant="tonal" style={{ flex: 1 }} />
-              <Button label="Delete" onPress={executeDelete} style={{ flex: 1, backgroundColor: colors.error }} />
+              <Button label={t('cancel')} onPress={() => setDeleteConfirmVisible(false)} variant="quiet" style={{ flex: 1 }} />
+              <Button label={t('delete')} onPress={executeDelete} variant="dangerSolid" style={{ flex: 1 }} />
             </View>
           </Animated.View>
         </View>
       </Modal>
 
-      {/* Note Delete Confirm Modal */}
+      {/* Note delete confirm */}
       <Modal visible={deleteNoteConfirmVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <Animated.View entering={FadeInDown.duration(300)} exiting={FadeOut.duration(200)} style={styles.modalContent}>
-            <View style={styles.modalIconWrap}>
-              <Icon name="delete" size={32} color={colors.error} />
+        <View style={[styles.modalOverlay, { backgroundColor: c.overlay }]}>
+          <Animated.View
+            entering={FadeInDown.duration(300)}
+            exiting={FadeOut.duration(200)}
+            style={[styles.modalContent, { backgroundColor: c.surface }, floatShadow]}
+          >
+            <View style={[styles.modalIconWrap, { backgroundColor: c.dangerWash }]}>
+              <Icon name="delete-outline" size={30} color={c.danger} />
             </View>
-            <Txt variant="headlineMd" color={colors.onSurface} style={{ marginTop: 16 }}>
-              Delete Note
-            </Txt>
-            <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 8, textAlign: 'center' }}>
-              Are you sure you want to delete this note? This action cannot be undone.
-            </Txt>
+            <Txt variant="heading" style={{ marginTop: 16 }}>{t('delete_note')}</Txt>
+            <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center' }}>
+              {t('the_note_disappears_right_away')}</Txt>
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, width: '100%' }}>
-              <Button label="Cancel" onPress={() => setDeleteNoteConfirmVisible(false)} variant="tonal" style={{ flex: 1 }} />
-              <Button 
-                label="Delete" 
-                onPress={executeDeleteNote} 
-                style={{ flex: 1, backgroundColor: colors.error }} 
-               
-              />
+              <Button label={t('cancel')} onPress={() => setDeleteNoteConfirmVisible(false)} variant="quiet" style={{ flex: 1 }} />
+              <Button label={t('delete')} onPress={executeDeleteNote} variant="dangerSolid" style={{ flex: 1 }} />
             </View>
           </Animated.View>
         </View>
@@ -452,69 +493,31 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.containerMobile,
     paddingBottom: spacing.stackMd,
-    backgroundColor: colors.background,
   },
   bigAvatar: {
-    width: 128,
-    height: 128,
-    borderRadius: 64,
+    width: 124,
+    height: 124,
+    borderRadius: 62,
     borderWidth: 4,
-    borderColor: colors.surfaceContainerLowest,
-    ...ambientShadow,
   },
-  bigInitials: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryContainer },
-  contactBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 16,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    backgroundColor: colors.surfaceContainerLowest,
-  },
-  contactError: { fontWeight: 'normal', opacity: 0.8, marginTop: 8, textAlign: 'center' },
-  countdownCard: {
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: radius.lg,
-    padding: 24,
-    overflow: 'hidden',
-    ...ambientShadow,
-  },
+  bigInitials: { alignItems: 'center', justifyContent: 'center' },
+  contactError: { opacity: 0.8, marginTop: 8, textAlign: 'center' },
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  bigNumber: { fontFamily: 'Literata_600SemiBold', fontSize: 64, lineHeight: 64 },
+  flameDot: { width: 8, height: 8, borderRadius: 4 },
   progressTrack: {
-    height: 8,
-    backgroundColor: colors.surfaceVariant,
+    height: 6,
     borderRadius: radius.full,
-    marginTop: 24,
+    marginTop: 20,
     overflow: 'hidden',
   },
-  progressFill: { height: '100%', backgroundColor: colors.primary, borderRadius: radius.full },
-  blur: {
-    position: 'absolute',
-    top: -40,
-    right: -40,
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: 'rgba(217,142,142,0.2)',
-  },
-  sectionHeading: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceVariant,
-    paddingBottom: 8,
-  },
+  progressFill: { height: '100%', borderRadius: radius.full },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginLeft: 2 },
+  sectionRule: { flex: 1, height: 1 },
   dayRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radius.lg,
     padding: 16,
-    ...ambientShadow,
   },
   dayIcon: {
     width: 48,
@@ -523,93 +526,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  notesCard: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radius.lg,
-    padding: 24,
-    ...ambientShadow,
-  },
-  notesHeader: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceVariant,
-    paddingBottom: 12,
-    marginBottom: 24,
-  },
-  note: {
-    backgroundColor: colors.inverseOnSurface,
-    borderRadius: radius.lg,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(215,193,193,0.3)',
-  },
-  noteInput: {
-    marginTop: 12,
-    backgroundColor: 'rgba(228,226,225,0.3)',
-    borderRadius: radius.DEFAULT,
-    padding: 12,
-    minHeight: 80,
-    textAlignVertical: 'top',
-    fontFamily: 'Inter_400Regular',
-    fontSize: 16,
-    color: colors.onSurface,
-  },
-  chipWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 8,
-  },
-  selectChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
-  selectChipActive: {
-    backgroundColor: colors.secondaryContainer,
-    borderColor: colors.secondary,
-  },
-  addNoteBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: radius.DEFAULT,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.outlineVariant,
-    backgroundColor: colors.surfaceContainerLow,
-    marginTop: 12,
-  },
-  saveEditBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.containerMobile,
   },
   modalContent: {
-    backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radius.xl,
     padding: 24,
     width: '100%',
     maxWidth: 400,
     alignItems: 'center',
-    ...ambientShadow,
   },
   modalIconWrap: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.errorContainer,
     alignItems: 'center',
     justifyContent: 'center',
   },

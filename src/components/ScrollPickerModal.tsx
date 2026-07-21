@@ -1,7 +1,8 @@
 import { View, Modal, StyleSheet, Pressable, ScrollView, Platform } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing, radius } from '@/theme/tokens';
+import { spacing, radius } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
 import { Txt } from '@/components/Txt';
 
 export type PickerOption = {
@@ -20,20 +21,32 @@ type Props = {
 
 export function ScrollPickerModal({ visible, onClose, options, selectedValue, onSelect, title }: Props) {
   const insets = useSafeAreaInsets();
+  const { c } = useTheme();
 
   if (!visible) return null;
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={styles.backdrop}>
+      <Animated.View
+        entering={FadeIn.duration(200)}
+        exiting={FadeOut.duration(200)}
+        style={[styles.backdrop, { backgroundColor: c.overlay }]}
+      >
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      <Animated.View entering={SlideInDown.duration(300).springify()} exiting={SlideOutDown.duration(200)} style={[styles.sheet, { paddingBottom: insets.bottom + spacing.stackLg }]}>
-        <View style={styles.handle} />
-        
+      <Animated.View
+        entering={SlideInDown.duration(300).springify()}
+        exiting={SlideOutDown.duration(200)}
+        style={[
+          styles.sheet,
+          { backgroundColor: c.surface, paddingBottom: insets.bottom + spacing.stackLg },
+        ]}
+      >
+        <View style={[styles.handle, { backgroundColor: c.lineStrong }]} />
+
         <View style={styles.header}>
-          <Txt variant="headlineMd" color={colors.onSurface}>{title}</Txt>
+          <Txt variant="heading">{title}</Txt>
         </View>
 
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -44,18 +57,17 @@ export function ScrollPickerModal({ visible, onClose, options, selectedValue, on
                 key={String(opt.value)}
                 style={({ pressed }) => [
                   styles.optionBtn,
-                  isSelected && styles.optionSelected,
-                  pressed && { backgroundColor: colors.surfaceContainerHigh }
+                  isSelected && { backgroundColor: c.flameWash },
+                  pressed && { backgroundColor: c.surfaceAlt },
                 ]}
                 onPress={() => {
                   onSelect(opt.value);
                   onClose();
                 }}
               >
-                <Txt 
-                  variant="bodyLg" 
-                  color={isSelected ? colors.onPrimaryContainer : colors.onSurface}
-                  style={isSelected && { fontWeight: '600' }}
+                <Txt
+                  variant={isSelected ? 'bodySemi' : 'body'}
+                  color={isSelected ? c.flameDeep : c.text}
                 >
                   {opt.label}
                 </Txt>
@@ -71,14 +83,12 @@ export function ScrollPickerModal({ visible, onClose, options, selectedValue, on
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFill as any,
-    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   sheet: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: colors.surfaceContainerLowest,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     maxHeight: '80%',
@@ -89,7 +99,6 @@ const styles = StyleSheet.create({
   handle: {
     width: 40,
     height: 4,
-    backgroundColor: colors.outlineVariant,
     borderRadius: 2,
     alignSelf: 'center',
     marginTop: 12,
@@ -112,8 +121,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     alignItems: 'center',
     marginBottom: 4,
-  },
-  optionSelected: {
-    backgroundColor: colors.primaryContainer,
   },
 });

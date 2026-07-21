@@ -1,61 +1,68 @@
-import { View, StyleSheet, useWindowDimensions } from 'react-native';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { colors, spacing } from '@/theme/tokens';
+import { spacing, radius, dark } from '@/theme/tokens';
+import { fonts } from '@/theme/type';
 import { Txt } from '@/components/Txt';
 import { Button } from '@/components/Button';
+import { useTranslation } from 'react-i18next';
 
-const BG =
-  'https://images.unsplash.com/photo-1543807535-eceef0bc6599?auto=format&fit=crop&w=900&q=80';
+// The welcome screen is the lamp before it's lit: always the deep spruce ink,
+// whatever the theme, with one candle-amber line. First impression = identity.
+const c = dark;
 
 export default function Welcome() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { height } = useWindowDimensions();
 
   return (
-    <View style={styles.root}>
-      <Image source={{ uri: BG }} style={StyleSheet.absoluteFill} contentFit="cover" transition={400} />
-      <LinearGradient
-        colors={['rgba(252,249,248,0.4)', 'rgba(252,249,248,0.65)', colors.background]}
-        locations={[0, 0.55, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-      <View style={[styles.content, { paddingBottom: insets.bottom + spacing.stackXl, minHeight: height }]}>
-        <Animated.View entering={FadeInDown.duration(700)}>
-          <Txt variant="headlineMd" color={colors.primary}>
-            Kindred
-          </Txt>
+    <View style={[styles.root, { backgroundColor: '#141A15' }]}>
+      <View
+        style={[
+          styles.content,
+          { paddingTop: insets.top + spacing.stackXl, paddingBottom: insets.bottom + spacing.stackXl },
+        ]}
+      >
+        <Animated.View entering={FadeInDown.duration(700)} style={styles.brandRow}>
+          <View style={[styles.flameDot, { backgroundColor: c.flame }]} />
+          <Txt color={c.onInk} style={styles.wordmark}>{t('welcome_brand')}</Txt>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.duration(700).delay(120)} style={{ marginTop: spacing.stackLg }}>
-          <Txt variant="headlineLgMobile" color={colors.onSurface}>
-            Never miss a special moment with those who matter most.
+        <View style={{ flex: 1 }} />
+
+        <Animated.View entering={FadeInDown.duration(700).delay(120)}>
+          <Txt color={c.onInk} style={styles.headline}>
+            {t('welcome_headline')}
           </Txt>
         </Animated.View>
 
         <Animated.View entering={FadeInDown.duration(700).delay(240)} style={{ marginTop: spacing.stackMd, maxWidth: 420 }}>
-          <Txt variant="bodyLg" color={colors.onSurfaceVariant}>
-            A mindful space to remember birthdays, anniversaries, and the quiet moments that build lifelong connections.
+          <Txt variant="body" color={c.onInkMuted}>
+            {t('welcome_sub')}
           </Txt>
         </Animated.View>
 
         <Animated.View entering={FadeInDown.duration(700).delay(360)} style={styles.actions}>
           <Button
-            label="Get Started"
+            label={t('get_started')}
             iconRight="arrow-forward"
             fullWidth
             onPress={() => router.push('/register')}
           />
-          <Button
-            label="Log In"
-            variant="tonal"
-            fullWidth
+          {/* Styled by hand: this screen is always ink, whatever the active
+              theme, so themed Button variants would clash here. */}
+          <Pressable
             onPress={() => router.push('/login')}
-          />
+            style={({ pressed }) => [
+              styles.loginBtn,
+              { borderColor: c.inkSoft },
+              pressed && { opacity: 0.8 },
+            ]}
+          >
+            <Txt variant="bodySemi" color={c.onInkMuted}>{t('log_in')}</Txt>
+          </Pressable>
         </Animated.View>
       </View>
     </View>
@@ -63,16 +70,37 @@ export default function Welcome() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1 },
   content: {
     flex: 1,
-    justifyContent: 'flex-end',
-    paddingHorizontal: spacing.containerMobile,
+    paddingHorizontal: spacing.containerMobile + 4,
+  },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  flameDot: { width: 10, height: 10, borderRadius: radius.full },
+  wordmark: {
+    fontFamily: fonts.frauncesSemiBold,
+    fontSize: 22,
+    lineHeight: 28,
+    letterSpacing: -0.3,
+  },
+  headline: {
+    fontFamily: fonts.frauncesSemiBold,
+    fontSize: 40,
+    lineHeight: 47,
+    letterSpacing: -0.8,
   },
   actions: {
     marginTop: spacing.stackXl,
     gap: spacing.stackMd,
     maxWidth: 420,
     width: '100%',
+  },
+  loginBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    alignSelf: 'stretch',
   },
 });

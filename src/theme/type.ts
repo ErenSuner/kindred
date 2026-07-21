@@ -1,58 +1,82 @@
 import { TextStyle } from 'react-native';
 
 // Font family keys map to loaded @expo-google-fonts assets (see _layout.tsx).
+// Fraunces carries the voice (warm, bookish); Figtree does the quiet work.
 export const fonts = {
-  literataMedium: 'Literata_500Medium',
-  literataSemiBold: 'Literata_600SemiBold',
-  interRegular: 'Inter_400Regular',
-  interMedium: 'Inter_500Medium',
-  interSemiBold: 'Inter_600SemiBold',
+  frauncesMedium: 'Fraunces_500Medium',
+  frauncesSemiBold: 'Fraunces_600SemiBold',
+  figtreeRegular: 'Figtree_400Regular',
+  figtreeMedium: 'Figtree_500Medium',
+  figtreeSemiBold: 'Figtree_600SemiBold',
+  figtreeBold: 'Figtree_700Bold',
 } as const;
 
-// Typographic scale from DESIGN.md. Serif (Literata) for headlines, Inter for UI/body.
 export const type = {
-  headlineXl: {
-    fontFamily: fonts.literataSemiBold,
-    fontSize: 40,
-    lineHeight: 48,
-    letterSpacing: -0.8,
-  },
-  headlineLg: {
-    fontFamily: fonts.literataSemiBold,
+  /** Screen titles. */
+  display: {
+    fontFamily: fonts.frauncesSemiBold,
     fontSize: 32,
-    lineHeight: 40,
-    letterSpacing: -0.3,
+    lineHeight: 38,
+    letterSpacing: -0.5,
   },
-  headlineLgMobile: {
-    fontFamily: fonts.literataSemiBold,
-    fontSize: 28,
-    lineHeight: 36,
+  /** Hero moments — a name on a dark card, a welcome line. */
+  title: {
+    fontFamily: fonts.frauncesSemiBold,
+    fontSize: 25,
+    lineHeight: 31,
+    letterSpacing: -0.25,
   },
-  headlineMd: {
-    fontFamily: fonts.literataMedium,
-    fontSize: 24,
-    lineHeight: 32,
+  /** Section and card headings. */
+  heading: {
+    fontFamily: fonts.frauncesMedium,
+    fontSize: 20,
+    lineHeight: 26,
   },
-  bodyLg: {
-    fontFamily: fonts.interRegular,
-    fontSize: 18,
-    lineHeight: 28,
+  /** Countdown numerals and dates that deserve warmth. */
+  num: {
+    fontFamily: fonts.frauncesSemiBold,
+    fontSize: 17,
+    lineHeight: 22,
   },
-  bodyMd: {
-    fontFamily: fonts.interRegular,
+  body: {
+    fontFamily: fonts.figtreeRegular,
     fontSize: 16,
-    lineHeight: 24,
+    lineHeight: 23,
   },
-  labelMd: {
-    fontFamily: fonts.interMedium,
+  bodyMed: {
+    fontFamily: fonts.figtreeMedium,
+    fontSize: 16,
+    lineHeight: 23,
+  },
+  bodySemi: {
+    fontFamily: fonts.figtreeSemiBold,
+    fontSize: 16,
+    lineHeight: 23,
+  },
+  sub: {
+    fontFamily: fonts.figtreeRegular,
     fontSize: 14,
     lineHeight: 20,
-    letterSpacing: 0.14,
   },
-  labelSm: {
-    fontFamily: fonts.interSemiBold,
-    fontSize: 12,
-    lineHeight: 16,
-    letterSpacing: 0.36,
+  subMed: {
+    fontFamily: fonts.figtreeMedium,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  /** Buttons, chips, tab labels. */
+  label: {
+    fontFamily: fonts.figtreeSemiBold,
+    fontSize: 13,
+    lineHeight: 18,
+    letterSpacing: 0.2,
+  },
+  /** Tiny uppercase wayfinding. Pair with textTransform in Txt. */
+  eyebrow: {
+    fontFamily: fonts.figtreeBold,
+    fontSize: 11,
+    lineHeight: 14,
+    letterSpacing: 1.3,
   },
 } satisfies Record<string, TextStyle>;
+
+export type TypeVariant = keyof typeof type;

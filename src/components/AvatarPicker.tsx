@@ -1,7 +1,10 @@
 import { useState } from 'react';
+import i18n from '@/lib/i18n';
 import { View, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
-import { colors, radius } from '@/theme/tokens';
+import { radius } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
+import { fonts } from '@/theme/type';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { pickAvatarImage, uploadAvatar } from '@/utils/avatars';
@@ -35,6 +38,7 @@ export function AvatarPicker({
   onError,
   hideBadgeWhenSet = false,
 }: Props) {
+  const { c } = useTheme();
   const { user } = useAuth();
   const [busy, setBusy] = useState(false);
 
@@ -48,7 +52,7 @@ export function AvatarPicker({
   const handlePress = async () => {
     if (busy) return;
     if (!user) {
-      onError?.('You need to be signed in to add a photo.');
+      onError?.(i18n.t('need_sign_in_photo'));
       return;
     }
 
@@ -56,7 +60,7 @@ export function AvatarPicker({
       const picked = await pickAvatarImage();
 
       if (picked.status === 'denied') {
-        onError?.('Kindred needs access to your photos to set a picture.');
+        onError?.(i18n.t('photos_access_picture'));
         return;
       }
       if (picked.status === 'cancelled') return;
@@ -66,7 +70,7 @@ export function AvatarPicker({
       await onUploaded(publicUrl);
     } catch (e) {
       console.error('Avatar upload failed', e);
-      onError?.('Could not upload that photo. Check your connection and try again.');
+      onError?.(i18n.t('photo_upload_failed'));
     } finally {
       setBusy(false);
     }
@@ -76,32 +80,37 @@ export function AvatarPicker({
     <Pressable
       onPress={handlePress}
       disabled={busy}
-      style={({ pressed }) => [styles.wrap, dim, pressed && !busy && { opacity: 0.85, transform: [{ scale: 0.97 }] }]}
+      style={({ pressed }) => [
+        styles.wrap,
+        dim,
+        { backgroundColor: c.surfaceAlt },
+        pressed && !busy && { opacity: 0.85, transform: [{ scale: 0.97 }] },
+      ]}
     >
       {uri ? (
         <Image source={{ uri }} style={[dim, styles.img]} contentFit="cover" transition={200} />
       ) : (
-        <View style={[dim, styles.placeholder]}>
+        <View style={[dim, styles.placeholder, { backgroundColor: c.flameWash }]}>
           {initials ? (
-            <Txt color={colors.onPrimaryContainer} style={{ fontSize: size * 0.36, fontFamily: 'Inter_500Medium' }}>
+            <Txt color={c.flameDeep} style={{ fontSize: size * 0.36, fontFamily: fonts.frauncesSemiBold }}>
               {initials}
             </Txt>
           ) : (
-            <Icon name="add-a-photo" size={size * 0.3} color={colors.onSurfaceVariant} />
+            <Icon name="add-a-photo" size={size * 0.3} color={c.flameDeep} />
           )}
         </View>
       )}
 
       {/* Doubles as the affordance: an invitation when empty, an edit hint when set. */}
       {showBadge && (
-        <View style={[styles.badge, badgeDim]}>
-          <Icon name={uri ? 'edit' : 'add-a-photo'} size={badgeSize * 0.55} color={colors.onPrimary} />
+        <View style={[styles.badge, badgeDim, { backgroundColor: c.flame, borderColor: c.bg }]}>
+          <Icon name={uri ? 'edit' : 'add-a-photo'} size={badgeSize * 0.55} color={c.onFlame} />
         </View>
       )}
 
       {busy && (
-        <View style={[styles.busyVeil, dim]}>
-          <ActivityIndicator size="small" color={colors.primary} />
+        <View style={[styles.busyVeil, dim, { backgroundColor: c.overlay }]}>
+          <ActivityIndicator size="small" color={c.flame} />
         </View>
       )}
     </Pressable>
@@ -112,27 +121,22 @@ const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surfaceContainerHigh,
   },
   img: { width: '100%', height: '100%' },
   placeholder: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primaryContainer,
   },
   badge: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: colors.background,
   },
   busyVeil: {
     position: 'absolute',
-    backgroundColor: 'rgba(255,255,255,0.7)',
     borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',

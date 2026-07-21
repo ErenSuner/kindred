@@ -1,3 +1,4 @@
+import i18n from '@/lib/i18n';
 // Weekly routines: the things that happen on the same weekdays every week —
 // a course on Tuesdays and Thursdays, a standing call on Mondays.
 //
@@ -38,15 +39,15 @@ export function isRoutine(weekdays: Weekday[] | undefined): boolean {
   return !!weekdays && weekdays.length > 0;
 }
 
-// "Tue & Thu", "Mon, Wed & Fri", "Every day"
+// "Tue & Thu" / "Sal ve Per", "Every day" / "Her gün" — localized.
 export function weekdaysLabel(days: Weekday[]): string {
   const sorted = sortWeekdays(days);
-  if (sorted.length === 0) return 'No days picked';
-  if (sorted.length === 7) return 'Every day';
+  if (sorted.length === 0) return i18n.t('no_days_picked');
+  if (sorted.length === 7) return i18n.t('every_day');
 
-  const names = sorted.map((d) => WEEKDAYS.find((w) => w.value === d)?.short ?? '');
-  if (names.length === 1) return `Every ${names[0]}`;
-  return `${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}`;
+  const names = sorted.map((d) => i18n.t(`wd_sh_${d}`));
+  if (names.length === 1) return i18n.t('every_wd', { day: names[0] });
+  return names.slice(0, -1).join(', ') + i18n.t('wd_join_and') + names[names.length - 1];
 }
 
 function startOfToday(): Date {

@@ -68,6 +68,20 @@ export type MyEvent = {
   timeOfDay?: TimeOfDay | null;
 };
 
+// A birthday saved with no person attached — just a name and a date. The light
+// alternative to adopting someone as a full Person. Computed fields (date,
+// daysAway, turningAge) are worked out from `originalDate` on read.
+export type SimpleBirthday = {
+  id: string;
+  name: string;
+  originalDate: string; // YYYY-MM-DD; year 1000 means the year was skipped
+  emoji: string;
+  nudges: string[];
+  date: string; // display string for the next occurrence
+  daysAway: number;
+  turningAge?: number;
+};
+
 export type Person = {
   id: string;
   name: string;

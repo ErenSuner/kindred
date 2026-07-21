@@ -1,13 +1,17 @@
 import { describeWriteError } from '@/utils/loadError';
 import { Button } from '@/components/Button';
+import { Card } from '@/components/Card';
 import { DateFields, DateValue } from '@/components/DateFields';
 import { FormError } from '@/components/FormError';
 import { Icon } from '@/components/Icon';
 import { RecurrencePicker } from '@/components/RecurrencePicker';
 import { ReminderEditor } from '@/components/ReminderEditor';
 import { Txt } from '@/components/Txt';
+import { showHeld } from '@/components/HeldNotice';
 import { useEvents } from '@/context/EventsContext';
-import { colors, radius, softShadow, spacing } from '@/theme/tokens';
+import { radius, spacing } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
+import { fonts } from '@/theme/type';
 import { Nudge, serializeNudges } from '@/utils/nudges';
 import { Recurrence, YEARLY } from '@/utils/recurrence';
 import { TimeField } from '@/components/TimeField';
@@ -17,20 +21,25 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 
-const SUGGESTIONS = ['Dentist', 'Rent Due', 'Renew Passport', 'Gym Renewal', 'Car Service'];
+const SUGGESTION_KEYS = ['suggest_dentist','suggest_rent','suggest_passport','suggest_gym','suggest_car'];
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
+  const { c } = useTheme();
   return (
-    <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.fieldLabel}>
-      {typeof children === 'string' ? children.toUpperCase() : children}
+    <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>
+      {children}
     </Txt>
   );
 }
 
 export default function AddMyEvent() {
+    const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { c } = useTheme();
   const { addEvent } = useEvents();
 
   const [title, setTitle] = useState('');
@@ -60,15 +69,15 @@ export default function AddMyEvent() {
     setError(null);
 
     if (!title.trim()) {
-      setError('Give your event a title.');
+      setError(i18n.t('give_your_event_a_title'));
       return;
     }
     if (!day || !month) {
-      setError('Pick a day and a month.');
+      setError(i18n.t('pick_a_day_and_a_month'));
       return;
     }
     if (needsYear && !hasYear) {
-      setError('A one-time event needs a year.');
+      setError(i18n.t('a_one_time_event_needs_a_year'));
       return;
     }
 
@@ -85,6 +94,13 @@ export default function AddMyEvent() {
         timeOfDay,
       });
       router.back();
+      // The reassurance is the product: say the job has been taken on.
+      showHeld(
+        t('is_remembered', { title: title.trim() }),
+        reminders.length > 0
+          ? `On the day, plus ${reminders.length} earlier ${reminders.length === 1 ? 'reminder' : 'reminders'}`
+          : i18n.t('we_ll_remind_you_on_the_day'),
+      );
     } catch (e) {
       console.error(e);
       setError(describeWriteError(e));
@@ -94,14 +110,13 @@ export default function AddMyEvent() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} hitSlop={8}>
-          <Icon name="arrow-back" size={24} color={colors.primary} />
+          <Icon name="arrow-back" size={24} color={c.muted} />
         </Pressable>
-        <Txt variant="headlineMd" color={colors.primary} style={{ flex: 1, textAlign: 'center', marginRight: 24 }}>
-          New Reminder
-        </Txt>
+        <Txt variant="title" style={{ flex: 1, textAlign: 'center', marginRight: 24 }}>
+          {t('new_reminder')}</Txt>
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -110,56 +125,52 @@ export default function AddMyEvent() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <Animated.View entering={FadeInDown.duration(500).delay(100)} style={[styles.card, { gap: spacing.stackMd }]}>
-            <View style={styles.cardHeader}>
-              <Txt variant="headlineMd" color={colors.onSurface}>Something for you</Txt>
-              <Icon name="self-improvement" size={24} color={colors.primary} />
-            </View>
+          <Animated.View entering={FadeInDown.duration(500).delay(100)}>
+            <Card style={{ gap: spacing.stackMd }}>
+              <View style={{ gap: 6 }}>
+                <FieldLabel>{t('title')}</FieldLabel>
+                <TextInput
+                  value={title}
+                  onChangeText={setTitle}
+                  placeholder={t('e_g_dentist_passport_renewal')}
+                  placeholderTextColor={c.faint}
+                  style={[styles.input, { backgroundColor: c.surfaceAlt, color: c.text }]}
+                />
+              </View>
 
-            <View style={{ gap: 4 }}>
-              <FieldLabel>Title</FieldLabel>
-              <TextInput
-                value={title}
-                onChangeText={setTitle}
-                placeholder="e.g., Dentist, Passport renewal"
-                placeholderTextColor={colors.outline}
-                style={styles.input}
-              />
-            </View>
+              <View style={styles.chipWrap}>
+                {SUGGESTION_KEYS.map((s) => (
+                  <Pressable
+                    key={s}
+                    onPress={() => setTitle(t(s))}
+                    style={({ pressed }) => [
+                      styles.suggestChip,
+                      { borderColor: c.lineStrong },
+                      pressed && { opacity: 0.7 },
+                    ]}
+                  >
+                    <Txt variant="sub" color={c.muted}>{t(s)}</Txt>
+                  </Pressable>
+                ))}
+              </View>
 
-            <View style={styles.chipWrap}>
-              {SUGGESTIONS.map((s) => (
-                <Pressable
-                  key={s}
-                  onPress={() => setTitle(s)}
-                  style={({ pressed }) => [styles.suggestChip, pressed && { opacity: 0.7 }]}
-                >
-                  <Txt variant="labelSm" color={colors.onSurfaceVariant}>{s}</Txt>
-                </Pressable>
-              ))}
-            </View>
+              <View style={{ gap: 6 }}>
+                <FieldLabel>{needsYear ? t('date_year_required') : t('date_year_optional')}</FieldLabel>
+                <DateFields value={date} onChange={setDate} yearMode="future" allowSkipYear={!needsYear} />
+              </View>
 
-            <View style={{ gap: 4 }}>
-              <FieldLabel>
-                Date{' '}
-                <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontWeight: 'normal' }}>
-                  {needsYear ? '(Year required)' : '(Year optional)'}
-                </Txt>
-              </FieldLabel>
-              <DateFields value={date} onChange={setDate} yearMode="future" allowSkipYear={!needsYear} />
-            </View>
+              <RecurrencePicker value={recurrence} onChange={setRecurrence} />
 
-            <RecurrencePicker value={recurrence} onChange={setRecurrence} />
+              <TimeField value={timeOfDay} onChange={setTimeOfDay} />
 
-            <TimeField value={timeOfDay} onChange={setTimeOfDay} />
-
-            <ReminderEditor reminders={reminders} onChange={setReminders} eventDate={eventDate()} />
+              <ReminderEditor reminders={reminders} onChange={setReminders} eventDate={eventDate()} />
+            </Card>
           </Animated.View>
 
           <FormError message={error} />
 
           <Animated.View entering={FadeInDown.duration(500).delay(200)} style={{ alignItems: 'center' }}>
-            <Button label={saving ? 'Saving…' : 'Save Reminder'} icon="check" onPress={handleSubmit} disabled={saving} />
+            <Button label={saving ? t('saving') : t('save_reminder')} icon="check" onPress={handleSubmit} disabled={saving} />
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -174,50 +185,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.containerMobile,
     paddingBottom: spacing.stackMd,
-    backgroundColor: colors.background,
   },
-  card: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radius.lg,
-    padding: spacing.stackMd,
-    ...softShadow,
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  fieldLabel: { letterSpacing: 1, marginLeft: 2 },
+  fieldLabel: { marginLeft: 2 },
   input: {
-    backgroundColor: 'rgba(228,226,225,0.4)',
     borderRadius: radius.DEFAULT,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: fonts.figtreeRegular,
     fontSize: 16,
-    color: colors.onSurface,
   },
-  inputCenter: { alignItems: 'center', justifyContent: 'center' },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   suggestChip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: radius.full,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
-  nudgeBox: {
-    backgroundColor: colors.surfaceContainerLow,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.surfaceVariant,
-    padding: 16,
-    marginTop: spacing.stackSm,
-  },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16 },
-  errorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.errorContainer,
-    borderRadius: radius.DEFAULT,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
   },
 });

@@ -10,7 +10,9 @@ import Animated, {
   useDerivedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { colors, radius, spacing, ambientShadow } from '@/theme/tokens';
+import { radius, spacing } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
+import { fonts } from '@/theme/type';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { PhotoViewer } from '@/components/PhotoViewer';
@@ -19,6 +21,7 @@ import { usePeople } from '@/context/PeopleContext';
 import { pickPhoto, uploadPhoto } from '@/utils/avatars';
 import { GIFT_IDEA, MEMORY, NOTEBOOK } from '@/utils/notes';
 import type { Note, Person } from '@/data/mock';
+import { useTranslation } from "react-i18next";
 
 // A gift idea is a line, not an essay — the cap is what keeps the list
 // scannable.
@@ -34,13 +37,12 @@ type Props = {
 };
 
 function Section({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
+  const { c } = useTheme();
   return (
     <View style={{ gap: spacing.stackSm }}>
-      <View style={styles.sectionHead}>
-        <Icon name={icon as any} size={16} color={colors.tertiary} />
-        <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ letterSpacing: 1 }}>
-          {title.toUpperCase()}
-        </Txt>
+      <View style={[styles.sectionHead, { borderBottomColor: c.line }]}>
+        <Icon name={icon as any} size={15} color={c.flameDeep} />
+        <Txt variant="eyebrow" color={c.faint}>{title}</Txt>
       </View>
       {children}
     </View>
@@ -52,28 +54,30 @@ function Section({ icon, title, children }: { icon: string; title: string; child
 // short, and hiding two thirds of what you know about someone behind a tab was
 // more chrome than the content deserved.
 export function AboutPerson({ person, onDeleteNote }: Props) {
+    const { t } = useTranslation();
+  const { c, cardShadow } = useTheme();
   const notes = person.notes ?? [];
   const gifts = notes.filter((n) => !n.photoUrl && n.kind === GIFT_IDEA);
   const photos = notes.filter((n) => !!n.photoUrl);
   const notebookNote = notes.find((n) => n.kind === NOTEBOOK);
 
   return (
-    <View style={styles.card}>
-      <View style={styles.headerRow}>
-        <Icon name="auto-stories" size={24} color={colors.tertiary} />
-        <Txt variant="headlineMd" color={colors.onSurface}>About {person.name}</Txt>
+    <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.line }, cardShadow]}>
+      <View style={[styles.headerRow, { borderBottomColor: c.line }]}>
+        <Icon name="auto-stories" size={22} color={c.flameDeep} />
+        <Txt variant="heading">{t('about_person', { name: person.name })}</Txt>
       </View>
 
       <View style={{ gap: spacing.stackLg }}>
-        <Section icon="card-giftcard" title="Gift Ideas">
+        <Section icon="card-giftcard" title={t('gift_ideas')}>
           <GiftIdeas person={person} gifts={gifts} onDelete={onDeleteNote} />
         </Section>
 
-        <Section icon="photo-library" title="Memories">
+        <Section icon="photo-library" title={t('memories')}>
           <Memories person={person} photos={photos} onDelete={onDeleteNote} />
         </Section>
 
-        <Section icon="menu-book" title="Notebook">
+        <Section icon="menu-book" title={t('notebook')}>
           <Notebook person={person} note={notebookNote} />
         </Section>
       </View>
@@ -84,9 +88,12 @@ export function AboutPerson({ person, onDeleteNote }: Props) {
 // --- Gift ideas --------------------------------------------------------------
 
 function GiftIdeas({ person, gifts, onDelete }: { person: Person; gifts: Note[]; onDelete: (id: string) => void }) {
+    const { t } = useTranslation();
+  const { c } = useTheme();
   const { addNoteToPerson } = usePeople();
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [showBought, setShowBought] = useState(false);
 
   const trimmed = body.trim();
@@ -117,10 +124,10 @@ function GiftIdeas({ person, gifts, onDelete }: { person: Person; gifts: Note[];
     <Animated.View layout={ROW_MOTION} style={{ gap: spacing.stackSm }}>
       {open.length === 0 ? (
         <Animated.View entering={FadeIn.duration(160)} style={styles.emptyWrap}>
-          <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={styles.empty}>
+          <Txt variant="sub" color={c.muted} style={styles.empty}>
             {bought.length > 0
-              ? 'All caught up — everything on the list has been bought.'
-              : 'Nothing yet. Anything they mention wanting, jot it here — a line is enough.'}
+              ? t('all_bought')
+              : t('jot_here')}
           </Txt>
         </Animated.View>
       ) : (
@@ -131,26 +138,46 @@ function GiftIdeas({ person, gifts, onDelete }: { person: Person; gifts: Note[];
         </Animated.View>
       )}
 
-      <View style={styles.giftInputRow}>
-        <TextInput
-          value={body}
-          onChangeText={setBody}
-          maxLength={GIFT_MAX_LENGTH}
-          placeholder="e.g., that camera lens she mentioned"
-          placeholderTextColor={colors.outline}
-          style={styles.giftInput}
-          returnKeyType="done"
-          onSubmitEditing={add}
-          editable={!busy}
-        />
+      {/* The input only appears while adding — an always-on text field made the
+          section look like a form even when you were only reading. */}
+      {adding ? (
+        <Animated.View entering={FadeIn.duration(140)} style={styles.giftInputRow}>
+          <TextInput
+            autoFocus
+            value={body}
+            onChangeText={setBody}
+            maxLength={GIFT_MAX_LENGTH}
+            placeholder={t('e_g_that_camera_lens')}
+            placeholderTextColor={c.faint}
+            style={[styles.giftInput, { backgroundColor: c.surfaceAlt, color: c.text }]}
+            returnKeyType="done"
+            onSubmitEditing={add}
+            onBlur={() => { if (!trimmed) setAdding(false); }}
+            editable={!busy}
+          />
+          <Pressable
+            onPress={add}
+            disabled={!trimmed || busy}
+            style={({ pressed }) => [
+              styles.giftAddBtn,
+              { backgroundColor: c.flame },
+              (!trimmed || busy) && { opacity: 0.4 },
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <Icon name="add" size={20} color={c.onFlame} />
+          </Pressable>
+        </Animated.View>
+      ) : (
         <Pressable
-          onPress={add}
-          disabled={!trimmed || busy}
-          style={({ pressed }) => [styles.giftAddBtn, (!trimmed || busy) && { opacity: 0.4 }, pressed && { opacity: 0.85 }]}
+          onPress={() => setAdding(true)}
+          hitSlop={8}
+          style={({ pressed }) => [styles.addInline, pressed && { opacity: 0.6 }]}
         >
-          <Icon name="add" size={20} color={colors.onPrimary} />
+          <Icon name="add" size={17} color={c.flameDeep} />
+          <Txt variant="label" color={c.flameDeep}>{t('add_idea')}</Txt>
         </Pressable>
-      </View>
+      )}
 
       {bought.length > 0 && (
         <Animated.View
@@ -163,9 +190,9 @@ function GiftIdeas({ person, gifts, onDelete }: { person: Person; gifts: Note[];
             onPress={() => setShowBought((v) => !v)}
             style={({ pressed }) => [styles.boughtToggle, pressed && { opacity: 0.7 }]}
           >
-            <Icon name={showBought ? 'expand-less' : 'expand-more'} size={16} color={colors.onSurfaceVariant} />
-            <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ letterSpacing: 1 }}>
-              BOUGHT ({bought.length})
+            <Icon name={showBought ? 'expand-less' : 'expand-more'} size={16} color={c.muted} />
+            <Txt variant="eyebrow" color={c.faint}>
+              {t('bought_count', { count: bought.length })}
             </Txt>
           </Pressable>
 
@@ -180,6 +207,7 @@ function GiftIdeas({ person, gifts, onDelete }: { person: Person; gifts: Note[];
 // One row of the gift list. Ticking the box is the whole interaction — it moves
 // between the open list and the bought one, and untick puts it back.
 function GiftRow({ gift, onDelete }: { gift: Note; onDelete: (id: string) => void }) {
+  const { c } = useTheme();
   const { setNoteDone } = usePeople();
   const [busy, setBusy] = useState(false);
   const done = !!gift.doneAt;
@@ -208,7 +236,7 @@ function GiftRow({ gift, onDelete }: { gift: Note; onDelete: (id: string) => voi
       entering={FadeInDown.duration(200).springify().damping(18)}
       exiting={FadeOut.duration(140)}
       layout={ROW_MOTION}
-      style={[styles.giftRow, rowStyle]}
+      style={[styles.giftRow, { backgroundColor: c.surfaceAlt, borderColor: c.line }, rowStyle]}
     >
       <Pressable onPress={toggle} disabled={busy} hitSlop={8} style={{ marginTop: 1 }}>
         {/* Swapping the icon outright is the one hard cut left, so it gets a
@@ -217,7 +245,7 @@ function GiftRow({ gift, onDelete }: { gift: Note; onDelete: (id: string) => voi
           <Icon
             name={done ? 'check-circle' : 'radio-button-unchecked'}
             size={20}
-            color={done ? colors.secondary : colors.outline}
+            color={done ? c.good : c.faint}
           />
         </Animated.View>
       </Pressable>
@@ -226,8 +254,8 @@ function GiftRow({ gift, onDelete }: { gift: Note; onDelete: (id: string) => voi
           long unbroken word pushes straight out of the card. */}
       <Animated.View style={[{ flex: 1, minWidth: 0 }, textStyle]}>
         <Txt
-          variant="bodyMd"
-          color={done ? colors.onSurfaceVariant : colors.onSurface}
+          variant="body"
+          color={done ? c.muted : c.text}
           style={done ? styles.giftTextDone : undefined}
         >
           {gift.body}
@@ -235,7 +263,7 @@ function GiftRow({ gift, onDelete }: { gift: Note; onDelete: (id: string) => voi
       </Animated.View>
 
       <Pressable onPress={() => onDelete(gift.id)} hitSlop={8}>
-        <Icon name="close" size={16} color={colors.onSurfaceVariant} />
+        <Icon name="close" size={16} color={c.faint} />
       </Pressable>
     </Animated.View>
   );
@@ -244,6 +272,8 @@ function GiftRow({ gift, onDelete }: { gift: Note; onDelete: (id: string) => voi
 // --- Memories ----------------------------------------------------------------
 
 function Memories({ person, photos, onDelete }: { person: Person; photos: Note[]; onDelete: (id: string) => void }) {
+    const { t } = useTranslation();
+  const { c } = useTheme();
   const { user } = useAuth();
   const { addNoteToPerson } = usePeople();
   const [busy, setBusy] = useState(false);
@@ -253,7 +283,7 @@ function Memories({ person, photos, onDelete }: { person: Person; photos: Note[]
   const addPhoto = async () => {
     if (busy) return;
     if (!user) {
-      setError('You need to be signed in to add a photo.');
+      setError(t('need_sign_in_photo'));
       return;
     }
     setError(null);
@@ -261,7 +291,7 @@ function Memories({ person, photos, onDelete }: { person: Person; photos: Note[]
     try {
       const picked = await pickPhoto();
       if (picked.status === 'denied') {
-        setError('Kindred needs access to your photos to add a memory.');
+        setError(t('photos_access_memory'));
         return;
       }
       if (picked.status === 'cancelled') return;
@@ -272,7 +302,7 @@ function Memories({ person, photos, onDelete }: { person: Person; photos: Note[]
       await addNoteToPerson(person.id, MEMORY, '', undefined, url);
     } catch (e) {
       console.error('Failed to add memory:', e);
-      setError('Could not upload that photo. Check your connection and try again.');
+      setError(t('photo_upload_failed'));
     } finally {
       setBusy(false);
     }
@@ -281,9 +311,8 @@ function Memories({ person, photos, onDelete }: { person: Person; photos: Note[]
   return (
     <View style={{ gap: spacing.stackSm }}>
       {photos.length === 0 ? (
-        <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={styles.empty}>
-          No photos yet. Pictures of the two of you, things you did together.
-        </Txt>
+        <Txt variant="sub" color={c.muted} style={styles.empty}>
+          {t('pictures_of_the_two_of')}</Txt>
       ) : (
         <View style={styles.grid}>
           {photos.map((photo) => (
@@ -294,10 +323,15 @@ function Memories({ person, photos, onDelete }: { person: Person; photos: Note[]
                 onPress={() => setViewing(photo)}
                 style={({ pressed }) => [StyleSheet.absoluteFill, pressed && { opacity: 0.85 }]}
               >
-                <Image source={{ uri: photo.photoUrl }} style={styles.thumb} contentFit="cover" transition={150} />
+                <Image
+                  source={{ uri: photo.photoUrl }}
+                  style={[styles.thumb, { backgroundColor: c.surfaceAlt }]}
+                  contentFit="cover"
+                  transition={150}
+                />
               </Pressable>
               <Pressable onPress={() => onDelete(photo.id)} hitSlop={6} style={styles.thumbDelete}>
-                <Icon name="close" size={14} color={colors.onPrimary} />
+                <Icon name="close" size={14} color="#FFFFFF" />
               </Pressable>
             </View>
           ))}
@@ -305,20 +339,24 @@ function Memories({ person, photos, onDelete }: { person: Person; photos: Note[]
       )}
 
       {error && (
-        <Txt variant="labelSm" color={colors.error} style={{ fontWeight: 'normal' }}>{error}</Txt>
+        <Txt variant="sub" color={c.danger}>{error}</Txt>
       )}
 
       <Pressable
         onPress={addPhoto}
         disabled={busy}
-        style={({ pressed }) => [styles.dashedBtn, pressed && { opacity: 0.8 }]}
+        style={({ pressed }) => [
+          styles.dashedBtn,
+          { borderColor: c.lineStrong, backgroundColor: c.surfaceAlt },
+          pressed && { opacity: 0.8 },
+        ]}
       >
         {busy ? (
-          <ActivityIndicator size="small" color={colors.primary} />
+          <ActivityIndicator size="small" color={c.flameDeep} />
         ) : (
           <>
-            <Icon name="add-a-photo" size={18} color={colors.primary} />
-            <Txt variant="labelMd" color={colors.primary}>Add a photo</Txt>
+            <Icon name="add-a-photo" size={18} color={c.flameDeep} />
+            <Txt variant="label" color={c.flameDeep}>{t('add_a_photo')}</Txt>
           </>
         )}
       </Pressable>
@@ -336,25 +374,37 @@ function Memories({ person, photos, onDelete }: { person: Person; photos: Note[]
 // --- Notebook ----------------------------------------------------------------
 
 function Notebook({ person, note }: { person: Person; note?: Note }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
   const { saveNotebook } = usePeople();
-  const [body, setBody] = useState(note?.body ?? '');
+  const savedBody = note?.body ?? '';
+  const [editing, setEditing] = useState(false);
+  const [body, setBody] = useState(savedBody);
   const [saving, setSaving] = useState(false);
-  const [savedAt, setSavedAt] = useState<number | null>(null);
 
-  // Pull in whatever the server has whenever it changes underneath — but not
-  // while the user is mid-edit, which is what the dirty check protects.
+  // Keep the draft in step with the server whenever we're not mid-edit.
   useEffect(() => {
-    setBody((current) => (current === '' ? note?.body ?? '' : current));
-  }, [note?.body]);
+    if (!editing) setBody(savedBody);
+  }, [savedBody, editing]);
 
-  const dirty = body !== (note?.body ?? '');
+  const dirty = body !== savedBody;
+
+  const startEditing = () => {
+    setBody(savedBody);
+    setEditing(true);
+  };
+
+  const cancel = () => {
+    setBody(savedBody);
+    setEditing(false);
+  };
 
   const save = async () => {
-    if (!dirty || saving) return;
+    if (saving) return;
     setSaving(true);
     try {
       await saveNotebook(person.id, body, note?.id);
-      setSavedAt(Date.now());
+      setEditing(false);
     } catch (e) {
       console.error('Failed to save notebook:', e);
     } finally {
@@ -362,49 +412,82 @@ function Notebook({ person, note }: { person: Person; note?: Note }) {
     }
   };
 
-  return (
-    <View style={{ gap: spacing.stackSm }}>
-      <TextInput
-        multiline
-        value={body}
-        onChangeText={setBody}
-        placeholder={`Anything about ${person.name} — sizes, allergies, what they love, what they said last time.`}
-        placeholderTextColor={colors.outline}
-        style={styles.notebook}
-        textAlignVertical="top"
-      />
-
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontWeight: 'normal', opacity: 0.8 }}>
-          {dirty ? 'Unsaved changes' : savedAt ? 'Saved' : 'Your notebook for them'}
-        </Txt>
-        <Pressable
-          onPress={save}
-          disabled={!dirty || saving}
-          style={({ pressed }) => [styles.saveBtn, (!dirty || saving) && { opacity: 0.4 }, pressed && { opacity: 0.85 }]}
-        >
-          <Icon name="check" size={16} color={colors.onPrimary} />
-          <Txt variant="labelMd" color={colors.onPrimary}>{saving ? 'Saving…' : 'Save'}</Txt>
-        </Pressable>
+  // Editing: a real textarea with save/cancel. This is the only time the
+  // notebook looks like an input.
+  if (editing) {
+    return (
+      <View style={{ gap: spacing.stackSm }}>
+        <TextInput
+          autoFocus
+          multiline
+          value={body}
+          onChangeText={setBody}
+          placeholder={t('notebook_placeholder', { name: person.name })}
+          placeholderTextColor={c.faint}
+          style={[styles.notebook, { backgroundColor: c.surfaceAlt, color: c.text }]}
+          textAlignVertical="top"
+        />
+        <View style={styles.notebookFooter}>
+          <Pressable onPress={cancel} hitSlop={8} style={({ pressed }) => pressed && { opacity: 0.6 }}>
+            <Txt variant="label" color={c.muted}>{t('cancel')}</Txt>
+          </Pressable>
+          <Pressable
+            onPress={save}
+            disabled={!dirty || saving}
+            style={({ pressed }) => [
+              styles.saveBtn,
+              { backgroundColor: c.flame },
+              (!dirty || saving) && { opacity: 0.5 },
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <Icon name="check" size={16} color={c.onFlame} />
+            <Txt variant="label" color={c.onFlame}>{saving ? t('saving') : t('save')}</Txt>
+          </Pressable>
+        </View>
       </View>
+    );
+  }
 
-    </View>
+  // Empty: a quiet invitation, no input box sitting there.
+  if (!savedBody) {
+    return (
+      <Pressable
+        onPress={startEditing}
+        hitSlop={8}
+        style={({ pressed }) => [styles.addInline, pressed && { opacity: 0.6 }]}
+      >
+        <Icon name="add" size={17} color={c.flameDeep} />
+        <Txt variant="label" color={c.flameDeep}>{t('add_a_note')}</Txt>
+      </Pressable>
+    );
+  }
+
+  // Has content: read it as text. Tapping anywhere opens the editor.
+  return (
+    <Pressable onPress={startEditing} style={({ pressed }) => pressed && { opacity: 0.85 }}>
+      <View style={{ gap: spacing.stackSm }}>
+        <Txt variant="body" color={c.text} style={{ lineHeight: 24 }}>{savedBody}</Txt>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Icon name="edit" size={13} color={c.faint} />
+          <Txt variant="sub" color={c.faint}>{t('tap_to_edit')}</Txt>
+        </View>
+      </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radius.lg,
-    padding: 24,
-    ...ambientShadow,
+    borderWidth: 1,
+    padding: 20,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceVariant,
     paddingBottom: 12,
     marginBottom: 16,
   },
@@ -413,35 +496,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceVariant,
     paddingBottom: 6,
   },
-  empty: { fontStyle: 'italic', opacity: 0.9, paddingVertical: 4 },
+  empty: { paddingVertical: 2 },
 
   giftRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: colors.inverseOnSurface,
     borderRadius: radius.DEFAULT,
     borderWidth: 1,
-    borderColor: 'rgba(215,193,193,0.3)',
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   giftTextDone: { textDecorationLine: 'line-through' },
+  addInline: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, alignSelf: 'flex-start' },
   emptyWrap: { paddingVertical: 4 },
   boughtToggle: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4 },
   giftInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   giftInput: {
     flex: 1,
-    backgroundColor: 'rgba(228,226,225,0.35)',
     borderRadius: radius.full,
     paddingHorizontal: 16,
     paddingVertical: 11,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: fonts.figtreeRegular,
     fontSize: 15,
-    color: colors.onSurface,
   },
   giftAddBtn: {
     width: 42,
@@ -449,12 +528,11 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary,
   },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   thumbWrap: { width: '31.5%', aspectRatio: 1 },
-  thumb: { width: '100%', height: '100%', borderRadius: radius.DEFAULT, backgroundColor: colors.surfaceContainerHigh },
+  thumb: { width: '100%', height: '100%', borderRadius: radius.DEFAULT },
   thumbDelete: {
     position: 'absolute',
     top: 4,
@@ -476,25 +554,26 @@ const styles = StyleSheet.create({
     borderRadius: radius.DEFAULT,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: colors.outlineVariant,
-    backgroundColor: colors.surfaceContainerLow,
   },
 
   notebook: {
-    backgroundColor: 'rgba(228,226,225,0.3)',
     borderRadius: radius.DEFAULT,
     padding: 14,
-    minHeight: 200,
-    fontFamily: 'Inter_400Regular',
+    minHeight: 140,
+    fontFamily: fonts.figtreeRegular,
     fontSize: 16,
     lineHeight: 24,
-    color: colors.onSurface,
+  },
+  notebookFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 36,
   },
   saveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: colors.primary,
     paddingHorizontal: 16,
     paddingVertical: 9,
     borderRadius: radius.full,

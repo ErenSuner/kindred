@@ -1,3 +1,4 @@
+import i18n from '@/lib/i18n';
 // Reminder ("gentle nudge") options and storage format.
 //
 // A nudge is always "some amount of time before the day". It is persisted as a
@@ -65,11 +66,20 @@ export type Nudge = {
   value: string;
 };
 
-const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 export function formatCustomDate(dateStr: string) {
   const [y, m, d] = dateStr.split('-').map(Number);
-  return `${MONTHS_SHORT[m - 1]} ${d}, ${y}`;
+  const month = i18n.t(`month_sh_${m - 1}`);
+  return i18n.language === 'tr' ? `${d} ${month} ${y}` : `${month} ${d}, ${y}`;
+}
+
+// Localized label for a stored nudge value — presets, custom leads and legacy
+// dates all resolve through here, so display never carries a baked-in language.
+export function nudgeLabel(value: string): string {
+  if (value in PRESET_OFFSET_DAYS) return i18n.t(`nudge_${value}`);
+  const lead = parseLead(value);
+  if (lead) return leadLabel(lead.amount, lead.unit);
+  if (ISO_DATE.test(value)) return formatCustomDate(value);
+  return value;
 }
 
 export function leadValue(amount: number, unit: LeadUnit): string {
@@ -77,8 +87,8 @@ export function leadValue(amount: number, unit: LeadUnit): string {
 }
 
 export function leadLabel(amount: number, unit: LeadUnit): string {
-  const spec = LEAD_UNITS.find((u) => u.value === unit) ?? LEAD_UNITS[0];
-  return `${amount} ${amount === 1 ? spec.label : spec.plural} before`;
+  const unitKey = amount === 1 ? `unit_${unit}` : `unit_${unit}s`;
+  return i18n.t('lead_before', { n: amount, unit: i18n.t(unitKey) });
 }
 
 export function clampLead(amount: number): number {
@@ -110,8 +120,7 @@ export function offsetDaysFor(nudge: Nudge): number | null {
 export function parseNudge(raw: unknown): Nudge | null {
   if (typeof raw === 'string') {
     if (raw in PRESET_OFFSET_DAYS) {
-      const preset = PRESET_REMINDERS.find((p) => p.value === raw);
-      return { type: 'preset', label: preset?.label ?? raw, value: raw };
+      return { type: 'preset', label: nudgeLabel(raw), value: raw };
     }
 
     const lead = parseLead(raw);

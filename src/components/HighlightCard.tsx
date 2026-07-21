@@ -8,7 +8,8 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { colors, radius } from '@/theme/tokens';
+import { radius } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
 
 export type HighlightHandle = {
   pulse: () => void;
@@ -25,6 +26,8 @@ type Props = {
 // shifts anything on screen.
 export const HighlightCard = forwardRef<HighlightHandle, Props>(function HighlightCard({ children, style, onLayout }, ref) {
   const progress = useSharedValue(0);
+  const { c } = useTheme();
+  const flame = c.flame;
 
   useImperativeHandle(ref, () => ({
     pulse: () => {
@@ -39,7 +42,7 @@ export const HighlightCard = forwardRef<HighlightHandle, Props>(function Highlig
   }));
 
   const animatedStyle = useAnimatedStyle(() => ({
-    borderColor: interpolateColor(progress.value, [0, 1], ['rgba(139,76,77,0)', colors.primary]),
+    borderColor: interpolateColor(progress.value, [0, 1], ['rgba(237,163,61,0)', flame]),
     transform: [{ scale: interpolate(progress.value, [0, 1], [1, 1.015]) }],
   }));
 

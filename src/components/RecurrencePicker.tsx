@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { colors, radius, spacing } from '@/theme/tokens';
+import { radius, spacing } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
@@ -15,14 +16,15 @@ import {
   recurrenceDescription,
   recurrenceIcon,
 } from '@/utils/recurrence';
+import { useTranslation } from "react-i18next";
 
-type Quick = { label: string; value: Recurrence };
+type Quick = { labelKey: string; value: Recurrence };
 
 const QUICK_OPTIONS: Quick[] = [
-  { label: 'Once', value: ONE_TIME },
-  { label: 'Weekly', value: WEEKLY },
-  { label: 'Monthly', value: MONTHLY },
-  { label: 'Yearly', value: YEARLY },
+  { labelKey: 'rec_once', value: ONE_TIME },
+  { labelKey: 'rec_weekly_opt', value: WEEKLY },
+  { labelKey: 'rec_monthly_opt', value: MONTHLY },
+  { labelKey: 'rec_yearly_opt', value: YEARLY },
 ];
 
 // Custom is for the short cycles the quick chips don't cover. "Every N years"
@@ -30,10 +32,10 @@ const QUICK_OPTIONS: Quick[] = [
 // on a multi-year cycle.
 type CustomUnit = 'day' | 'week' | 'month';
 
-const UNIT_OPTIONS: { label: string; value: CustomUnit }[] = [
-  { label: 'Days', value: 'day' },
-  { label: 'Weeks', value: 'week' },
-  { label: 'Months', value: 'month' },
+const UNIT_OPTIONS: { labelKey: string; value: CustomUnit }[] = [
+  { labelKey: 'opt_days', value: 'day' },
+  { labelKey: 'opt_weeks', value: 'week' },
+  { labelKey: 'opt_months', value: 'month' },
 ];
 
 function matchesQuick(r: Recurrence, quick: Recurrence) {
@@ -56,6 +58,8 @@ type Props = {
 };
 
 export function RecurrencePicker({ value, onChange }: Props) {
+    const { t } = useTranslation();
+  const { c } = useTheme();
   const [customMode, setCustomMode] = useState(() => isCustom(value));
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerType, setPickerType] = useState<'interval' | 'unit'>('interval');
@@ -78,13 +82,18 @@ export function RecurrencePicker({ value, onChange }: Props) {
 
   const showCustom = customMode || isCustom(value);
 
+  const chipLook = (active: boolean) => ({
+    backgroundColor: active ? c.ink : c.surfaceAlt,
+    borderColor: active ? c.ink : c.line,
+  });
+
   return (
-    <View style={styles.box}>
+    <View style={[styles.box, { backgroundColor: c.surface, borderColor: c.line }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Icon name={recurrenceIcon(value)} size={16} color={colors.primary} />
-        <Txt variant="labelMd" color={colors.onSurface}>Repeats</Txt>
+        <Icon name={recurrenceIcon(value)} size={16} color={c.flameDeep} />
+        <Txt variant="subMed">{t('repeats')}</Txt>
       </View>
-      <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 4, marginBottom: 12 }}>
+      <Txt variant="sub" color={c.muted} style={{ marginTop: 4, marginBottom: 12 }}>
         {recurrenceDescription(value)}
       </Txt>
 
@@ -93,12 +102,12 @@ export function RecurrencePicker({ value, onChange }: Props) {
           const active = !showCustom && matchesQuick(value, option.value);
           return (
             <Pressable
-              key={option.label}
+              key={option.labelKey}
               onPress={() => selectQuick(option.value)}
-              style={({ pressed }) => [styles.chip, active && styles.chipActive, pressed && { opacity: 0.8 }]}
+              style={({ pressed }) => [styles.chip, chipLook(active), pressed && { opacity: 0.8 }]}
             >
-              <Txt variant="labelSm" color={active ? colors.onSecondaryContainer : colors.onSurfaceVariant}>
-                {option.label}
+              <Txt variant="label" color={active ? c.onInk : c.muted}>
+                {t(option.labelKey)}
               </Txt>
             </Pressable>
           );
@@ -106,33 +115,32 @@ export function RecurrencePicker({ value, onChange }: Props) {
 
         <Pressable
           onPress={enterCustom}
-          style={({ pressed }) => [styles.chip, showCustom && styles.chipActive, pressed && { opacity: 0.8 }]}
+          style={({ pressed }) => [styles.chip, chipLook(showCustom), pressed && { opacity: 0.8 }]}
         >
-          <Icon name="tune" size={12} color={showCustom ? colors.onSecondaryContainer : colors.onSurfaceVariant} />
-          <Txt variant="labelSm" color={showCustom ? colors.onSecondaryContainer : colors.onSurfaceVariant}>
-            Custom
-          </Txt>
+          <Icon name="tune" size={12} color={showCustom ? c.onInk : c.muted} />
+          <Txt variant="label" color={showCustom ? c.onInk : c.muted}>
+            {t('custom')}</Txt>
         </Pressable>
       </View>
 
       {showCustom && (
         <Animated.View entering={FadeIn.duration(200)} style={styles.customRow}>
-          <Txt variant="bodyMd" color={colors.onSurfaceVariant}>Every</Txt>
+          <Txt variant="body" color={c.muted}>{t('every')}</Txt>
           <Pressable
             onPress={() => { setPickerType('interval'); setPickerVisible(true); }}
-            style={[styles.stepper, { minWidth: 64 }]}
+            style={[styles.stepper, { minWidth: 64, backgroundColor: c.surfaceAlt, borderColor: c.line }]}
           >
-            <Txt variant="bodyMd" color={colors.onSurface}>{customInterval}</Txt>
-            <Icon name="expand-more" size={16} color={colors.onSurfaceVariant} />
+            <Txt variant="body">{customInterval}</Txt>
+            <Icon name="expand-more" size={16} color={c.muted} />
           </Pressable>
           <Pressable
             onPress={() => { setPickerType('unit'); setPickerVisible(true); }}
-            style={[styles.stepper, { flex: 1 }]}
+            style={[styles.stepper, { flex: 1, backgroundColor: c.surfaceAlt, borderColor: c.line }]}
           >
-            <Txt variant="bodyMd" color={colors.onSurface}>
-              {UNIT_OPTIONS.find((u) => u.value === customUnit)?.label}
+            <Txt variant="body">
+              {t(UNIT_OPTIONS.find((u) => u.value === customUnit)?.labelKey ?? '')}
             </Txt>
-            <Icon name="expand-more" size={16} color={colors.onSurfaceVariant} />
+            <Icon name="expand-more" size={16} color={c.muted} />
           </Pressable>
         </Animated.View>
       )}
@@ -140,11 +148,11 @@ export function RecurrencePicker({ value, onChange }: Props) {
       <ScrollPickerModal
         visible={pickerVisible}
         onClose={() => setPickerVisible(false)}
-        title={pickerType === 'interval' ? 'Repeat Every' : 'Repeat Unit'}
+        title={pickerType === 'interval' ? t('repeat_every_title') : t('repeat_unit_title')}
         options={
           pickerType === 'interval'
             ? Array.from({ length: MAX_INTERVAL }, (_, i) => ({ label: String(i + 1), value: i + 1 }))
-            : UNIT_OPTIONS
+            : UNIT_OPTIONS.map((u) => ({ label: t(u.labelKey), value: u.value }))
         }
         selectedValue={pickerType === 'interval' ? customInterval : customUnit}
         onSelect={(val) => {
@@ -162,10 +170,8 @@ export function RecurrencePicker({ value, onChange }: Props) {
 
 const styles = StyleSheet.create({
   box: {
-    backgroundColor: colors.surfaceContainerLow,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.surfaceVariant,
     padding: 16,
     marginTop: spacing.stackSm,
   },
@@ -178,12 +184,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: radius.full,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    backgroundColor: colors.surfaceContainerLowest,
-  },
-  chipActive: {
-    backgroundColor: colors.secondaryContainer,
-    borderColor: colors.secondary,
   },
   customRow: {
     flexDirection: 'row',
@@ -196,10 +196,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 4,
-    backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radius.DEFAULT,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },

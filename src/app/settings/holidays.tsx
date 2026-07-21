@@ -2,28 +2,31 @@ import { View, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { colors, spacing, radius, softShadow } from '@/theme/tokens';
+import { spacing, radius } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Toggle } from '@/components/Toggle';
 import { HOLIDAYS } from '@/data/holidays';
 import { HOLIDAY_HORIZON_DAYS, useHolidays } from '@/context/HolidaysContext';
 import { resolveHoliday } from '@/utils/holidays';
+import { useTranslation } from "react-i18next";
 
 export default function HolidaySettings() {
+    const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { c, cardShadow } = useTheme();
   const { isEnabled, toggleHoliday, enabledIds } = useHolidays();
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} hitSlop={8}>
-          <Icon name="arrow-back" size={24} color={colors.primary} />
+          <Icon name="arrow-back" size={24} color={c.muted} />
         </Pressable>
-        <Txt variant="headlineMd" color={colors.primary} style={{ flex: 1, textAlign: 'center', marginRight: 24 }}>
-          Shared Occasions
-        </Txt>
+        <Txt variant="title" style={{ flex: 1, textAlign: 'center', marginRight: 24 }}>
+          {t('shared_occasions')}</Txt>
       </View>
 
       <ScrollView
@@ -36,13 +39,11 @@ export default function HolidaySettings() {
         showsVerticalScrollIndicator={false}
       >
         <Animated.View entering={FadeInDown.duration(500)}>
-          <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ lineHeight: 22 }}>
-            Days everyone shares, not tied to one person. Kindred shows the ones you keep on your
-            home screen {HOLIDAY_HORIZON_DAYS} days ahead, and nudges you a week and a day before.
-          </Txt>
+          <Txt variant="sub" color={c.muted}>
+            {t('holidays_intro', { days: HOLIDAY_HORIZON_DAYS })}</Txt>
         </Animated.View>
 
-        <View style={styles.group}>
+        <View style={[styles.group, { backgroundColor: c.surface, borderColor: c.line }, cardShadow]}>
           {HOLIDAYS.map((holiday, index) => {
             const enabled = isEnabled(holiday.id);
             const { daysAway, formattedDate } = resolveHoliday(holiday);
@@ -52,35 +53,34 @@ export default function HolidaySettings() {
               <Animated.View key={holiday.id} entering={FadeInDown.duration(400).delay(60 + index * 30)}>
                 <Pressable
                   onPress={() => toggleHoliday(holiday.id, !enabled)}
-                  style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]}
+                  style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.surfaceAlt }]}
                 >
-                  <View style={[styles.iconWrap, enabled && { backgroundColor: colors.primaryFixed }]}>
+                  <View style={[styles.iconWrap, { backgroundColor: enabled ? c.flameWash : c.surfaceAlt }]}>
                     <Icon
                       name={holiday.icon as any}
                       size={20}
-                      color={enabled ? colors.onPrimaryContainer : colors.outline}
+                      color={enabled ? c.flameDeep : c.faint}
                     />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Txt variant="bodyMd" color={colors.onSurface}>{holiday.name}</Txt>
-                    <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.sublabel}>
+                    <Txt variant="bodyMed">{holiday.name}</Txt>
+                    <Txt variant="sub" color={c.muted} style={{ marginTop: 2 }}>
                       {enabled ? `${formattedDate} · ${daysAway === 0 ? 'today' : `${daysAway} days away`}` : holiday.blurb}
                     </Txt>
                   </View>
                   <Toggle value={enabled} onChange={(v) => toggleHoliday(holiday.id, v)} />
                 </Pressable>
-                {!last && <View style={styles.divider} />}
+                {!last && <View style={[styles.divider, { backgroundColor: c.line }]} />}
               </Animated.View>
             );
           })}
         </View>
 
         {enabledIds.length === 0 && (
-          <Animated.View entering={FadeInDown.duration(300)} style={styles.emptyNote}>
-            <Icon name="info-outline" size={16} color={colors.onSurfaceVariant} />
-            <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ flex: 1, fontWeight: 'normal' }}>
-              With none selected, shared occasions stay off your home screen entirely.
-            </Txt>
+          <Animated.View entering={FadeInDown.duration(300)} style={[styles.emptyNote, { backgroundColor: c.surfaceAlt }]}>
+            <Icon name="info-outline" size={16} color={c.muted} />
+            <Txt variant="sub" color={c.muted} style={{ flex: 1 }}>
+              {t('with_none_selected_shared_occa')}</Txt>
           </Animated.View>
         )}
       </ScrollView>
@@ -94,13 +94,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.containerMobile,
     paddingBottom: spacing.stackMd,
-    backgroundColor: colors.background,
   },
   group: {
-    backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radius.lg,
+    borderWidth: 1,
     overflow: 'hidden',
-    ...softShadow,
   },
   row: {
     flexDirection: 'row',
@@ -113,21 +111,17 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sublabel: { fontWeight: 'normal', marginTop: 2 },
   divider: {
     height: 1,
-    backgroundColor: colors.surfaceVariant,
     marginLeft: 72,
   },
   emptyNote: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: colors.surfaceContainer,
     borderRadius: radius.DEFAULT,
     paddingHorizontal: 12,
     paddingVertical: 10,

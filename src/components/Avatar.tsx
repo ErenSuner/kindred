@@ -1,31 +1,42 @@
 import { View, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
-import { colors } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
+import { fonts } from '@/theme/type';
 import { Txt } from './Txt';
 
 type Props = {
   uri?: string;
   initials?: string;
   size?: number;
-  ring?: boolean; // white border ring used on cards
+  ring?: boolean; // surface-coloured border ring used on cards
 };
 
-// Circular avatar — a core brand identifier. Falls back to initials on a blush chip.
+// Circular avatar — the faces are the content. Falls back to Fraunces
+// initials on a warm amber wash.
 export function Avatar({ uri, initials, size = 48, ring = true }: Props) {
+  const { c } = useTheme();
   const dim = { width: size, height: size, borderRadius: size / 2 };
   return (
     <View
       style={[
         styles.wrap,
         dim,
-        ring && { borderWidth: 2, borderColor: colors.surface },
+        { backgroundColor: c.surfaceAlt },
+        ring && { borderWidth: 2, borderColor: c.surface },
       ]}
     >
       {uri ? (
         <Image source={{ uri }} style={[dim, styles.img]} contentFit="cover" transition={200} />
       ) : (
-        <View style={[dim, styles.initials]}>
-          <Txt variant="headlineMd" color={colors.onPrimaryContainer}>
+        <View style={[dim, styles.initials, { backgroundColor: c.flameWash }]}>
+          <Txt
+            color={c.flameDeep}
+            style={{
+              fontFamily: fonts.frauncesSemiBold,
+              fontSize: Math.max(13, Math.round(size * 0.38)),
+              lineHeight: Math.max(16, Math.round(size * 0.46)),
+            }}
+          >
             {initials ?? '?'}
           </Txt>
         </View>
@@ -37,12 +48,10 @@ export function Avatar({ uri, initials, size = 48, ring = true }: Props) {
 const styles = StyleSheet.create({
   wrap: {
     overflow: 'hidden',
-    backgroundColor: colors.surfaceVariant,
   },
   img: { width: '100%', height: '100%' },
   initials: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primaryContainer,
   },
 });

@@ -1,33 +1,33 @@
 import { AvatarPicker } from '@/components/AvatarPicker';
 import { Button } from '@/components/Button';
+import { Card } from '@/components/Card';
 import { SelectableChip } from '@/components/Chip';
 import { Icon } from '@/components/Icon';
 import { Txt } from '@/components/Txt';
+import { showHeld } from '@/components/HeldNotice';
 import { usePeople } from '@/context/PeopleContext';
 import { describeWriteError } from '@/utils/loadError';
 import type { Relationship } from '@/data/mock';
-import { ambientShadow, colors, radius, softShadow, spacing } from '@/theme/tokens';
+import { radius, spacing } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
+import { fonts } from '@/theme/type';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from "react-i18next";
+import { relationshipLabel } from '@/utils/relationshipLabel';
 
 const RELATIONSHIPS: Relationship[] = ['Family', 'Friend', 'Partner', 'Colleague', 'Acquaintance'];
 
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.fieldLabel}>
-      {typeof children === 'string' ? children.toUpperCase() : children}
-    </Txt>
-  );
-}
-
 export default function EditConnection() {
+    const { t } = useTranslation();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const { updatePerson, getPerson, people, addNoteToPerson } = usePeople();
+  const { c, floatShadow } = useTheme();
+  const { updatePerson, getPerson, people } = usePeople();
 
   const person = getPerson(id ?? '');
 
@@ -48,12 +48,10 @@ export default function EditConnection() {
     }
   }, [person]);
 
-
-
   const handleSubmit = async () => {
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setNameError('Please enter a name');
+      setNameError(t('please_enter_name'));
       return;
     }
 
@@ -61,7 +59,7 @@ export default function EditConnection() {
       (p) => p.id !== person?.id && p.name.toLowerCase().trim() === trimmedName.toLowerCase()
     );
     if (nameExists) {
-      setNameError('A connection with this name already exists.');
+      setNameError(t('name_already_here'));
       setDuplicateAlertVisible(true);
       return;
     }
@@ -74,6 +72,7 @@ export default function EditConnection() {
       });
 
       router.back();
+      showHeld(t('changes_saved'));
     } catch (e) {
       // This used to fail silently: the button did nothing and the screen
       // stayed put with no explanation.
@@ -83,14 +82,12 @@ export default function EditConnection() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} hitSlop={8}>
-          <Icon name="close" size={26} color={colors.onSurfaceVariant} />
+          <Icon name="close" size={26} color={c.muted} />
         </Pressable>
-        <Txt variant="headlineMd" color={colors.onSurface}>
-          Edit Connection
-        </Txt>
+        <Txt variant="heading">{t('edit_person', { name: person?.name ?? 'person' })}</Txt>
         <View style={{ width: 26 }} />
       </View>
 
@@ -100,12 +97,11 @@ export default function EditConnection() {
             paddingHorizontal: spacing.containerMobile,
             paddingTop: spacing.stackLg,
             paddingBottom: insets.bottom + 140,
-            gap: spacing.stackXl,
+            gap: spacing.stackLg,
           }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Intro */}
           <Animated.View entering={FadeInDown.duration(500)} style={{ alignItems: 'center' }}>
             <AvatarPicker
               uri={avatarUrl}
@@ -114,68 +110,68 @@ export default function EditConnection() {
               onUploaded={setAvatarUrl}
               onError={setNameError}
             />
-            <Txt variant="headlineLgMobile" color={colors.onSurface} style={{ marginTop: 24, textAlign: 'center' }}>
-              Edit Connection
-            </Txt>
-            <Txt variant="bodyLg" color={colors.onSurfaceVariant} style={{ marginTop: 8, textAlign: 'center', maxWidth: 320 }}>
-              Update the details for this connection.
-            </Txt>
           </Animated.View>
 
           {/* Basics */}
-          <Animated.View entering={FadeInDown.duration(500).delay(100)} style={[styles.card, { gap: spacing.stackMd }]}>
-            <View style={{ gap: 4 }}>
-              <FieldLabel>Their Name</FieldLabel>
-              <TextInput
-                value={name}
-                onChangeText={(t) => { setName(t); setNameError(''); }}
-                placeholder="e.g., Eleanor"
-                placeholderTextColor={colors.outline}
-                style={[styles.input, styles.inputLg, !!nameError && styles.inputError]}
-              />
-              {!!nameError && (
-                <Txt variant="labelSm" color={colors.error} style={{ marginTop: 4, marginLeft: 2 }}>
-                  {nameError}
-                </Txt>
-              )}
-            </View>
-            <View style={{ gap: 8 }}>
-              <FieldLabel>Relationship</FieldLabel>
-              <View style={styles.chipWrap}>
-                {RELATIONSHIPS.map((r) => (
-                  <SelectableChip
-                    key={r}
-                    label={r}
-                    active={relationship === r}
-                    onPress={() => setRelationship(r)}
-                    isRole
-                  />
-                ))}
+          <Animated.View entering={FadeInDown.duration(500).delay(100)}>
+            <Card style={{ gap: spacing.stackMd }}>
+              <View style={{ gap: 6 }}>
+                <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>{t('their_name')}</Txt>
+                <TextInput
+                  value={name}
+                  onChangeText={(t) => { setName(t); setNameError(''); }}
+                  placeholder={t('e_g_eleanor')}
+                  placeholderTextColor={c.faint}
+                  style={[
+                    styles.input,
+                    { backgroundColor: c.surfaceAlt, color: c.text },
+                    !!nameError && { borderWidth: 1, borderColor: c.danger },
+                  ]}
+                />
+                {!!nameError && (
+                  <Txt variant="sub" color={c.danger} style={{ marginTop: 4, marginLeft: 2 }}>
+                    {nameError}
+                  </Txt>
+                )}
               </View>
-            </View>
+              <View style={{ gap: 8 }}>
+                <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>{t('relationship')}</Txt>
+                <View style={styles.chipWrap}>
+                  {RELATIONSHIPS.map((r) => (
+                    <SelectableChip
+                      key={r}
+                      label={relationshipLabel(r)}
+                      active={relationship === r}
+                      onPress={() => setRelationship(r)}
+                    />
+                  ))}
+                </View>
+              </View>
+            </Card>
           </Animated.View>
 
           {/* Submit */}
           <Animated.View entering={FadeInDown.duration(500).delay(200)} style={{ alignItems: 'center' }}>
-            <Button label="Save Changes" icon="check" onPress={handleSubmit} />
+            <Button label={t('save_changes')} icon="check" onPress={handleSubmit} />
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Duplicate Name Alert Modal */}
+      {/* Duplicate name alert */}
       <Modal visible={duplicateAlertVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <Animated.View entering={FadeInDown.duration(300)} exiting={FadeOut.duration(200)} style={styles.modalContent}>
-            <View style={styles.modalIconWrap}>
-              <Icon name="error" size={32} color={colors.error} />
+        <View style={[styles.modalOverlay, { backgroundColor: c.overlay }]}>
+          <Animated.View
+            entering={FadeInDown.duration(300)}
+            exiting={FadeOut.duration(200)}
+            style={[styles.modalContent, { backgroundColor: c.surface }, floatShadow]}
+          >
+            <View style={[styles.modalIconWrap, { backgroundColor: c.dangerWash }]}>
+              <Icon name="error-outline" size={30} color={c.danger} />
             </View>
-            <Txt variant="headlineMd" color={colors.onSurface} style={{ marginTop: 16 }}>
-              Name Exists
-            </Txt>
-            <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: 8, textAlign: 'center' }}>
-              You already have a connection named &ldquo;{name.trim()}&rdquo;. Please use a different name or add a last initial.
-            </Txt>
-            <Button label="Got it" onPress={() => setDuplicateAlertVisible(false)} fullWidth style={{ marginTop: 24 }} />
+            <Txt variant="heading" style={{ marginTop: 16 }}>{t('already_here')}</Txt>
+            <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center' }}>
+              {t('duplicate_name_body', { name: name.trim() })}</Txt>
+            <Button label={t('got_it')} onPress={() => setDuplicateAlertVisible(false)} fullWidth style={{ marginTop: 24 }} />
           </Animated.View>
         </View>
       </Modal>
@@ -191,74 +187,33 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.containerMobile,
     paddingBottom: spacing.stackMd,
-    backgroundColor: colors.background,
   },
-  avatarUpload: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: colors.surfaceContainerHigh,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: colors.outlineVariant,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  card: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radius.lg,
-    padding: spacing.stackMd,
-    ...softShadow,
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  fieldLabel: { letterSpacing: 1, marginLeft: 2 },
+  fieldLabel: { marginLeft: 2 },
   input: {
-    backgroundColor: 'rgba(228,226,225,0.4)',
     borderRadius: radius.DEFAULT,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 16,
-    color: colors.onSurface,
-  },
-  inputLg: { fontSize: 18 },
-  inputError: {
-    borderWidth: 1,
-    borderColor: colors.error,
+    fontFamily: fonts.figtreeRegular,
+    fontSize: 18,
   },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  selectChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
-  selectChipActive: {
-    backgroundColor: colors.secondaryContainer,
-    borderColor: colors.secondary,
-  },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.containerMobile,
   },
   modalContent: {
-    backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radius.xl,
     padding: 24,
     width: '100%',
     maxWidth: 400,
     alignItems: 'center',
-    ...ambientShadow,
   },
   modalIconWrap: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.errorContainer,
     alignItems: 'center',
     justifyContent: 'center',
   },

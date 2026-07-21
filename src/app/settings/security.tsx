@@ -3,23 +3,22 @@ import { View, ScrollView, StyleSheet, Pressable, TextInput, KeyboardAvoidingVie
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { colors, spacing, radius } from '@/theme/tokens';
+import { spacing, radius } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
+import { fonts } from '@/theme/type';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
+import { showHeld } from '@/components/HeldNotice';
 import { supabase } from '@/lib/supabase';
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.fieldLabel}>
-      {typeof children === 'string' ? children.toUpperCase() : children}
-    </Txt>
-  );
-}
+import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 
 export default function SecuritySettings() {
+    const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { c } = useTheme();
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -27,17 +26,17 @@ export default function SecuritySettings() {
 
   const handleSave = async () => {
     if (!password.trim() || !confirmPassword.trim()) {
-      Alert.alert('Error', 'Please fill in all fields.');
+      Alert.alert(t('error_title'), t('fill_all_fields'));
       return;
     }
-    
+
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match.');
+      Alert.alert(t('error_title'), t('passwords_no_match'));
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters.');
+      Alert.alert(t('error_title'), t('password_min'));
       return;
     }
 
@@ -45,26 +44,26 @@ export default function SecuritySettings() {
     try {
       const { error } = await supabase.auth.updateUser({ password: password.trim() });
       if (error) throw error;
-      
-      Alert.alert('Success', 'Password updated successfully.');
+
       router.back();
+      showHeld(t('password_updated'));
     } catch (error: any) {
       console.error(error);
-      Alert.alert('Error', error.message || 'Failed to update password.');
+      Alert.alert(t('error_title'), error.message || t('password_update_failed'));
     } finally {
       setLoading(false);
     }
   };
 
+  const inputWrap = [styles.inputWrap, { backgroundColor: c.surface, borderColor: c.line }];
+
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: c.line }]}>
         <Pressable onPress={() => router.back()} hitSlop={8}>
-          <Icon name="arrow-back" size={26} color={colors.onSurfaceVariant} />
+          <Icon name="arrow-back" size={26} color={c.muted} />
         </Pressable>
-        <Txt variant="headlineMd" color={colors.onSurface}>
-          Security
-        </Txt>
+        <Txt variant="title">{t('security')}</Txt>
         <View style={{ width: 26 }} />
       </View>
 
@@ -80,13 +79,13 @@ export default function SecuritySettings() {
           showsVerticalScrollIndicator={false}
         >
           <Animated.View entering={FadeInDown.duration(400)}>
-            <FieldLabel>New Password</FieldLabel>
-            <View style={styles.inputWrap}>
-              <Icon name="lock" size={20} color={colors.outline} style={styles.inputIcon} />
+            <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>{t('new_password')}</Txt>
+            <View style={inputWrap}>
+              <Icon name="lock" size={20} color={c.faint} style={styles.inputIcon} />
               <TextInput
-                style={styles.input}
-                placeholder="Enter new password"
-                placeholderTextColor={colors.outline}
+                style={[styles.input, { color: c.text }]}
+                placeholder={t('enter_new_password')}
+                placeholderTextColor={c.faint}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
@@ -95,13 +94,13 @@ export default function SecuritySettings() {
           </Animated.View>
 
           <Animated.View entering={FadeInDown.duration(400).delay(50)}>
-            <FieldLabel>Confirm New Password</FieldLabel>
-            <View style={styles.inputWrap}>
-              <Icon name="lock" size={20} color={colors.outline} style={styles.inputIcon} />
+            <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>{t('confirm_new_password')}</Txt>
+            <View style={inputWrap}>
+              <Icon name="lock" size={20} color={c.faint} style={styles.inputIcon} />
               <TextInput
-                style={styles.input}
-                placeholder="Confirm new password"
-                placeholderTextColor={colors.outline}
+                style={[styles.input, { color: c.text }]}
+                placeholder={t('confirm_new_password')}
+                placeholderTextColor={c.faint}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 secureTextEntry
@@ -112,9 +111,14 @@ export default function SecuritySettings() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 24) }]}>
+      <View
+        style={[
+          styles.bottomBar,
+          { backgroundColor: c.bg, borderTopColor: c.line, paddingBottom: Math.max(insets.bottom, 24) },
+        ]}
+      >
         <Button
-          label={loading ? 'Saving...' : 'Update Password'}
+          label={loading ? t('saving') : t('update_password')}
           onPress={handleSave}
           disabled={loading || !password.trim() || !confirmPassword.trim()}
           icon="shield"
@@ -133,7 +137,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.containerMobile,
     paddingBottom: spacing.stackMd,
     borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceVariant,
   },
   fieldLabel: {
     marginBottom: 8,
@@ -142,11 +145,9 @@ const styles = StyleSheet.create({
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radius.lg,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
     height: 56,
   },
   inputIcon: {
@@ -154,9 +155,8 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: fonts.figtreeRegular,
     fontSize: 16,
-    color: colors.onSurface,
     height: '100%',
   },
   bottomBar: {
@@ -164,10 +164,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: colors.background,
     paddingHorizontal: spacing.containerMobile,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: colors.surfaceVariant,
   },
 });

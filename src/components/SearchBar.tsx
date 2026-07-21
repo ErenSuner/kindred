@@ -1,7 +1,10 @@
 import { useRef } from 'react';
 import { StyleSheet, Pressable, TextInput } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { colors, radius } from '@/theme/tokens';
+import { radius } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
+import { useTranslation } from 'react-i18next';
+import { fonts } from '@/theme/type';
 import { Icon } from '@/components/Icon';
 
 type Props = {
@@ -10,19 +13,25 @@ type Props = {
   placeholder?: string;
 };
 
-export function SearchBar({ value, onChange, placeholder = 'Search' }: Props) {
+export function SearchBar({ value, onChange, placeholder }: Props) {
+  const { t } = useTranslation();
+  const ph = placeholder ?? t('search');
   const inputRef = useRef<TextInput>(null);
+  const { c } = useTheme();
 
   return (
-    <Pressable style={styles.bar} onPress={() => inputRef.current?.focus()}>
-      <Icon name="search" size={20} color={colors.onSurfaceVariant} />
+    <Pressable
+      style={[styles.bar, { backgroundColor: c.surface, borderColor: c.line }]}
+      onPress={() => inputRef.current?.focus()}
+    >
+      <Icon name="search" size={20} color={c.faint} />
       <TextInput
         ref={inputRef}
         value={value}
         onChangeText={onChange}
-        placeholder={placeholder}
-        placeholderTextColor={colors.outline}
-        style={styles.input}
+        placeholder={ph}
+        placeholderTextColor={c.faint}
+        style={[styles.input, { color: c.text }]}
         autoCorrect={false}
         autoCapitalize="none"
         returnKeyType="search"
@@ -31,7 +40,7 @@ export function SearchBar({ value, onChange, placeholder = 'Search' }: Props) {
       {value.length > 0 && (
         <Animated.View entering={FadeIn.duration(150)}>
           <Pressable onPress={() => onChange('')} hitSlop={10}>
-            <Icon name="close" size={18} color={colors.onSurfaceVariant} />
+            <Icon name="close" size={18} color={c.muted} />
           </Pressable>
         </Animated.View>
       )}
@@ -44,18 +53,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radius.full,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   input: {
     flex: 1,
     padding: 0,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: fonts.figtreeRegular,
     fontSize: 16,
-    color: colors.onSurface,
   },
 });

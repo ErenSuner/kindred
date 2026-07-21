@@ -11,12 +11,14 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { colors, radius, spacing } from '@/theme/tokens';
+import { radius, spacing } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
 import { FormError } from '@/components/FormError';
 import { SearchBar } from '@/components/SearchBar';
+import { showHeld } from '@/components/HeldNotice';
 import { useAuth } from '@/context/AuthContext';
 import { usePeople } from '@/context/PeopleContext';
 import { ImportableContact, loadContacts, readContactPhoto } from '@/utils/contacts';
@@ -26,6 +28,7 @@ import { formatOccurrenceDate } from '@/utils/dates';
 import { serializeNudges } from '@/utils/nudges';
 import { normalize } from '@/utils/search';
 import type { Relationship } from '@/data/mock';
+import { useTranslation } from "react-i18next";
 
 // What an imported person gets until the user says otherwise. Every other
 // relationship is a guess Kindred has no business making.
@@ -47,12 +50,14 @@ function birthdayLabel(iso: string): string {
   const formatted = formatOccurrenceDate(new Date(y, m - 1, d));
   // A contact with no birth year still has a day worth knowing; drop the
   // placeholder year rather than claiming they were born in the year 1000.
-  return y <= 1000 ? formatted.replace(/,\s*\d+$/, '') : formatted;
+  return y <= 1000 ? formatted.replace(new RegExp(`[,\s]*${y}$`), '') : formatted;
 }
 
 export default function ImportContacts() {
+    const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { c } = useTheme();
   const { user } = useAuth();
   const { people, importPeople } = usePeople();
 
@@ -87,7 +92,7 @@ export default function ImportContacts() {
         }
       } catch (e) {
         console.error('Could not read contacts', e);
-        if (!cancelled) setError("Couldn't read your contacts. Try again in a moment.");
+        if (!cancelled) setError(t('couldnt_read_contacts'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -100,9 +105,9 @@ export default function ImportContacts() {
 
   const visible = useMemo(() => {
     const q = normalize(query);
-    return contacts.filter((c) => {
-      if (existingNames.has(normalize(c.name))) return false;
-      return !q || normalize(c.name).includes(q);
+    return contacts.filter((contact) => {
+      if (existingNames.has(normalize(contact.name))) return false;
+      return !q || normalize(contact.name).includes(q);
     });
   }, [contacts, query, existingNames]);
 
@@ -115,9 +120,9 @@ export default function ImportContacts() {
     });
   };
 
-  const withBirthdays = visible.filter((c) => c.birthday);
+  const withBirthdays = visible.filter((contact) => contact.birthday);
   const selectAllWithBirthdays = () => {
-    setSelected(new Set(withBirthdays.map((c) => c.id)));
+    setSelected(new Set(withBirthdays.map((contact) => contact.id)));
   };
 
   const handleImport = async () => {
@@ -126,7 +131,7 @@ export default function ImportContacts() {
     setImporting(true);
     setProgress(0);
 
-    const chosen = contacts.filter((c) => selected.has(c.id));
+    const chosen = contacts.filter((contact) => selected.has(contact.id));
     const nudges = serializeNudges(DEFAULT_NUDGES);
 
     try {
@@ -167,11 +172,15 @@ export default function ImportContacts() {
 
       // One insert for everyone, one for their birthdays, one reload. Doing it
       // person by person cost two full reloads each.
-      await importPeople(entries);
+      const count = await importPeople(entries);
       router.back();
+      showHeld(
+        t('in_your_circle', { count }),
+        t('contacts_birthdays_set'),
+      );
     } catch (e) {
       console.error('Import failed', e);
-      setError("Couldn't add them. Check your connection and try again.");
+      setError(t('couldnt_add_them'));
     } finally {
       setImporting(false);
     }
@@ -180,52 +189,46 @@ export default function ImportContacts() {
   const header = (
     <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
       <Pressable onPress={() => router.back()} hitSlop={8}>
-        <Icon name="arrow-back" size={24} color={colors.primary} />
+        <Icon name="arrow-back" size={24} color={c.muted} />
       </Pressable>
-      <Txt variant="headlineMd" color={colors.primary} style={{ flex: 1, textAlign: 'center', marginRight: 24 }}>
-        From Contacts
-      </Txt>
+      <Txt variant="title" style={{ flex: 1, textAlign: 'center', marginRight: 24 }}>
+        {t('from_contacts')}</Txt>
     </View>
   );
 
   if (Platform.OS === 'web') {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <View style={{ flex: 1, backgroundColor: c.bg }}>
         {header}
         <View style={styles.centered}>
-          <Icon name="contacts" size={40} color={colors.outlineVariant} />
-          <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={styles.centeredText}>
-            Contacts are only available in the Kindred app on your phone.
-          </Txt>
+          <Icon name="contacts" size={40} color={c.lineStrong} />
+          <Txt variant="body" color={c.muted} style={styles.centeredText}>
+            {t('contacts_are_only_available_in')}</Txt>
         </View>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
       {header}
 
       {loading ? (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={styles.centeredText}>
-            Reading your contacts…
-          </Txt>
+          <ActivityIndicator size="large" color={c.flame} />
+          <Txt variant="body" color={c.muted} style={styles.centeredText}>
+            {t('reading_your_contacts')}</Txt>
         </View>
       ) : denied ? (
         <View style={styles.centered}>
-          <Icon name="lock" size={40} color={colors.outlineVariant} />
-          <Txt variant="headlineMd" color={colors.onSurface} style={{ marginTop: 16 }}>
-            No access to contacts
-          </Txt>
-          <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={styles.centeredText}>
-            Kindred can&apos;t read your address book. You can allow it in your phone&apos;s settings, or
-            add people by hand instead.
-          </Txt>
+          <Icon name="lock" size={40} color={c.lineStrong} />
+          <Txt variant="heading" style={{ marginTop: 16 }}>
+            {t('no_access_to_contacts')}</Txt>
+          <Txt variant="body" color={c.muted} style={styles.centeredText}>
+            {t('kindred_can_apos_t_read')}</Txt>
           <Button
-            label="Add someone by hand"
-            variant="tonal"
+            label={t('add_someone_by_hand')}
+            variant="quiet"
             style={{ marginTop: 24 }}
             onPress={() => router.replace('/new-connection' as any)}
           />
@@ -233,10 +236,10 @@ export default function ImportContacts() {
       ) : (
         <>
           <View style={{ paddingHorizontal: spacing.containerMobile, gap: spacing.stackSm }}>
-            <SearchBar value={query} onChange={setQuery} placeholder="Search contacts" />
+            <SearchBar value={query} onChange={setQuery} placeholder={t('search_contacts')} />
 
             <View style={styles.summaryRow}>
-              <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontWeight: 'normal' }}>
+              <Txt variant="sub" color={c.muted}>
                 {selected.size > 0
                   ? `${selected.size} selected`
                   : `${visible.length} ${visible.length === 1 ? 'contact' : 'contacts'}`}
@@ -244,15 +247,14 @@ export default function ImportContacts() {
 
               {withBirthdays.length > 0 && selected.size === 0 && (
                 <Pressable onPress={selectAllWithBirthdays} hitSlop={8}>
-                  <Txt variant="labelSm" color={colors.primary}>
-                    Select all {withBirthdays.length} with birthdays
-                  </Txt>
+                  <Txt variant="label" color={c.flameDeep}>
+                    {t('select_all_birthdays', { count: withBirthdays.length })}</Txt>
                 </Pressable>
               )}
 
               {selected.size > 0 && (
                 <Pressable onPress={() => setSelected(new Set())} hitSlop={8}>
-                  <Txt variant="labelSm" color={colors.primary}>Clear</Txt>
+                  <Txt variant="label" color={c.flameDeep}>{t('clear')}</Txt>
                 </Pressable>
               )}
             </View>
@@ -269,10 +271,10 @@ export default function ImportContacts() {
             }}
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
-              <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={styles.emptyList}>
+              <Txt variant="body" color={c.muted} style={styles.emptyList}>
                 {query
-                  ? 'No contacts match that.'
-                  : 'Everyone in your address book is already in Kindred.'}
+                  ? t('no_contacts_match')
+                  : t('everyone_already_in')}
               </Txt>
             }
             renderItem={({ item }) => {
@@ -281,36 +283,40 @@ export default function ImportContacts() {
                 <Pressable
                   onPress={() => toggle(item.id)}
                   disabled={importing}
-                  style={({ pressed }) => [styles.row, on && styles.rowOn, pressed && { opacity: 0.85 }]}
+                  style={({ pressed }) => [
+                    styles.row,
+                    { backgroundColor: c.surface, borderColor: c.line },
+                    on && { borderColor: c.flame, backgroundColor: c.flameWash },
+                    pressed && { opacity: 0.85 },
+                  ]}
                 >
                   {item.imageUri ? (
-                    <Image source={{ uri: item.imageUri }} style={styles.avatar} contentFit="cover" />
+                    <Image source={{ uri: item.imageUri }} style={[styles.avatar, { backgroundColor: c.surfaceAlt }]} contentFit="cover" />
                   ) : (
-                    <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                      <Txt variant="labelMd" color={colors.onPrimaryContainer}>{item.initials}</Txt>
+                    <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: c.surfaceAlt }]}>
+                      <Txt variant="subMed" color={c.muted}>{item.initials}</Txt>
                     </View>
                   )}
 
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Txt variant="bodyMd" color={colors.onSurface}>{item.name}</Txt>
+                    <Txt variant="bodyMed">{item.name}</Txt>
                     {item.birthday ? (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                        <Icon name="cake" size={12} color={colors.tertiary} />
-                        <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ fontWeight: 'normal' }}>
+                        <Icon name="cake" size={12} color={c.flameDeep} />
+                        <Txt variant="sub" color={c.muted}>
                           {birthdayLabel(item.birthday)}
                         </Txt>
                       </View>
                     ) : (
-                      <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.noBirthday}>
-                        No birthday saved
-                      </Txt>
+                      <Txt variant="sub" color={c.faint} style={styles.noBirthday}>
+                        {t('no_birthday_saved')}</Txt>
                     )}
                   </View>
 
                   <Icon
                     name={on ? 'check-circle' : 'radio-button-unchecked'}
                     size={22}
-                    color={on ? colors.primary : colors.outlineVariant}
+                    color={on ? c.flameDeep : c.lineStrong}
                   />
                 </Pressable>
               );
@@ -320,25 +326,27 @@ export default function ImportContacts() {
           {selected.size > 0 && (
             <Animated.View
               entering={FadeIn.duration(180)}
-              style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}
+              style={[
+                styles.footer,
+                { backgroundColor: c.bg, borderTopColor: c.line, paddingBottom: insets.bottom + 16 },
+              ]}
             >
               <FormError message={error} />
               <Button
                 label={
                   importing
                     ? progress < selected.size
-                      ? `Preparing ${progress} of ${selected.size}…`
-                      : 'Adding…'
-                    : `Add ${selected.size} ${selected.size === 1 ? 'person' : 'people'}`
+                      ? t('preparing_progress', { n: progress, total: selected.size })
+                      : t('adding_ellipsis')
+                    : t('add_n_people', { count: selected.size })
                 }
                 icon="person-add"
                 fullWidth
                 disabled={importing}
                 onPress={handleImport}
               />
-              <Txt variant="labelSm" color={colors.onSurfaceVariant} style={styles.footerNote}>
-                Names, photos and birthdays only. Phone numbers are never read.
-              </Txt>
+              <Txt variant="sub" color={c.faint} style={styles.footerNote}>
+                {t('names_photos_and_birthdays_onl')}</Txt>
             </Animated.View>
           )}
         </>
@@ -353,7 +361,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.containerMobile,
     paddingBottom: spacing.stackMd,
-    backgroundColor: colors.background,
   },
   centered: {
     flex: 1,
@@ -372,20 +379,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
     padding: 12,
   },
-  rowOn: { borderColor: colors.primary, backgroundColor: colors.surfaceContainerLow },
-  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surfaceContainerHigh },
+  avatar: { width: 44, height: 44, borderRadius: 22 },
   avatarPlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primaryContainer,
   },
-  noBirthday: { fontWeight: 'normal', opacity: 0.6, marginTop: 2 },
+  noBirthday: { opacity: 0.7, marginTop: 2 },
   emptyList: { textAlign: 'center', marginTop: 40, fontStyle: 'italic', opacity: 0.8 },
   footer: {
     position: 'absolute',
@@ -395,9 +398,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.containerMobile,
     paddingTop: 16,
     gap: 8,
-    backgroundColor: colors.background,
     borderTopWidth: 1,
-    borderTopColor: colors.surfaceVariant,
   },
-  footerNote: { textAlign: 'center', fontWeight: 'normal', opacity: 0.7 },
+  footerNote: { textAlign: 'center', opacity: 0.8 },
 });

@@ -1,30 +1,35 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Notifications from 'expo-notifications';
+import i18n from '../lib/i18n';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   useFonts,
-  Literata_500Medium,
-  Literata_600SemiBold,
-} from '@expo-google-fonts/literata';
+  Fraunces_500Medium,
+  Fraunces_600SemiBold,
+} from '@expo-google-fonts/fraunces';
 import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-} from '@expo-google-fonts/inter';
-import { colors } from '@/theme/tokens';
+  Figtree_400Regular,
+  Figtree_500Medium,
+  Figtree_600SemiBold,
+  Figtree_700Bold,
+} from '@expo-google-fonts/figtree';
+import { ThemeProvider, useTheme } from '@/theme/ThemeContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { PeopleProvider } from '@/context/PeopleContext';
 import { EventsProvider } from '@/context/EventsContext';
+import { BirthdaysProvider } from '@/context/BirthdaysContext';
 import { HolidaysProvider } from '@/context/HolidaysContext';
 import { NotificationSync } from '@/components/NotificationSync';
 import { UndoProvider } from '@/context/UndoContext';
 import { UndoSnackbar } from '@/components/UndoSnackbar';
 import { AppErrorBoundary } from '@/components/AppErrorBoundary';
 import { PendingWrites } from '@/components/PendingWrites';
+import { HeldNotice } from '@/components/HeldNotice';
 
 import { Platform, LogBox } from 'react-native';
 
@@ -49,6 +54,7 @@ if (Platform.OS !== 'web') {
 
 function RootLayoutNav() {
   const { user, loading } = useAuth();
+  const { c } = useTheme();
   const router = useRouter();
   const segments = useSegments();
 
@@ -73,8 +79,8 @@ function RootLayoutNav() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.bg }}>
+        <ActivityIndicator size="large" color={c.flame} />
       </View>
     );
   }
@@ -83,7 +89,7 @@ function RootLayoutNav() {
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: colors.background },
+        contentStyle: { backgroundColor: c.bg },
         animation: 'fade',
       }}
     >
@@ -95,17 +101,43 @@ function RootLayoutNav() {
       <Stack.Screen name="import-contacts" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="my-event/add" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="my-event/edit/[id]" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="birthday/add" options={{ animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="birthday/edit/[id]" options={{ animation: 'slide_from_right' }} />
     </Stack>
+  );
+}
+
+function ThemedApp() {
+  const { mode } = useTheme();
+  // Some strings come from util funcs that read i18n.t at compute time and
+  // aren't subscribed to language changes, so they stay stale until a remount.
+  // Remount the screen subtree on language change (data providers stay intact).
+  const [lang, setLang] = useState(i18n.language);
+  useEffect(() => {
+    const onChange = (lng: string) => setLang(lng);
+    i18n.on('languageChanged', onChange);
+    return () => i18n.off('languageChanged', onChange);
+  }, []);
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
+      <NotificationSync />
+      <RootLayoutNav key={lang} />
+      <PendingWrites />
+      <HeldNotice />
+      <UndoSnackbar />
+    </GestureHandlerRootView>
   );
 }
 
 export default function RootLayout() {
   const [loaded] = useFonts({
-    Literata_500Medium,
-    Literata_600SemiBold,
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
+    Fraunces_500Medium,
+    Fraunces_600SemiBold,
+    Figtree_400Regular,
+    Figtree_500Medium,
+    Figtree_600SemiBold,
+    Figtree_700Bold,
   });
 
   useEffect(() => {
@@ -127,28 +159,34 @@ export default function RootLayout() {
     reqPerm();
   }, []);
 
+  useEffect(() => {
+    AsyncStorage.getItem('app_language').then((lang) => {
+      if (lang) {
+        i18n.changeLanguage(lang);
+      }
+    });
+  }, []);
+
   if (!loaded) return null;
 
   return (
     // Outside the providers, so a crash in any of them is caught too.
     <AppErrorBoundary>
-      <AuthProvider>
-        <UndoProvider>
-        <PeopleProvider>
-          <EventsProvider>
-            <HolidaysProvider>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <StatusBar style="dark" />
-                <NotificationSync />
-                <RootLayoutNav />
-                <PendingWrites />
-                <UndoSnackbar />
-              </GestureHandlerRootView>
-            </HolidaysProvider>
-          </EventsProvider>
-        </PeopleProvider>
-        </UndoProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <UndoProvider>
+            <PeopleProvider>
+              <EventsProvider>
+                <BirthdaysProvider>
+                  <HolidaysProvider>
+                    <ThemedApp />
+                  </HolidaysProvider>
+                </BirthdaysProvider>
+              </EventsProvider>
+            </PeopleProvider>
+          </UndoProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </AppErrorBoundary>
   );
 }

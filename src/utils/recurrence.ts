@@ -1,3 +1,4 @@
+import i18n from '@/lib/i18n';
 // How often an event comes back around.
 //
 // Stored as two columns rather than a boolean so "every 3 weeks" is expressible
@@ -18,32 +19,25 @@ export const DAILY: Recurrence = { unit: 'day', interval: 1 };
 
 export const MAX_INTERVAL = 30;
 
-const UNIT_NAMES: Record<Exclude<RepeatUnit, 'none'>, [string, string]> = {
-  day: ['day', 'days'],
-  week: ['week', 'weeks'],
-  month: ['month', 'months'],
-  year: ['year', 'years'],
-};
-
 export function isRepeating(r: Recurrence) {
   return r.unit !== 'none';
 }
 
-// "Every year", "Every 3 weeks", "One-time"
+// "Every year" / "Her yıl", "Every 3 weeks" / "3 haftada bir", "One-time"
 export function recurrenceLabel(r: Recurrence): string {
-  if (r.unit === 'none') return 'One-time';
-  const [singular, plural] = UNIT_NAMES[r.unit];
-  return r.interval === 1 ? `Every ${singular}` : `Every ${r.interval} ${plural}`;
+  if (r.unit === 'none') return i18n.t('rec_one_time');
+  if (r.interval === 1) return i18n.t('rec_every_one', { unit: i18n.t(`unit_${r.unit}`) });
+  return i18n.t('rec_every_n', { n: r.interval, unit: i18n.t(`unit_${r.unit}s`) });
 }
 
-// Short form for chips and list rows: "Yearly", "Every 3 weeks"
+// Short form for chips and list rows: "Yearly" / "Yıllık", "Every 3 weeks"
 export function recurrenceShortLabel(r: Recurrence): string {
-  if (r.unit === 'none') return 'One-time';
+  if (r.unit === 'none') return i18n.t('rec_one_time');
   if (r.interval === 1) {
-    return { day: 'Daily', week: 'Weekly', month: 'Monthly', year: 'Annual' }[r.unit];
+    const key = { day: 'rec_daily', week: 'rec_weekly', month: 'rec_monthly', year: 'rec_annual' }[r.unit];
+    return i18n.t(key);
   }
-  const [, plural] = UNIT_NAMES[r.unit];
-  return `Every ${r.interval} ${plural}`;
+  return i18n.t('rec_every_n', { n: r.interval, unit: i18n.t(`unit_${r.unit}s`) });
 }
 
 export function recurrenceIcon(r: Recurrence): 'event' | 'event-repeat' {
@@ -51,18 +45,10 @@ export function recurrenceIcon(r: Recurrence): 'event' | 'event-repeat' {
 }
 
 export function recurrenceDescription(r: Recurrence): string {
-  switch (r.unit) {
-    case 'none':
-      return 'This event will happen only once.';
-    case 'day':
-      return r.interval === 1 ? 'This event repeats every day.' : `This event repeats every ${r.interval} days.`;
-    case 'week':
-      return r.interval === 1 ? 'This event repeats every week.' : `This event repeats every ${r.interval} weeks.`;
-    case 'month':
-      return r.interval === 1 ? 'This event repeats every month.' : `This event repeats every ${r.interval} months.`;
-    case 'year':
-      return r.interval === 1 ? 'This event repeats every year.' : `This event repeats every ${r.interval} years.`;
-  }
+  if (r.unit === 'none') return i18n.t('rec_desc_once');
+  const one = r.interval === 1;
+  const key = `rec_desc_${r.unit}${one ? '' : 's'}`;
+  return one ? i18n.t(key) : i18n.t(key, { n: r.interval });
 }
 
 function clampInterval(n: unknown): number {
