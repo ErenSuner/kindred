@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Pressable, Modal, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, Modal, Alert, Linking } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
+import { PRIVACY_POLICY_URL, SUPPORT_EMAIL } from '@/lib/links';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { spacing, radius } from '@/theme/tokens';
@@ -311,8 +313,17 @@ export default function Settings() {
           <SectionTitle>{t('support')}</SectionTitle>
           <View style={[styles.group, { backgroundColor: c.surface, borderColor: c.line }, cardShadow]}>
             <Row icon="help" label={t('help_center')} soon />
-            <Row icon="chat-bubble" label={t('feedback')} soon />
-            <Row icon="privacy-tip" label={t('privacy_policy')} soon last />
+            <Row
+              icon="chat-bubble"
+              label={t('feedback')}
+              onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Kindred%20feedback`)}
+            />
+            <Row
+              icon="privacy-tip"
+              label={t('privacy_policy')}
+              onPress={() => WebBrowser.openBrowserAsync(PRIVACY_POLICY_URL)}
+              last
+            />
           </View>
         </View>
 

@@ -9,9 +9,13 @@
     "scheme": "kindred",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.erensuner.kindred",
+      "supportsTablet": true
     },
     "android": {
+      "package": "com.erensuner.kindred",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -39,7 +43,20 @@
         {
           "contactsPermission": "Kindred uses your contacts so you can add the people you care about without typing their details in by hand."
         }
-      ]
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Kindred needs access to your photos so you can set a picture for a person and attach photos to your memories."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#EDA33D"
+        }
+      ],
+      "@sentry/react-native"
     ],
     "experiments": {
       "typedRoutes": true,

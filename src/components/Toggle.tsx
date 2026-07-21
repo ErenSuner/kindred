@@ -1,11 +1,14 @@
 import { View, Pressable, StyleSheet } from 'react-native';
 import { useTheme } from '@/theme/ThemeContext';
 
-export function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+export function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: boolean) => void; label?: string }) {
   const { c } = useTheme();
   return (
     <Pressable
       onPress={() => onChange(!value)}
+      accessibilityRole="switch"
+      accessibilityLabel={label}
+      accessibilityState={{ checked: value }}
       style={[styles.toggle, { backgroundColor: value ? c.flame : c.surfaceAlt }]}
     >
       <View

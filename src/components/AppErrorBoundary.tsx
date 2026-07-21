@@ -4,6 +4,7 @@ import { light, radius, spacing } from '@/theme/tokens';
 import { type as typeScale } from '@/theme/type';
 import { Icon } from '@/components/Icon';
 import i18n from '@/lib/i18n';
+import { Sentry } from '@/lib/sentry';
 
 type Props = { children: React.ReactNode };
 type State = { error: Error | null };
@@ -25,6 +26,7 @@ export class AppErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('Unhandled render error', error, info.componentStack);
+    Sentry.captureException(error, { extra: { componentStack: info.componentStack } });
   }
 
   render() {

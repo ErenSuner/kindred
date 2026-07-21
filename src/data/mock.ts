@@ -1,4 +1,5 @@
-// Mock data standing in for a backend. Shapes match the Kindred screens.
+// The shared domain types — the shapes every Kindred screen and context speaks
+// in. (Historically this also held mock seed data, hence the filename.)
 
 import type { Recurrence } from '@/utils/recurrence';
 import type { Weekday } from '@/utils/routines';
@@ -110,50 +111,4 @@ export type Person = {
   // The address-book entry this person was imported from, when there was one.
   // Only ever handed back to the OS to open its own Contacts app.
   contactId?: string;
-};
-
-// Seed data — only Eleanor ships as an example.
-export const initialPeople: Person[] = [
-  {
-    id: 'eleanor',
-    name: 'Eleanor',
-    role: 'Grandmother',
-    avatar: 'https://randomuser.me/api/portraits/women/68.jpg',
-    tags: ['Family', 'Local'],
-    eventTitle: "Mom's Birthday",
-    eventTag: 'Family',
-    daysAway: 5,
-    eventDate: 'Thursday, October 12th',
-    countdown: {
-      tag: 'Birthday',
-      days: 14,
-      title: "Eleanor's 85th Birthday",
-      date: 'October 24th, 2024',
-      progress: 0.8,
-    },
-    specialDays: [
-      { id: 'd1', title: 'Birthday', date: 'October 24', icon: 'cake', accent: 'primary' },
-      { id: 'd2', title: 'Grandparents Day', date: 'September 8', icon: 'volunteer-activism', accent: 'tertiary' },
-    ],
-    notes: [
-      {
-        id: 'n1',
-        kind: 'Gift Idea',
-        when: '2 days ago',
-        body: 'Loves that specific brand of Earl Grey tea from the little shop downtown. Also mentioned wanting a new gardening trowel.',
-      },
-      {
-        id: 'n2',
-        kind: 'Memory',
-        when: 'Last Month',
-        body: 'Had a wonderful afternoon looking through old photo albums. Remember to scan the pictures from her 1970 trip to Italy.',
-      },
-    ],
-  },
-];
-
-export const currentUser = {
-  name: 'Sarah',
-  email: 'sarah@example.com',
-  avatar: 'https://randomuser.me/api/portraits/women/44.jpg',
 };

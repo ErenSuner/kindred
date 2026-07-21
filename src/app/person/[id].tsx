@@ -33,7 +33,7 @@ function SpecialDayRow({ day, personId, onLongPress, onMore }: { day: SpecialDay
     <Card
       onPress={() => {
         if ((day as any).isBirthday) {
-          router.push({ pathname: '/birthday/edit/[personId]', params: { personId } } as any);
+          router.push({ pathname: '/birthday/person/[personId]', params: { personId } } as any);
         } else {
           router.push({ pathname: '/special-day/edit/[dayId]', params: { dayId: day.id, personId } } as any);
         }

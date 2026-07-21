@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -9,8 +9,10 @@ import { fonts } from '@/theme/type';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
+import { FormError } from '@/components/FormError';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
 import { showHeld } from '@/components/HeldNotice';
+import { describeWriteError } from '@/utils/loadError';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from "react-i18next";
@@ -61,16 +63,19 @@ export default function ProfileSettings() {
 
   const [email, setEmail] = useState(user?.email || '');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
+    setError(null);
+
     if ((day && !month) || (month && !day)) {
-      Alert.alert(t('incomplete_date'), t('provide_day_month'));
+      setError(t('provide_day_month'));
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (email.trim() !== user?.email && !emailRegex.test(email.trim())) {
-      Alert.alert(t('invalid_email'), t('invalid_email_format'));
+      setError(t('invalid_email_format'));
       return;
     }
 
@@ -94,20 +99,20 @@ export default function ProfileSettings() {
         updates.email = email.trim();
       }
 
-      const { error } = await supabase.auth.updateUser(updates);
-      if (error) {
+      const { error: err } = await supabase.auth.updateUser(updates);
+      if (err) {
         // More friendly error for email issues
-        if (error.message.includes('invalid') && error.message.toLowerCase().includes('email')) {
+        if (err.message.includes('invalid') && err.message.toLowerCase().includes('email')) {
           throw new Error(t('email_rejected'));
         }
-        throw error;
+        throw err;
       }
 
       router.back();
       showHeld(t('profile_updated'));
-    } catch (error: any) {
-      console.error(error);
-      Alert.alert(t('error_title'), error.message || t('profile_update_failed'));
+    } catch (e) {
+      console.error(e);
+      setError(describeWriteError(e));
     } finally {
       setLoading(false);
     }
@@ -216,6 +221,8 @@ export default function ProfileSettings() {
               />
             </View>
           </Animated.View>
+
+          <FormError message={error} />
         </ScrollView>
       </KeyboardAvoidingView>
 

@@ -215,7 +215,7 @@ export default function Connections() {
                     onPress={() => {
                       Keyboard.dismiss();
                       if (day.isBirthday) {
-                        router.push({ pathname: '/birthday/edit/[personId]', params: { personId: person.id } } as any);
+                        router.push({ pathname: '/birthday/person/[personId]', params: { personId: person.id } } as any);
                       } else {
                         router.push({ pathname: '/special-day/edit/[dayId]', params: { dayId: day.id, personId: person.id } } as any);
                       }

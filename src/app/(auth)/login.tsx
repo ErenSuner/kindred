@@ -22,6 +22,26 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [noticeMsg, setNoticeMsg] = useState('');
+
+  const handleForgotPassword = async () => {
+    setErrorMsg('');
+    setNoticeMsg('');
+    if (!email.trim()) {
+      setErrorMsg(t('reset_enter_email'));
+      return;
+    }
+    try {
+      // No redirectTo: Supabase's hosted recovery page handles setting the new
+      // password, then the user returns to the app to sign in. Avoids fragile
+      // native deep-link session handling for v1.
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+      if (error) throw error;
+      setNoticeMsg(t('reset_email_sent'));
+    } catch (err: any) {
+      setErrorMsg(err.message || t('error_sign_in'));
+    }
+  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -30,6 +50,7 @@ export default function Login() {
     }
     setLoading(true);
     setErrorMsg('');
+    setNoticeMsg('');
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -83,6 +104,15 @@ export default function Login() {
               </View>
             ) : null}
 
+            {noticeMsg ? (
+              <View style={[styles.errorBox, { backgroundColor: c.goodWash }]}>
+                <Icon name="mark-email-read" size={20} color={c.good} />
+                <Txt variant="sub" color={c.good} style={{ flex: 1, marginLeft: 8 }}>
+                  {noticeMsg}
+                </Txt>
+              </View>
+            ) : null}
+
             <View style={{ gap: spacing.stackSm }}>
               <Txt variant="eyebrow" color={c.faint} style={styles.label}>{t('email_address')}</Txt>
               <TextInput
@@ -109,6 +139,9 @@ export default function Login() {
                 autoCorrect={false}
                 style={input}
               />
+              <Pressable onPress={handleForgotPassword} hitSlop={8} style={{ alignSelf: 'flex-end', marginTop: 4 }}>
+                <Txt variant="sub" color={c.flameDeep}>{t('forgot_password')}</Txt>
+              </Pressable>
             </View>
 
             <Button
