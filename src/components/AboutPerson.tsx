@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
   giftInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   giftInput: {
     flex: 1,
-    borderRadius: radius.full,
+    borderRadius: radius.DEFAULT,
     paddingHorizontal: 16,
     paddingVertical: 11,
     fontFamily: fonts.figtreeRegular,
@@ -525,7 +525,7 @@ const styles = StyleSheet.create({
   giftAddBtn: {
     width: 42,
     height: 42,
-    borderRadius: 21,
+    borderRadius: radius.DEFAULT,
     alignItems: 'center',
     justifyContent: 'center',
   },

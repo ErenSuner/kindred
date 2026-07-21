@@ -42,14 +42,14 @@ export function WeekdayPicker({ value, onChange }: Props) {
               style={({ pressed }) => [
                 styles.day,
                 {
-                  backgroundColor: on ? c.ink : c.surfaceAlt,
-                  borderColor: on ? c.ink : c.line,
+                  backgroundColor: on ? c.flame : c.surfaceAlt,
+                  borderColor: on ? c.flame : c.line,
                 },
                 pressed && { opacity: 0.8 },
               ]}
             >
-              <Txt variant="label" color={on ? c.onInk : c.muted}>
-                {day.short.charAt(0)}
+              <Txt variant="label" color={on ? c.onFlame : c.muted}>
+                {t('wd_sh_' + day.value).charAt(0)}
               </Txt>
             </Pressable>
           );
