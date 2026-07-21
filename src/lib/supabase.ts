@@ -5,8 +5,17 @@ import { AppState } from 'react-native';
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase URL or Anon Key is missing. Check your .env file.');
+// These are inlined at build time. If either is missing from the bundle,
+// createClient() throws at import — before React renders, so AppErrorBoundary
+// can't catch it and the app crashes on launch. Fall back to placeholders so
+// the app still boots (auth/data just fail, which the contexts handle), and
+// shout loudly about why.
+const hasConfig = !!supabaseUrl && !!supabaseAnonKey;
+if (!hasConfig) {
+  console.error(
+    'Supabase config missing: EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY ' +
+      'were not in the build. Sign-in and data will not work until they are set.',
+  );
 }
 
 const customStorage = {
@@ -42,7 +51,10 @@ const customStorage = {
   },
 };
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder-anon-key',
+  {
   auth: {
     storage: customStorage,
     autoRefreshToken: true,

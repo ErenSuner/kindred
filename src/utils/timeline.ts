@@ -24,6 +24,8 @@ export type TimelineEntry = {
   // The line under the title: who it belongs to, or what days a routine runs.
   subtitle?: string;
   icon: string;
+  // A birthday gets a festive card treatment on home.
+  isBirthday?: boolean;
   timeOfDay?: TimeOfDay | null;
   notes?: Note[];
   // Where tapping it should go.
@@ -80,6 +82,7 @@ export function buildTimeline(
           : i18n.t('timeline_person_day', { name: person.name, title: day.title }),
         subtitle: i18n.t(`rel_${person.role}`, { defaultValue: person.role }),
         icon: day.icon,
+        isBirthday: day.isBirthday,
         notes: day.notes,
         personId: person.id,
         avatar: person.avatar,

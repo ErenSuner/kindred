@@ -91,6 +91,8 @@
   "which_days": "Hangi günler",
   "people": "Kişiler",
   "import": "İçe Aktar",
+  "import_from_contacts": "Rehberden içe aktar",
+  "import_from_contacts_sub": "Bir ismi doğrudan telefonundan al",
   "new": "Yeni",
   "birthdays_by_month": "Aylara göre doğum günleri",
   "try_a_name_an_occasion": "Bir isim, bir etkinlik veya notlara yazdığınız bir şeyi arayın.",

@@ -1,10 +1,10 @@
-import { Pressable, View, StyleSheet, ViewStyle, PressableProps } from 'react-native';
+import { Pressable, View, StyleSheet, ViewStyle, StyleProp, PressableProps } from 'react-native';
 import { radius } from '@/theme/tokens';
 import { useTheme } from '@/theme/ThemeContext';
 
 type Props = {
   children: React.ReactNode;
-  style?: ViewStyle | ViewStyle[];
+  style?: StyleProp<ViewStyle>;
   onPress?: PressableProps['onPress'];
   pressable?: boolean;
   /** Dark spruce anchor surface — one per screen at most. */

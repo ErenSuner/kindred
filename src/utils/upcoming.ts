@@ -54,6 +54,8 @@ export function deriveUpcoming(name: string, role: Relationship, days: SpecialDa
       title,
       date: next.date,
       progress: Math.max(0, Math.min(1, 1 - daysAway / cycle)),
+      isBirthday: next.isBirthday,
+      turningAge: next.turningAge,
     },
   };
 }

@@ -91,6 +91,8 @@
   "which_days": "Which days",
   "people": "People",
   "import": "Import",
+  "import_from_contacts": "Import from contacts",
+  "import_from_contacts_sub": "Pull a name straight from your phone",
   "new": "New",
   "birthdays_by_month": "Birthdays by month",
   "try_a_name_an_occasion": "Try a name, an occasion, or something you wrote in a note.",
