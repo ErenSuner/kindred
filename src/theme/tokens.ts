@@ -1,4 +1,5 @@
-// Kindred "Lamplight" tokens — spruce ink, candle flame, linen paper.
+// Kindred "Lamplight" tokens — candle flame, linen paper (light) / cool
+// slate (dark).
 // Both themes are first-class; every colour is semantic and swaps at runtime
 // via the ThemeProvider (src/theme/ThemeContext.tsx).
 import { Platform } from 'react-native';
@@ -74,21 +75,21 @@ export const light: Palette = {
 };
 
 export const dark: Palette = {
-  bg: '#141A15',
-  surface: '#1D241E',
-  surfaceAlt: '#272F27',
-  line: '#313A31',
-  lineStrong: '#45503F',
+  bg: '#12151A',
+  surface: '#1A1F27',
+  surfaceAlt: '#232A34',
+  line: '#2E3641',
+  lineStrong: '#424C59',
 
-  ink: '#28322A',
-  inkSoft: '#344036',
-  onInk: '#F0EDE1',
-  onInkMuted: '#AEB8AA',
-  onInkFaint: '#7C867A',
+  ink: '#1F2530',
+  inkSoft: '#2C3541',
+  onInk: '#ECEFF4',
+  onInkMuted: '#A8B1BF',
+  onInkFaint: '#737D8C',
 
-  text: '#EBE8DC',
-  muted: '#A6AD9F',
-  faint: '#78806F',
+  text: '#E7EBF1',
+  muted: '#9BA3B0',
+  faint: '#6F7787',
 
   flame: '#F0B054',
   flameDeep: '#F2BC6F',
