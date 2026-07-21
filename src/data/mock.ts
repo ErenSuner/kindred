@@ -100,6 +100,8 @@ export type Person = {
     title: string;
     date: string;
     progress: number; // 0..1
+    isBirthday?: boolean;
+    turningAge?: number;
   };
   specialDays?: SpecialDay[];
   // One-off dates that have already passed. Kept rather than deleted so there

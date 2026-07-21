@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { View, ScrollView, StyleSheet, Pressable } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -17,6 +17,7 @@ import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Avatar } from '@/components/Avatar';
 import { Card } from '@/components/Card';
+import { CelebrationBg } from '@/components/CelebrationBg';
 import { NotePreview } from '@/components/NotePreview';
 import { FormError } from '@/components/FormError';
 import { usePeople } from '@/context/PeopleContext';
@@ -57,11 +58,25 @@ function FlameDot({ today }: { today: boolean }) {
 // Home answers one question: what is coming up, and when. It deliberately does
 // not list people or reminders — those are whole tabs of their own, and having
 // them here too meant the same thing appeared twice under different headings.
+// A soft neon halo in the card's own accent — a lit frame rather than a fill.
+function glow(color: string) {
+  return Platform.select({
+    web: { boxShadow: `0 0 14px ${color}59, 0 0 3px ${color}40` },
+    default: {
+      shadowColor: color,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.55,
+      shadowRadius: 9,
+      elevation: 5,
+    },
+  }) as object;
+}
+
 export default function Home() {
     const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c } = useTheme();
+  const { c, mode } = useTheme();
   const { people, loadError, refreshPeople } = usePeople();
   const { events, routines } = useEvents();
   const { imminent } = useHolidays();
@@ -174,9 +189,17 @@ export default function Home() {
               onPress={() => openEntry(hero)}
               style={styles.hero}
             >
+              {hero.isBirthday && <CelebrationBg tone="party" />}
+              {hero.source === 'holiday' && <CelebrationBg tone="shared" />}
               <View style={styles.heroEyebrowRow}>
-                <FlameDot today={hero.daysAway === 0} />
-                <Txt variant="eyebrow" color={c.flame}>
+                {hero.isBirthday ? (
+                  <Icon name="cake" size={15} color={c.flame} />
+                ) : hero.source === 'holiday' ? (
+                  <Icon name={hero.icon as any} size={15} color={c.sharedAccent} />
+                ) : (
+                  <FlameDot today={hero.daysAway === 0} />
+                )}
+                <Txt variant="eyebrow" color={hero.source === 'holiday' ? c.sharedAccent : c.flame}>
                   {heroKey === 'today' ? t('today') : t('next_up_group', { label: heroLabel })}
                 </Txt>
               </View>
@@ -204,7 +227,7 @@ export default function Home() {
 
               <View style={styles.heroDays}>
                 <Txt
-                  color={c.flame}
+                  color={hero.source === 'holiday' ? c.sharedAccent : c.flame}
                   style={{ fontFamily: fonts.frauncesSemiBold, fontSize: 30, lineHeight: 36 }}
                 >
                   {daysLongLabel(hero.daysAway)}
@@ -232,21 +255,47 @@ export default function Home() {
             </View>
 
             <View style={{ gap: spacing.stackSm }}>
-              {group.entries.map((entry) => (
+              {group.entries.map((entry) => {
+                // Birthdays glow warm amber; shared occasions a cooler communal
+                // blue. Both keep their own surface — the accent is a lit frame
+                // and a whisper-thin wash, never a solid fill.
+                const accent = entry.isBirthday
+                  ? c.flame
+                  : entry.source === 'holiday'
+                    ? c.sharedAccent
+                    : null;
+                return (
                 <Card
                   key={entry.id}
                   pressable={!!(entry.personId || entry.eventId)}
                   onPress={() => openEntry(entry)}
-                  style={styles.row}
+                  style={[
+                    styles.row,
+                    accent ? { borderColor: accent, borderWidth: 1.5 } : null,
+                    accent ? glow(accent) : null,
+                  ]}
                 >
+                  {accent && (
+                    <View
+                      pointerEvents="none"
+                      style={[
+                        StyleSheet.absoluteFillObject,
+                        {
+                          backgroundColor: accent,
+                          opacity: mode === 'dark' ? 0.13 : 0.08,
+                          borderRadius: radius.lg,
+                        },
+                      ]}
+                    />
+                  )}
                   <View style={styles.rowLeft}>
                     {entry.personId ? (
                       <Avatar uri={entry.avatar} initials={entry.initials} size={44} />
                     ) : entry.source === 'event' ? (
                       <Avatar uri={ownAvatar} initials={userName?.charAt(0)?.toUpperCase()} size={44} />
                     ) : (
-                      <View style={[styles.iconWrap, { backgroundColor: c.surfaceAlt }]}>
-                        <Icon name={entry.icon as any} size={20} color={c.muted} />
+                      <View style={[styles.iconWrap, { backgroundColor: entry.source === 'holiday' ? c.sharedWash : c.surfaceAlt }]}>
+                        <Icon name={entry.icon as any} size={20} color={entry.source === 'holiday' ? c.sharedAccent : c.muted} />
                       </View>
                     )}
 
@@ -281,7 +330,8 @@ export default function Home() {
                     </Txt>
                   </View>
                 </Card>
-              ))}
+                );
+              })}
             </View>
           </Animated.View>
         ))}

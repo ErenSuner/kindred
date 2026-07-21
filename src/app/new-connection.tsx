@@ -90,8 +90,30 @@ export default function NewConnection() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {/* The faster path in, offered up top for anyone who'd rather pull a
+              name straight from their phone than type it. */}
+          <Animated.View entering={FadeInDown.duration(500)}>
+            <Pressable
+              onPress={() => router.push('/import-contacts' as any)}
+              style={({ pressed }) => [pressed && { opacity: 0.7 }]}
+            >
+              <Card style={styles.importRow}>
+                <View style={[styles.importIcon, { backgroundColor: c.flameWash }]}>
+                  <Icon name="contacts" size={20} color={c.flameDeep} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Txt variant="bodyMed">{t('import_from_contacts')}</Txt>
+                  <Txt variant="sub" color={c.muted} numberOfLines={1} style={{ marginTop: 1 }}>
+                    {t('import_from_contacts_sub')}
+                  </Txt>
+                </View>
+                <Icon name="chevron-right" size={20} color={c.faint} />
+              </Card>
+            </Pressable>
+          </Animated.View>
+
           {/* The face first — it's the content. */}
-          <Animated.View entering={FadeInDown.duration(500)} style={{ alignItems: 'center' }}>
+          <Animated.View entering={FadeInDown.duration(500).delay(50)} style={{ alignItems: 'center' }}>
             <AvatarPicker
               uri={avatarUrl}
               initials={name.trim().charAt(0).toUpperCase() || undefined}
@@ -176,6 +198,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.containerMobile,
     paddingBottom: spacing.stackMd,
+  },
+  importRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 14,
+  },
+  importIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   fieldLabel: { marginLeft: 2 },
   input: {

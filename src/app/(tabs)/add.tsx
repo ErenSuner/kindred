@@ -120,18 +120,18 @@ export default function Connections() {
         {/* Title row with the two ways in: importing is the faster path for
             most people, so it sits beside the manual one, quieter. */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.titleRow}>
-          <Txt variant="display" style={{ flex: 1 }}>{t('people')}</Txt>
+          <Txt variant="display" numberOfLines={1} style={{ flex: 1 }}>{t('people')}</Txt>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Pressable
-              onPress={() => router.push('/import-contacts' as any)}
+              onPress={() => router.push('/birthdays')}
               style={({ pressed }) => [
                 styles.headerBtn,
-                { borderWidth: 1, borderColor: c.lineStrong },
-                pressed && { opacity: 0.8, transform: [{ scale: 0.96 }] },
+                { backgroundColor: c.flameWash, borderWidth: 1, borderColor: c.flame },
+                pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
               ]}
             >
-              <Icon name="contacts" size={17} color={c.muted} />
-              <Txt variant="label" color={c.muted}>{t('import')}</Txt>
+              <Icon name="cake" size={17} color={c.flameDeep} />
+              <Txt variant="label" color={c.flameDeep}>{t('birthdays')}</Txt>
             </Pressable>
 
             <Pressable
@@ -153,28 +153,6 @@ export default function Connections() {
         {/* Search — hidden until there's something to search through */}
         {people.length > 0 && (
           <SearchBar value={query} onChange={setQuery} placeholder={t('search_people_days_notes')} />
-        )}
-
-        {/* Birthdays are their own space — and you can keep one without adopting
-            a whole contact, so this stays visible even before anyone's added. */}
-        {!searching && (
-          <Pressable
-            onPress={() => router.push('/birthdays')}
-            style={({ pressed }) => [pressed && { opacity: 0.7 }]}
-          >
-            <Card style={styles.birthdaysRow}>
-              <View style={[styles.birthdaysIcon, { backgroundColor: c.flameWash }]}>
-                <Icon name="cake" size={20} color={c.flameDeep} />
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Txt variant="heading" style={{ fontSize: 16, lineHeight: 21 }}>{t('birthdays')}</Txt>
-                <Txt variant="sub" color={c.muted} numberOfLines={1} style={{ marginTop: 1 }}>
-                  {t('birthdays_row_sub')}
-                </Txt>
-              </View>
-              <Icon name="chevron-right" size={20} color={c.faint} />
-            </Card>
-          </Pressable>
         )}
 
         {/* Search results replace the list while a query is active */}
@@ -361,19 +339,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: radius.full,
-  },
-  birthdaysRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    padding: 14,
-  },
-  birthdaysIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   emptyState: {
     alignItems: 'center',

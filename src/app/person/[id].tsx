@@ -12,6 +12,7 @@ import { Icon } from '@/components/Icon';
 import { Chip } from '@/components/Chip';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
+import { CelebrationBg } from '@/components/CelebrationBg';
 import { Avatar } from '@/components/Avatar';
 import { usePeople } from '@/context/PeopleContext';
 import { InlineBirthdayCard } from '@/components/InlineBirthdayCard';
@@ -214,10 +215,15 @@ export default function PersonDetail() {
         {/* Countdown — the one dark card on this screen. */}
         {person.countdown && (
           <Animated.View entering={FadeInDown.duration(500).delay(100)}>
-            <Card ink>
+            <Card ink style={{ overflow: 'hidden' }}>
+              {person.countdown.isBirthday && <CelebrationBg />}
               <View style={styles.cardHeaderRow}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <View style={[styles.flameDot, { backgroundColor: c.flame }]} />
+                  {person.countdown.isBirthday ? (
+                    <Icon name="cake" size={15} color={c.flame} />
+                  ) : (
+                    <View style={[styles.flameDot, { backgroundColor: c.flame }]} />
+                  )}
                   <Txt variant="eyebrow" color={c.flame}>{t('next_big_day')}</Txt>
                 </View>
                 <Chip label={person.countdown.tag} tone="ink" />
