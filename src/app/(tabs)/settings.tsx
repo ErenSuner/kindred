@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Pressable, Modal, Alert, Linking } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, Modal, Alert, Linking, Share } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { PRIVACY_POLICY_URL, SUPPORT_EMAIL } from '@/lib/links';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -312,11 +313,16 @@ export default function Settings() {
         <View style={{ gap: spacing.stackSm }}>
           <SectionTitle>{t('support')}</SectionTitle>
           <View style={[styles.group, { backgroundColor: c.surface, borderColor: c.line }, cardShadow]}>
-            <Row icon="help" label={t('help_center')} soon />
+            <Row icon="help" label={t('help_center')} onPress={() => router.push('/settings/help')} />
             <Row
               icon="chat-bubble"
               label={t('feedback')}
               onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Kindred%20feedback`)}
+            />
+            <Row
+              icon="share"
+              label={t('share_app')}
+              onPress={() => Share.share({ message: t('share_message', { url: PRIVACY_POLICY_URL }) })}
             />
             <Row
               icon="privacy-tip"
@@ -344,6 +350,10 @@ export default function Settings() {
           style={{ marginTop: spacing.stackSm }}
           onPress={handleDeleteAccount}
         />
+
+        <Txt variant="sub" color={c.faint} style={{ textAlign: 'center', marginTop: spacing.stackMd }}>
+          {t('app_version', { version: Constants.expoConfig?.version ?? '' })}
+        </Txt>
       </ScrollView>
 
       <Modal visible={deleteModalVisible} transparent animationType="none" onRequestClose={() => setDeleteModalVisible(false)}>

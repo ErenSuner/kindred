@@ -39,9 +39,10 @@ function SpecialDayRow({ day, personId, onLongPress, onMore }: { day: SpecialDay
           router.push({ pathname: '/special-day/edit/[dayId]', params: { dayId: day.id, personId } } as any);
         }
       }}
+      onLongPress={onLongPress}
       style={styles.dayRow}
     >
-      <Pressable onLongPress={onLongPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flex: 1, minWidth: 0 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flex: 1, minWidth: 0 }}>
         <View style={[styles.dayIcon, { backgroundColor: c.flameWash }]}>
           <Icon name={day.icon as any} size={22} color={c.flameDeep} />
         </View>
@@ -58,7 +59,7 @@ function SpecialDayRow({ day, personId, onLongPress, onMore }: { day: SpecialDay
             </View>
           )}
         </View>
-      </Pressable>
+      </View>
       {onMore ? (
         <Pressable onPress={onMore} hitSlop={8} style={({ pressed }) => [{ padding: 4 }, pressed && { opacity: 0.6 }]}>
           <Icon name="more-horiz" size={20} color={c.faint} />

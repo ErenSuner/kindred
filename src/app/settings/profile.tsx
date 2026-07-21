@@ -9,6 +9,7 @@ import { fonts } from '@/theme/type';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
+import { AvatarPicker } from '@/components/AvatarPicker';
 import { FormError } from '@/components/FormError';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
 import { showHeld } from '@/components/HeldNotice';
@@ -64,6 +65,19 @@ export default function ProfileSettings() {
   const [email, setEmail] = useState(user?.email || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const ownAvatarUrl: string | null = user?.user_metadata?.avatar_url ?? null;
+  const previewName = [name, surname].filter(Boolean).join(' ').trim();
+
+  // Same field the settings hub writes — it lives on the auth user, not a table.
+  const saveOwnAvatar = async (publicUrl: string) => {
+    setError(null);
+    const { error: err } = await supabase.auth.updateUser({ data: { avatar_url: publicUrl } });
+    if (err) {
+      console.error('Could not save avatar', err);
+      setError(describeWriteError(err));
+    }
+  };
 
   const handleSave = async () => {
     setError(null);
@@ -141,7 +155,26 @@ export default function ProfileSettings() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Animated.View entering={FadeInDown.duration(400)}>
+          {/* Identity — see who you're editing, and change the photo here too. */}
+          <Animated.View entering={FadeInDown.duration(400)} style={styles.identity}>
+            <AvatarPicker
+              uri={ownAvatarUrl}
+              initials={(previewName || email).charAt(0).toUpperCase() || undefined}
+              size={88}
+              subjectId="me"
+              onUploaded={saveOwnAvatar}
+              onError={setError}
+            />
+            {!!previewName && (
+              <Txt variant="title" style={{ marginTop: 10, textTransform: 'capitalize' }}>
+                {previewName}
+              </Txt>
+            )}
+          </Animated.View>
+
+          <Txt variant="eyebrow" color={c.faint} style={styles.sectionTitle}>{t('personal_info')}</Txt>
+
+          <Animated.View entering={FadeInDown.duration(400).delay(50)}>
             <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>{t('name')}</Txt>
             <View style={inputWrap}>
               <Icon name="person" size={20} color={c.faint} style={styles.inputIcon} />
@@ -220,6 +253,7 @@ export default function ProfileSettings() {
                 autoCapitalize="none"
               />
             </View>
+            <Txt variant="sub" color={c.faint} style={styles.note}>{t('email_change_note')}</Txt>
           </Animated.View>
 
           <FormError message={error} />
@@ -279,6 +313,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginLeft: 4,
   },
+  identity: { alignItems: 'center' },
+  sectionTitle: { marginLeft: 4, marginBottom: -8 },
+  note: { marginTop: 8, marginLeft: 4 },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',

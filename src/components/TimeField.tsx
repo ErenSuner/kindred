@@ -28,7 +28,10 @@ export function TimeField({ value, onChange }: Props) {
   const toggle = () => onChange(value ? null : { hour: 18, minute: 0 });
 
   return (
-    <View style={[styles.box, { backgroundColor: c.surface, borderColor: c.line }]}>
+    <Pressable
+      onPress={value ? undefined : toggle}
+      style={[styles.box, { backgroundColor: c.surface, borderColor: c.line }]}
+    >
       <Pressable onPress={toggle} style={({ pressed }) => [styles.headerRow, pressed && { opacity: 0.8 }]}>
         <Icon name="schedule" size={16} color={c.flameDeep} />
         <Txt variant="subMed" style={{ flex: 1 }}>{t('time_of_day')}</Txt>
@@ -100,7 +103,7 @@ export function TimeField({ value, onChange }: Props) {
           setPicking(null);
         }}
       />
-    </View>
+    </Pressable>
   );
 }
 

@@ -9,6 +9,7 @@ import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Avatar } from '@/components/Avatar';
 import { Card } from '@/components/Card';
+import { CelebrationBg } from '@/components/CelebrationBg';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
 import { usePeople } from '@/context/PeopleContext';
 import { useBirthdays } from '@/context/BirthdaysContext';
@@ -117,11 +118,12 @@ export default function Birthdays() {
       item.source === 'simple' ? `/birthday/edit/${item.person.id}` : `/person/${item.person.id}`;
     return (
       <Animated.View key={`hero-${item.source}-${item.person.id}`} entering={FadeInDown.duration(400)}>
-        <Card onPress={() => router.push(target as any)} style={styles.heroCard}>
+        <Card ink onPress={() => router.push(target as any)} style={[styles.heroCard, { overflow: 'hidden' }]}>
+          <CelebrationBg tone="party" />
           <View style={styles.heroTop}>
             <View style={{ position: 'relative' }}>
               {item.source === 'simple' ? (
-                <View style={[styles.heroEmoji, { backgroundColor: c.surfaceAlt }]}>
+                <View style={[styles.heroEmoji, { backgroundColor: c.inkSoft }]}>
                   <Txt style={{ fontSize: 38, lineHeight: 46 }}>{item.emoji || '🎂'}</Txt>
                 </View>
               ) : (
@@ -130,20 +132,20 @@ export default function Birthdays() {
               {cakeBadge}
             </View>
             <View style={{ flex: 1, marginLeft: 18, minWidth: 0 }}>
-              <Txt variant="eyebrow" color={c.flameDeep}>{t('next_up')}</Txt>
-              <Txt variant="heading" style={{ fontSize: 24, lineHeight: 30, marginTop: 3 }}>
+              <Txt variant="eyebrow" color={c.flame}>{t('next_up')}</Txt>
+              <Txt variant="heading" color={c.onInk} style={{ fontSize: 24, lineHeight: 30, marginTop: 3 }}>
                 {item.person.name}
               </Txt>
-              <Txt variant="sub" color={c.muted} numberOfLines={1} style={{ marginTop: 3 }}>
+              <Txt variant="sub" color={c.onInkMuted} numberOfLines={1} style={{ marginTop: 3 }}>
                 {item.day.date.split(',')[0]}
                 {item.day.turningAge ? ` · ${t('turning_n', { age: item.day.turningAge })}` : ''}
               </Txt>
             </View>
           </View>
-          <View style={[styles.heroCount, { backgroundColor: days === 0 ? c.flameWash : c.surfaceAlt }]}>
+          <View style={[styles.heroCount, { backgroundColor: c.inkSoft }]}>
             <Txt
               variant="num"
-              color={days === 0 ? c.flameDeep : days <= 7 ? c.text : c.muted}
+              color={days === 0 ? c.flame : c.onInkMuted}
               style={{ fontSize: 15, lineHeight: 19 }}
             >
               {daysChipLabel(days)}
