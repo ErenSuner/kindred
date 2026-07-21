@@ -62,9 +62,9 @@
     "lint": "expo lint",
     "test": "jest",
     "test:watch": "jest --watch",
-    "build:preview": "npx eas build --profile preview --platform android",
-    "build:production": "npx eas build --profile production --platform android",
-    "submit:production": "npx eas submit --profile production --platform android"
+    "build:preview": "npx eas-cli build --profile preview --platform android",
+    "build:production": "npx eas-cli build --profile production --platform android",
+    "submit:production": "npx eas-cli submit --profile production --platform android"
   },
   "private": true,
   "jest": {
