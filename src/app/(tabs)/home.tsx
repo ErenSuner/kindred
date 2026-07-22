@@ -24,7 +24,7 @@ import { usePeople } from '@/context/PeopleContext';
 import { useEvents } from '@/context/EventsContext';
 import { useHolidays } from '@/context/HolidaysContext';
 import { useAuth } from '@/context/AuthContext';
-import { formatTimeOfDay } from '@/utils/eventTime';
+import { formatClock } from '@/utils/dates';
 import { TimelineEntry, buildTimeline } from '@/utils/timeline';
 import { daysChipLabel, daysLongLabel } from '@/utils/countdownLabel';
 import { useTranslation } from "react-i18next";
@@ -135,15 +135,31 @@ export default function Home() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Greeting leads, like every other tab leads with its title — no
-            orphaned wordmark, nothing competing on the right. */}
+        {/* Greeting leads, like every other tab leads with its title. The one
+            thing beside it is the way through to every birthday at once —
+            it has room to be a proper button here, which it never had wedged
+            next to New on the people tab. */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.welcome}>
-          <Txt variant="sub" color={c.muted} style={{ marginBottom: 6, textTransform: 'capitalize' }}>
-            {t('home_welcome', { name: userName })}
-          </Txt>
-          <Txt variant="display">
-            {total === 0 ? t('all_quiet') : t('coming_up_headline')}
-          </Txt>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Txt variant="sub" color={c.muted} style={{ marginBottom: 6, textTransform: 'capitalize' }}>
+              {t('home_welcome', { name: userName })}
+            </Txt>
+            <Txt variant="display">
+              {total === 0 ? t('all_quiet') : t('coming_up_headline')}
+            </Txt>
+          </View>
+
+          <Pressable
+            onPress={() => router.push('/birthdays')}
+            style={({ pressed }) => [
+              styles.birthdaysBtn,
+              { backgroundColor: c.flameWash, borderColor: c.flame },
+              pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
+            ]}
+          >
+            <Icon name="cake" size={20} color={c.flameDeep} />
+            <Txt variant="bodySemi" color={c.flameDeep}>{t('birthdays')}</Txt>
+          </Pressable>
         </Animated.View>
 
         <FormError message={loadError} onRetry={refreshPeople} retryLabel={t('try_again')} />
@@ -219,7 +235,7 @@ export default function Home() {
                   <Txt variant="title" color={c.onInk}>{hero.title}</Txt>
                   <Txt variant="sub" color={c.onInkMuted} style={{ marginTop: 6 }}>
                     {hero.date}
-                    {hero.timeOfDay ? ` · ${formatTimeOfDay(hero.timeOfDay)}` : ''}
+                    {hero.timeOfDay ? ` · ${formatClock(hero.timeOfDay)}` : ''}
                     {hero.subtitle ? ` · ${hero.subtitle}` : ''}
                   </Txt>
                 </View>
@@ -303,7 +319,7 @@ export default function Home() {
                       <Txt variant="bodyMed">{entry.title}</Txt>
                       <Txt variant="sub" color={c.muted} style={{ marginTop: 2 }}>
                         {entry.date}
-                        {entry.timeOfDay ? ` · ${formatTimeOfDay(entry.timeOfDay)}` : ''}
+                        {entry.timeOfDay ? ` · ${formatClock(entry.timeOfDay)}` : ''}
                         {entry.subtitle ? ` · ${entry.subtitle}` : ''}
                       </Txt>
 
@@ -342,7 +358,22 @@ export default function Home() {
 
 const styles = StyleSheet.create({
   wordmark: { fontFamily: fonts.frauncesSemiBold, fontSize: 15, lineHeight: 20, letterSpacing: 0.3 },
-  welcome: { marginBottom: spacing.stackLg },
+  welcome: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: spacing.stackLg,
+  },
+  birthdaysBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: radius.full,
+    borderWidth: 1.5,
+  },
   hero: { overflow: 'hidden' },
   heroEyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 18 },
   heroTop: { flexDirection: 'row', gap: 16, alignItems: 'center' },

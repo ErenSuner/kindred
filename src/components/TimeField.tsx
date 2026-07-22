@@ -6,7 +6,8 @@ import { useTheme } from '@/theme/ThemeContext';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
-import { HEADS_UP_HOURS, TimeOfDay, formatTimeOfDay } from '@/utils/eventTime';
+import { HEADS_UP_HOURS, TimeOfDay } from '@/utils/eventTime';
+import { formatClock, formatHourLabel } from '@/utils/dates';
 import { useTranslation } from "react-i18next";
 
 // Five-minute steps. Nothing in this app starts at 18:37, and a 60-row picker
@@ -53,7 +54,7 @@ export function TimeField({ value, onChange }: Props) {
                 pressed && { opacity: 0.8 },
               ]}
             >
-              <Txt variant="body">{String(value.hour).padStart(2, '0')}</Txt>
+              <Txt variant="body">{formatHourLabel(value.hour)}</Txt>
               <Icon name="expand-more" size={16} color={c.muted} />
             </Pressable>
 
@@ -75,7 +76,7 @@ export function TimeField({ value, onChange }: Props) {
           {/* Says what setting a time actually buys you, which is not obvious
               from a pair of steppers. */}
           <Txt variant="sub" color={c.muted} style={styles.blurb}>
-            {t('timefield_blurb', { hours: HEADS_UP_HOURS, time: formatTimeOfDay(minus(value, HEADS_UP_HOURS)) })}
+            {t('timefield_blurb', { hours: HEADS_UP_HOURS, time: formatClock(minus(value, HEADS_UP_HOURS)) })}
           </Txt>
         </Animated.View>
       ) : (
@@ -89,7 +90,7 @@ export function TimeField({ value, onChange }: Props) {
         title={picking === 'hour' ? t('hour') : t('minute')}
         options={
           picking === 'hour'
-            ? Array.from({ length: 24 }, (_, h) => ({ label: String(h).padStart(2, '0'), value: h }))
+            ? Array.from({ length: 24 }, (_, h) => ({ label: formatHourLabel(h), value: h }))
             : Array.from({ length: 60 / MINUTE_STEP }, (_, i) => ({
                 label: String(i * MINUTE_STEP).padStart(2, '0'),
                 value: i * MINUTE_STEP,
