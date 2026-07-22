@@ -3,7 +3,7 @@ import { View, ScrollView, StyleSheet, Pressable, Modal, Platform } from 'react-
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeOut, FadeIn, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeInDown, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { spacing, radius } from '@/theme/tokens';
 import { useTheme } from '@/theme/ThemeContext';
 import { fonts } from '@/theme/type';
@@ -322,7 +322,7 @@ export default function PersonDetail() {
         <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={[styles.modalOverlay, { backgroundColor: c.overlay }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setPersonActionsVisible(false)} />
           <Animated.View
-            entering={SlideInDown.duration(300).springify()}
+            entering={SlideInDown.duration(260).easing(Easing.out(Easing.cubic))}
             exiting={SlideOutDown.duration(200)}
             style={[
               styles.modalContent,
@@ -379,7 +379,7 @@ export default function PersonDetail() {
         <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={[styles.modalOverlay, { backgroundColor: c.overlay }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setDayActionVisible(false)} />
           <Animated.View
-            entering={SlideInDown.duration(300).springify()}
+            entering={SlideInDown.duration(260).easing(Easing.out(Easing.cubic))}
             exiting={SlideOutDown.duration(200)}
             style={[
               styles.modalContent,

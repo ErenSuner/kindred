@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { View, Pressable, StyleSheet } from 'react-native';
-import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius } from '@/theme/tokens';
 import { useTheme } from '@/theme/ThemeContext';
@@ -17,9 +17,13 @@ const TABS: (Omit<TabDef, 'label'> & { labelKey: string })[] = [
   { name: 'settings', labelKey: 'tab_settings', icon: 'settings' },
 ];
 
-// How the active pill and its neighbours resize when the tab changes. One
-// unhurried spring — the small delight the whole bar is built around.
-const SLIDE = LinearTransition.springify().damping(20).stiffness(180);
+// How the active pill and its neighbours resize when the tab changes.
+//
+// Deliberately not a spring: the bar and the pill inside it are separate
+// layouts changing by different amounts, so their overshoots don't match and
+// the pill visibly rides past the bar's rounded edge on the way. A curve that
+// only decelerates arrives once, together.
+const SLIDE = LinearTransition.duration(220).easing(Easing.out(Easing.cubic));
 
 // The floating ink bar — the app's dark anchor, present on every tab. Only the
 // active tab carries a label: it expands into an amber pill, the others stay
@@ -32,45 +36,50 @@ function TabBar({ state, navigation }: any) {
 
   return (
     <View pointerEvents="box-none" style={[styles.host, { paddingBottom: Math.max(insets.bottom, 14) }]}>
+      {/* Two layers on purpose: the shadow belongs to the outer one, the
+          clipping to the inner. Putting overflow:'hidden' on a view that also
+          casts a shadow clips the shadow away on iOS. */}
       <Animated.View layout={SLIDE} style={[styles.bar, { backgroundColor: c.ink }, floatShadow]}>
-        {state.routes.map((route: any, i: number) => {
-          const def = TABS.find((t) => t.name === route.name);
-          if (!def) return null;
+        <View style={styles.barInner}>
+          {state.routes.map((route: any, i: number) => {
+            const def = TABS.find((t) => t.name === route.name);
+            if (!def) return null;
 
-          const focused = state.index === i;
-          const onPress = () => {
-            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-            if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
-          };
+            const focused = state.index === i;
+            const onPress = () => {
+              const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+              if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+            };
 
-          return (
-            <Pressable
-              key={route.key}
-              onPress={onPress}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: focused }}
-              accessibilityLabel={t(def.labelKey)}
-              hitSlop={6}
-            >
-              <Animated.View
-                layout={SLIDE}
-                style={[
-                  styles.item,
-                  focused ? { backgroundColor: c.flame } : styles.itemIdle,
-                ]}
+            return (
+              <Pressable
+                key={route.key}
+                onPress={onPress}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: focused }}
+                accessibilityLabel={t(def.labelKey)}
+                hitSlop={6}
               >
-                <Icon name={def.icon} size={23} color={focused ? c.onFlame : c.onInkFaint} />
-                {focused && (
-                  <Animated.View entering={FadeIn.duration(160)}>
-                    <Txt variant="label" color={c.onFlame} numberOfLines={1}>
-                      {t(def.labelKey)}
-                    </Txt>
-                  </Animated.View>
-                )}
-              </Animated.View>
-            </Pressable>
-          );
-        })}
+                <Animated.View
+                  layout={SLIDE}
+                  style={[
+                    styles.item,
+                    focused ? { backgroundColor: c.flame } : styles.itemIdle,
+                  ]}
+                >
+                  <Icon name={def.icon} size={23} color={focused ? c.onFlame : c.onInkFaint} />
+                  {focused && (
+                    <Animated.View entering={FadeIn.duration(160)}>
+                      <Txt variant="label" color={c.onFlame} numberOfLines={1}>
+                        {t(def.labelKey)}
+                      </Txt>
+                    </Animated.View>
+                  )}
+                </Animated.View>
+              </Pressable>
+            );
+          })}
+        </View>
       </Animated.View>
     </View>
   );
@@ -102,11 +111,15 @@ const styles = StyleSheet.create({
   // Content-sized and centred, so the active pill genuinely expands and nudges
   // the others aside rather than lighting up a fixed cell.
   bar: {
+    borderRadius: radius.full,
+  },
+  barInner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     borderRadius: radius.full,
     padding: 7,
+    overflow: 'hidden',
   },
   item: {
     flexDirection: 'row',

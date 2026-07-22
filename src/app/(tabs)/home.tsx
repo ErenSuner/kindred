@@ -141,13 +141,18 @@ export default function Home() {
             thing beside it is the way through to every birthday at once —
             it has room to be a proper button here, which it never had wedged
             next to New on the people tab. */}
+        {/* Headline and its one button on the same line, the greeting under
+            them — the shape People uses, so the three tabs line up. */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.welcome}>
-          {/* The pill sits beside the greeting, not beside the headline: the
-              headline is the widest thing on the screen and sharing its line
-              broke it across two. */}
           <View style={styles.welcomeTop}>
-            <Txt variant="sub" color={c.muted} style={{ flex: 1 }} numberOfLines={1}>
-              {t('home_welcome', { name: capitalizeFirst(userName) })}
+            <Txt
+              variant="display"
+              style={{ flex: 1 }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+            >
+              {total === 0 ? t('all_quiet') : t('coming_up_headline')}
             </Txt>
 
             <Pressable
@@ -158,13 +163,13 @@ export default function Home() {
                 pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
               ]}
             >
-              <Icon name="cake" size={20} color={c.flameDeep} />
-              <Txt variant="bodySemi" color={c.flameDeep}>{t('birthdays')}</Txt>
+              <Icon name="cake" size={17} color={c.flameDeep} />
+              <Txt variant="label" color={c.flameDeep}>{t('birthdays')}</Txt>
             </Pressable>
           </View>
 
-          <Txt variant="display">
-            {total === 0 ? t('all_quiet') : t('coming_up_headline')}
+          <Txt variant="sub" color={c.muted} numberOfLines={1}>
+            {t('home_welcome', { name: capitalizeFirst(userName) })}
           </Txt>
         </Animated.View>
 
@@ -370,16 +375,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    marginBottom: 10,
+    marginBottom: 6,
   },
   birthdaysBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     borderRadius: radius.full,
-    borderWidth: 1.5,
+    borderWidth: 1,
   },
   hero: { overflow: 'hidden' },
   heroEyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 18 },

@@ -72,23 +72,32 @@ export default function MyEvents() {
         {/* Title left, primary add top-right — the same shape as People, so
             "where do I add" has one answer across the app. */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.titleRow}>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Txt variant="sub" color={c.muted} style={{ marginBottom: 6 }}>
-              {events.length === 0 ? t('events_sub') : t('reminders_count', { count: events.length })}
+          <View style={styles.titleTop}>
+            <Txt
+              variant="display"
+              style={{ flex: 1 }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+            >
+              {t('just_for_you')}
             </Txt>
-            <Txt variant="display">{t('just_for_you')}</Txt>
+            <Pressable
+              onPress={openAdd}
+              style={({ pressed }) => [
+                styles.headerBtn,
+                { backgroundColor: c.flame },
+                pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
+              ]}
+            >
+              <Icon name="add" size={17} color={c.onFlame} />
+              <Txt variant="label" color={c.onFlame}>{t('add')}</Txt>
+            </Pressable>
           </View>
-          <Pressable
-            onPress={openAdd}
-            style={({ pressed }) => [
-              styles.headerBtn,
-              { backgroundColor: c.flame },
-              pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
-            ]}
-          >
-            <Icon name="add" size={17} color={c.onFlame} />
-            <Txt variant="label" color={c.onFlame}>{t('add')}</Txt>
-          </Pressable>
+
+          <Txt variant="sub" color={c.muted} numberOfLines={1}>
+            {events.length === 0 ? t('events_sub') : t('reminders_count', { count: events.length })}
+          </Txt>
         </Animated.View>
 
         {loadError && (
@@ -306,12 +315,13 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: radius.full,
   },
-  titleRow: {
+  titleRow: { marginBottom: spacing.stackLg },
+  titleTop: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    marginBottom: spacing.stackLg,
+    marginBottom: 6,
   },
   headerBtn: {
     flexDirection: 'row',

@@ -3,6 +3,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Notifications from 'expo-notifications';
 import i18n from '../lib/i18n';
@@ -25,6 +26,7 @@ import { EventsProvider } from '@/context/EventsContext';
 import { BirthdaysProvider } from '@/context/BirthdaysContext';
 import { HolidaysProvider } from '@/context/HolidaysContext';
 import { NotificationSync } from '@/components/NotificationSync';
+import { AuthLinkHandler } from '@/components/AuthLinkHandler';
 import { UndoProvider } from '@/context/UndoContext';
 import { UndoSnackbar } from '@/components/UndoSnackbar';
 import { AppErrorBoundary } from '@/components/AppErrorBoundary';
@@ -111,6 +113,7 @@ function RootLayoutNav() {
 
 function ThemedApp() {
   const { mode } = useTheme();
+  const insets = useSafeAreaInsets();
   // Some strings come from util funcs that read i18n.t at compute time and
   // aren't subscribed to language changes, so they stay stale until a remount.
   // Remount the screen subtree on language change (data providers stay intact).
@@ -124,10 +127,30 @@ function ThemedApp() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
       <NotificationSync />
+      <AuthLinkHandler />
       <RootLayoutNav key={lang} />
       <PendingWrites />
       <HeldNotice />
       <UndoSnackbar />
+
+      {/* Android draws edge to edge from SDK 54 on, so the system navigation
+          bar is transparent and the screen's own content scrolls underneath it.
+          The platform APIs for colouring it are no-ops under edge-to-edge, so
+          the strip is painted here — last, over everything, and untouchable.
+          The tab bar clears it through its own bottom inset. */}
+      {Platform.OS === 'android' && insets.bottom > 0 && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: insets.bottom,
+            backgroundColor: '#000000',
+          }}
+        />
+      )}
     </GestureHandlerRootView>
   );
 }

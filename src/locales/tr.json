@@ -541,5 +541,21 @@
   "holiday_christmas": "Noël",
   "holiday_blurb_christmas": "25 Aralık",
   "holiday_new_years_eve": "Yılbaşı Gecesi",
-  "holiday_blurb_new_years_eve": "31 Aralık"
+  "holiday_blurb_new_years_eve": "31 Aralık",
+  "change_email": "E-postayı değiştir",
+  "update_email": "E-postayı güncelle",
+  "email_confirm_sent": "Onay maili gönderildi",
+  "email_confirm_sent_detail": "Değişikliğin tamamlanması için iki posta kutusundaki bağlantıya da bas.",
+  "email_updated": "E-posta güncellendi",
+  "signed_in": "Giriş yapıldı",
+  "auth_link_failed": "Bağlantı çalışmadı",
+  "auth_link_failed_detail": "Süresi dolmuş ya da daha önce kullanılmış olabilir. Güvenlik'ten tekrar dene.",
+  "same_person_q": "Aynı kişi mi?",
+  "birthday_exists_body": "{{name}} zaten doğum günü listende var: {{date}}. Bu aynı kişi mi?",
+  "yes_same_person": "Evet, aynı kişi",
+  "no_someone_else": "Hayır, başka biri",
+  "birthday_moved_over": "Doğum günü de birlikte taşındı",
+  "already_in_your_people": "Zaten kişilerinde",
+  "set_their_birthday_q": "{{name}} zaten kişilerinde. Doğum gününü onun kartına eklemek ister misin?",
+  "go_to_their_card": "Kartına git"
 }

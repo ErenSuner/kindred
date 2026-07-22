@@ -62,7 +62,10 @@ export default function ProfileSettings() {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerType, setPickerType] = useState<'day' | 'month' | 'year'>('day');
 
-  const [email, setEmail] = useState(user?.email || '');
+  // Read only here — the address is edited on the Security screen. Kept for the
+  // avatar's fallback initial, which needs something to fall back to before a
+  // name has been typed.
+  const email = user?.email ?? '';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,12 +90,6 @@ export default function ProfileSettings() {
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (email.trim() !== user?.email && !emailRegex.test(email.trim())) {
-      setError(t('invalid_email_format'));
-      return;
-    }
-
     setLoading(true);
     try {
       let formattedDate = '';
@@ -109,18 +106,8 @@ export default function ProfileSettings() {
         },
       };
 
-      if (email.trim() !== user?.email) {
-        updates.email = email.trim();
-      }
-
       const { error: err } = await supabase.auth.updateUser(updates);
-      if (err) {
-        // More friendly error for email issues
-        if (err.message.includes('invalid') && err.message.toLowerCase().includes('email')) {
-          throw new Error(t('email_rejected'));
-        }
-        throw err;
-      }
+      if (err) throw err;
 
       router.back();
       showHeld(t('profile_updated'));
@@ -239,23 +226,9 @@ export default function ProfileSettings() {
             </View>
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.duration(400).delay(200)}>
-            <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>{t('email')}</Txt>
-            <View style={inputWrap}>
-              <Icon name="email" size={20} color={c.faint} style={styles.inputIcon} />
-              <TextInput
-                style={[styles.input, { color: c.text }]}
-                placeholder={t('email_address')}
-                placeholderTextColor={c.faint}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-            <Txt variant="sub" color={c.faint} style={styles.note}>{t('email_change_note')}</Txt>
-          </Animated.View>
-
+          {/* The address lives on the Security screen, next to the password:
+              both are credentials, and changing either takes a confirmation
+              step that has nothing to do with a name or a birthday. */}
           <FormError message={error} />
         </ScrollView>
       </KeyboardAvoidingView>

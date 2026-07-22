@@ -65,11 +65,13 @@ export const light: Palette = {
   line: '#E4DFD0',
   lineStrong: '#CCC6B4',
 
-  ink: '#1F2921',
-  inkSoft: '#2D392F',
-  onInk: '#F5F2E8',
-  onInkMuted: '#B7BFB1',
-  onInkFaint: '#828C80',
+  // The dark anchor is the same cool slate in both themes — a warm paper
+  // background carrying an olive bar read as two different apps.
+  ink: '#1F2530',
+  inkSoft: '#2C3541',
+  onInk: '#ECEFF4',
+  onInkMuted: '#A8B1BF',
+  onInkFaint: '#737D8C',
 
   text: '#242B24',
   muted: '#5C635A',
@@ -93,7 +95,7 @@ export const light: Palette = {
   sharedGradient: ['#4E7BB0', '#6E86C4', '#9B8AC9'],
   sharedDot: '#CFE0F2',
 
-  overlay: 'rgba(23, 28, 23, 0.55)',
+  overlay: 'rgba(18, 21, 26, 0.55)',
 };
 
 export const dark: Palette = {
@@ -160,9 +162,9 @@ export const radius = {
 export function cardShadow(mode: 'light' | 'dark') {
   if (mode === 'dark') return {};
   return Platform.select({
-    web: { boxShadow: '0 2px 12px rgba(31, 41, 33, 0.07)' },
+    web: { boxShadow: '0 2px 12px rgba(31, 37, 48, 0.07)' },
     default: {
-      shadowColor: '#1F2921',
+      shadowColor: '#1F2530',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.07,
       shadowRadius: 10,
@@ -178,10 +180,10 @@ export function floatShadow(mode: 'light' | 'dark') {
       boxShadow:
         mode === 'dark'
           ? '0 6px 24px rgba(0, 0, 0, 0.45)'
-          : '0 6px 24px rgba(31, 41, 33, 0.18)',
+          : '0 6px 24px rgba(31, 37, 48, 0.18)',
     },
     default: {
-      shadowColor: mode === 'dark' ? '#000000' : '#1F2921',
+      shadowColor: mode === 'dark' ? '#000000' : '#1F2530',
       shadowOffset: { width: 0, height: 6 },
       shadowOpacity: mode === 'dark' ? 0.45 : 0.18,
       shadowRadius: 18,

@@ -541,5 +541,21 @@
   "holiday_christmas": "Christmas",
   "holiday_blurb_christmas": "December 25th",
   "holiday_new_years_eve": "New Year's Eve",
-  "holiday_blurb_new_years_eve": "December 31st"
+  "holiday_blurb_new_years_eve": "December 31st",
+  "change_email": "Change email",
+  "update_email": "Update email",
+  "email_confirm_sent": "Confirmation sent",
+  "email_confirm_sent_detail": "Open the link in both mailboxes to finish the change.",
+  "email_updated": "Email updated",
+  "signed_in": "Signed in",
+  "auth_link_failed": "That link didn't work",
+  "auth_link_failed_detail": "It may have expired or already been used. Try again from Security.",
+  "same_person_q": "Same person?",
+  "birthday_exists_body": "{{name}} is already in your birthday list, on {{date}}. Is this the same person?",
+  "yes_same_person": "Yes, the same person",
+  "no_someone_else": "No, someone else",
+  "birthday_moved_over": "Their birthday came across with them",
+  "already_in_your_people": "Already in your people",
+  "set_their_birthday_q": "{{name}} is already someone you keep. Set the birthday on their card instead?",
+  "go_to_their_card": "Go to their card"
 }
