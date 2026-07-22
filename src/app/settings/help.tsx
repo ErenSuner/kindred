@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, ScrollView, StyleSheet, Pressable, Linking } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
@@ -8,7 +8,7 @@ import { spacing, radius } from '@/theme/tokens';
 import { useTheme } from '@/theme/ThemeContext';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
-import { SUPPORT_EMAIL, PRIVACY_POLICY_URL } from '@/lib/links';
+import { PRIVACY_POLICY_URL } from '@/lib/links';
 import { useTranslation } from "react-i18next";
 
 // Static, localized FAQ — no backend. Questions live as help_q1..N / help_a1..N
@@ -69,7 +69,7 @@ export default function HelpCenter() {
           <Txt variant="eyebrow" color={c.faint} style={{ marginLeft: 4 }}>{t('still_need_help')}</Txt>
           <View style={[styles.group, { backgroundColor: c.surface, borderColor: c.line }, cardShadow]}>
             <Pressable
-              onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Kindred`)}
+              onPress={() => router.push('/settings/feedback')}
               style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.surfaceAlt }]}
             >
               <View style={[styles.rowIcon, { backgroundColor: c.surfaceAlt }]}>

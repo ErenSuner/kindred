@@ -27,6 +27,14 @@
         "android.permission.READ_CONTACTS",
         "android.permission.WRITE_CONTACTS",
         "android.permission.RECORD_AUDIO"
+      ],
+      "queries": [
+        {
+          "intent": {
+            "action": "android.intent.action.SENDTO",
+            "data": { "scheme": "mailto" }
+          }
+        }
       ]
     },
     "web": {

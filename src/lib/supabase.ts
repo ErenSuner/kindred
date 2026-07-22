@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -59,7 +59,12 @@ export const supabase = createClient(
     storage: customStorage,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    // On a phone there is no browser URL to watch, and the tokens that come back
+    // from a confirmation link are picked up by hand in @/utils/authLinks.
+    // On the web there is nothing else to pick them up: Linking.getInitialURL()
+    // does not hand over the fragment, so leaving this off meant a confirmation
+    // link opened the site and signed nobody in.
+    detectSessionInUrl: Platform.OS === 'web',
   },
 });
 

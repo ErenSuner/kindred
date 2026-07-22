@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, StyleSheet, TextInput, Pressable, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,8 +10,16 @@ import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
+import { PasswordField } from '@/components/PasswordField';
+import { authErrorCode, authErrorDetail, describeAuthError } from '@/utils/authErrors';
+import { authRedirectUrl } from '@/utils/authLinks';
+import { isOffline } from '@/utils/outbox';
 import { supabase } from '@/lib/supabase';
+import { Sentry } from '@/lib/sentry';
 import { useTranslation } from 'react-i18next';
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const RESET_COOLDOWN_SECONDS = 60;
 
 export default function Login() {
   const { t } = useTranslation();
@@ -22,47 +30,81 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [noticeMsg, setNoticeMsg] = useState('');
+  const [resetLeft, setResetLeft] = useState(0);
+
+  useEffect(() => {
+    if (resetLeft <= 0) return;
+    const id = setTimeout(() => setResetLeft((s) => s - 1), 1000);
+    return () => clearTimeout(id);
+  }, [resetLeft]);
 
   const handleForgotPassword = async () => {
     setErrorMsg('');
+    setErrorDetail(null);
     setNoticeMsg('');
-    if (!email.trim()) {
+    if (!EMAIL.test(email.trim())) {
       setErrorMsg(t('reset_enter_email'));
       return;
     }
+    if (resetLeft > 0) return;
+
     try {
-      // No redirectTo: Supabase's hosted recovery page handles setting the new
-      // password, then the user returns to the app to sign in. Avoids fragile
-      // native deep-link session handling for v1.
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+      // redirectTo is what keeps the emailed link out of the project's Site URL
+      // — which is where every reset link used to land on localhost. It brings
+      // the person back into the app, onto /settings/new-password.
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: authRedirectUrl(),
+      });
       if (error) throw error;
-      setNoticeMsg(t('reset_email_sent'));
-    } catch (err: any) {
-      setErrorMsg(err.message || t('error_sign_in'));
+    } catch (err) {
+      // Only a rate limit and a dead connection are reported. Everything else is
+      // swallowed on purpose: an error that appears for unknown addresses and
+      // not for known ones turns this button into a way of checking who has an
+      // account here.
+      const code = authErrorCode(err);
+      if (code?.startsWith('over_') || isOffline(err)) {
+        setErrorMsg(describeAuthError(err, 'public', 'send that email'));
+        setErrorDetail(authErrorDetail(err, authRedirectUrl()));
+        return;
+      }
+      // Still worth knowing about, even though the screen stays quiet.
+      Sentry.captureException(err);
     }
+
+    // Said the same way whether or not the address exists.
+    setNoticeMsg(t('reset_link_generic'));
+    setResetLeft(RESET_COOLDOWN_SECONDS);
   };
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
+    if (!email.trim() || !password) {
       setErrorMsg(t('error_fill_fields'));
       return;
     }
     setLoading(true);
     setErrorMsg('');
+    setErrorDetail(null);
     setNoticeMsg('');
 
     try {
+      // The password is sent exactly as typed. Trimming it here would lock out
+      // anyone whose password legitimately ends in a space.
       const { error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
-        password: password.trim(),
+        password,
       });
 
       if (error) throw error;
 
       // router.replace('/home') will be handled by the route guard in _layout.tsx
-    } catch (err: any) {
-      setErrorMsg(err.message || t('error_sign_in'));
+    } catch (err) {
+      // 'public': "no such account" and "wrong password" must read identically,
+      // or this screen becomes a tool for finding out who is registered.
+      setErrorMsg(describeAuthError(err, 'public', 'sign you in'));
+      setErrorDetail(authErrorDetail(err));
+      Sentry.captureException(err);
     } finally {
       setLoading(false);
     }
@@ -98,9 +140,14 @@ export default function Login() {
             {errorMsg ? (
               <View style={[styles.errorBox, { backgroundColor: c.dangerWash }]}>
                 <Icon name="error-outline" size={20} color={c.danger} />
-                <Txt variant="sub" color={c.danger} style={{ flex: 1, marginLeft: 8 }}>
-                  {errorMsg}
-                </Txt>
+                <View style={{ flex: 1, marginLeft: 8 }}>
+                  <Txt variant="sub" color={c.danger}>{errorMsg}</Txt>
+                  {errorDetail ? (
+                    <Txt variant="sub" color={c.danger} style={{ opacity: 0.7, marginTop: 2 }} selectable>
+                      {errorDetail}
+                    </Txt>
+                  ) : null}
+                </View>
               </View>
             ) : null}
 
@@ -123,24 +170,33 @@ export default function Login() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
+                autoComplete="email"
+                textContentType="username"
                 style={input}
+                editable={!loading}
               />
             </View>
 
             <View style={{ gap: spacing.stackSm, marginTop: spacing.stackMd }}>
               <Txt variant="eyebrow" color={c.faint} style={styles.label}>{t('password')}</Txt>
-              <TextInput
+              <PasswordField
                 value={password}
-                onChangeText={setPassword}
+                onChange={setPassword}
                 placeholder="••••••••"
-                placeholderTextColor={c.faint}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                style={input}
+                purpose="current"
+                editable={!loading}
+                returnKeyType="go"
+                onSubmitEditing={handleLogin}
               />
-              <Pressable onPress={handleForgotPassword} hitSlop={8} style={{ alignSelf: 'flex-end', marginTop: 4 }}>
-                <Txt variant="sub" color={c.flameDeep}>{t('forgot_password')}</Txt>
+              <Pressable
+                onPress={handleForgotPassword}
+                hitSlop={8}
+                disabled={resetLeft > 0}
+                style={[{ alignSelf: 'flex-end', marginTop: 4 }, resetLeft > 0 && { opacity: 0.45 }]}
+              >
+                <Txt variant="sub" color={c.flameDeep}>
+                  {resetLeft > 0 ? t('email_resend_in', { seconds: resetLeft }) : t('forgot_password')}
+                </Txt>
               </Pressable>
             </View>
 
@@ -148,6 +204,7 @@ export default function Login() {
               label={loading ? t('signing_in') : t('sign_in')}
               onPress={handleLogin}
               fullWidth
+              disabled={loading}
               style={{ marginTop: spacing.stackLg }}
             />
           </Card>
