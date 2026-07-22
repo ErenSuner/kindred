@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Pressable, Linking, Share } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, Share } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { PRIVACY_POLICY_URL, SUPPORT_EMAIL } from '@/lib/links';
+import { PRIVACY_POLICY_URL } from '@/lib/links';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { spacing, radius } from '@/theme/tokens';
@@ -280,10 +280,13 @@ export default function Settings() {
           <SectionTitle>{t('support')}</SectionTitle>
           <View style={[styles.group, { backgroundColor: c.surface, borderColor: c.line }, cardShadow]}>
             <Row icon="help" label={t('help_center')} onPress={() => router.push('/settings/help')} />
+            {/* Was a mailto: link, which Android 11+ can't resolve without a
+                <queries> manifest entry — so it opened a blank browser tab.
+                Now a screen that writes straight to the database. */}
             <Row
               icon="chat-bubble"
               label={t('feedback')}
-              onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Kindred%20feedback`)}
+              onPress={() => router.push('/settings/feedback')}
             />
             <Row
               icon="share"

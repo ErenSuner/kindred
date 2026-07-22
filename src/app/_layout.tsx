@@ -64,17 +64,29 @@ function RootLayoutNav() {
   useEffect(() => {
     if (loading) return;
 
-    const inAuthGroup = (segments as any)[0] === '(auth)';
-    const onIndex = (segments as any).length === 0 || (segments as any)[0] === 'index' || (segments as any)[0] === '';
+    const seg0 = (segments as any)[0];
+    const inAuthGroup = seg0 === '(auth)';
+    const onIndex = (segments as any).length === 0 || seg0 === 'index' || seg0 === '';
+
+    // Where a link from an email lands. Nobody following one is signed in yet at
+    // the moment it opens — the link is what creates the session — so this guard
+    // has to stay out of the way in both directions: it used to throw the
+    // signed-out arrival back to the welcome screen, and then, a beat later,
+    // pull the now-signed-in one to home before <AuthLinkHandler> could send
+    // them to the new-password screen they came for. The route redirects itself
+    // once the link has been read.
+    const onAuthLanding = seg0 === 'auth';
+    // Reached only through a recovery link, which brings its own session.
+    const onPasswordReset = seg0 === 'settings' && (segments as any)[1] === 'new-password';
 
     if (!user) {
       // Not logged in: send them to welcome screen if they attempt to view secure tabs
-      if (!inAuthGroup && !onIndex) {
+      if (!inAuthGroup && !onIndex && !onAuthLanding && !onPasswordReset) {
         router.replace('/');
       }
     } else {
       // Logged in: send them to home tab if they attempt to view welcome/auth
-      if (inAuthGroup || onIndex) {
+      if ((inAuthGroup || onIndex) && !onAuthLanding) {
         router.replace('/home');
       }
     }
@@ -99,6 +111,9 @@ function RootLayoutNav() {
       <Stack.Screen name="index" />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="auth/confirm" />
+      <Stack.Screen name="settings/new-password" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="settings/feedback" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="person/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="new-connection" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="import-contacts" options={{ animation: 'slide_from_bottom' }} />
