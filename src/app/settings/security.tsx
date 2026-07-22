@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { View, ScrollView, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform, Modal, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { spacing, radius } from '@/theme/tokens';
 import { useTheme } from '@/theme/ThemeContext';
 import { fonts } from '@/theme/type';
@@ -69,8 +69,8 @@ export default function SecuritySettings() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c } = useTheme();
-  const { user } = useAuth();
+  const { c, floatShadow } = useTheme();
+  const { user, signOut } = useAuth();
 
   const [current, setCurrent] = useState('');
   const [password, setPassword] = useState('');
@@ -94,6 +94,38 @@ export default function SecuritySettings() {
     } catch (e) {
       console.error(e);
       setError(describeWriteError(e));
+    }
+  };
+
+  // Deleting the account lives here rather than on the settings screen: it is
+  // the one action nothing can undo, and it should take a deliberate walk to
+  // reach. Two confirmations once you're here.
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deleteStep, setDeleteStep] = useState(1);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteAccount = () => {
+    setDeleteStep(1);
+    setDeleteModalVisible(true);
+  };
+
+  const executeDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const { error: err } = await supabase.rpc('delete_user');
+      if (err) throw err;
+
+      // If successful, log out
+      await signOut();
+    } catch (e) {
+      // The cause is almost always a missing delete_user RPC, which is a
+      // deployment problem — not something the person tapping the button can
+      // act on. It goes to the console; they get a plain apology.
+      console.error('Account deletion failed', e);
+      Alert.alert(t('delete_failed'), t('delete_failed_body'));
+    } finally {
+      setIsDeleting(false);
+      setDeleteModalVisible(false);
     }
   };
 
@@ -225,8 +257,70 @@ export default function SecuritySettings() {
           </Animated.View>
 
           <FormError message={error} />
+
+          <Animated.View entering={FadeInDown.duration(400).delay(100)}>
+            <Txt variant="eyebrow" color={c.danger} style={styles.fieldLabel}>{t('danger_zone')}</Txt>
+            <View style={[styles.dangerCard, { backgroundColor: c.surface, borderColor: c.danger }]}>
+              <Txt variant="sub" color={c.muted}>{t('delete_account_hint')}</Txt>
+              <Button
+                label={t('delete_account')}
+                variant="danger"
+                icon="delete-forever"
+                small
+                style={{ alignSelf: 'flex-start', marginTop: 14 }}
+                onPress={handleDeleteAccount}
+              />
+            </View>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal visible={deleteModalVisible} transparent animationType="none" onRequestClose={() => setDeleteModalVisible(false)}>
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          exiting={FadeOut.duration(200)}
+          style={[styles.modalOverlay, { backgroundColor: c.overlay }]}
+        >
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setDeleteModalVisible(false)} />
+          <Animated.View
+            entering={SlideInDown.duration(300).springify()}
+            exiting={SlideOutDown.duration(200)}
+            style={[styles.modalContent, { backgroundColor: c.surface }, floatShadow]}
+          >
+            <View style={[styles.modalIconWrap, { backgroundColor: c.dangerWash }]}>
+              <Icon name="warning" size={30} color={c.danger} />
+            </View>
+            <Txt variant="heading" style={{ marginTop: 16 }}>
+              {deleteStep === 1 ? t('delete_account') : t('final_warning')}
+            </Txt>
+            <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center', marginBottom: 24 }}>
+              {deleteStep === 1
+                ? t('are_you_absolutely_sure_this_w')
+                : t('this_is_your_last_chance_all_y')}
+            </Txt>
+
+            <View style={{ width: '100%', gap: 12 }}>
+              <Button
+                label={deleteStep === 1 ? t('delete_everything') : t('yes_delete_my_account')}
+                variant="dangerSolid"
+                onPress={() => {
+                  if (deleteStep === 1) setDeleteStep(2);
+                  else executeDelete();
+                }}
+                disabled={isDeleting}
+                fullWidth
+              />
+              <Button
+                label={t('cancel')}
+                variant="quiet"
+                onPress={() => setDeleteModalVisible(false)}
+                disabled={isDeleting}
+                fullWidth
+              />
+            </View>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
 
       <View
         style={[
@@ -272,6 +366,31 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   infoDivider: { height: 1 },
+  dangerCard: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.containerMobile,
+  },
+  modalContent: {
+    borderRadius: radius.xl,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  modalIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',

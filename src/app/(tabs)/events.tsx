@@ -17,7 +17,7 @@ import { useEvents } from '@/context/EventsContext';
 import { parseNudges } from '@/utils/nudges';
 import { recurrenceIcon, recurrenceShortLabel } from '@/utils/recurrence';
 import { weekdaysLabel } from '@/utils/routines';
-import { formatTimeOfDay } from '@/utils/eventTime';
+import { formatClock } from '@/utils/dates';
 import type { MyEvent } from '@/data/mock';
 import { useTranslation } from "react-i18next";
 
@@ -147,7 +147,7 @@ export default function MyEvents() {
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Txt variant="title" color={c.onInk}>{featured.title}</Txt>
                     <Txt variant="sub" color={c.onInkMuted} style={{ marginTop: 4 }}>
-                      {featured.date}{featured.timeOfDay ? ` · ${formatTimeOfDay(featured.timeOfDay)}` : ''}
+                      {featured.date}{featured.timeOfDay ? ` · ${formatClock(featured.timeOfDay)}` : ''}
                     </Txt>
                   </View>
                 </View>
@@ -184,7 +184,7 @@ export default function MyEvents() {
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Txt variant="bodyMed">{event.title}</Txt>
                         <Txt variant="sub" color={c.muted} style={{ marginTop: 2 }}>
-                          {event.date}{event.timeOfDay ? ` · ${formatTimeOfDay(event.timeOfDay)}` : ''}
+                          {event.date}{event.timeOfDay ? ` · ${formatClock(event.timeOfDay)}` : ''}
                         </Txt>
                       </View>
                     </View>
@@ -236,7 +236,7 @@ export default function MyEvents() {
                     <Txt variant="bodyMed">{routine.title}</Txt>
                     <Txt variant="sub" color={c.muted} style={{ marginTop: 2 }}>
                       {weekdaysLabel(routine.weekdays ?? [])}
-                      {routine.timeOfDay ? ` · ${formatTimeOfDay(routine.timeOfDay)}` : ''}
+                      {routine.timeOfDay ? ` · ${formatClock(routine.timeOfDay)}` : ''}
                     </Txt>
                   </View>
                 </View>

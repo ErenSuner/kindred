@@ -117,35 +117,22 @@ export default function Connections() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
       >
-        {/* Title row with the two ways in: importing is the faster path for
-            most people, so it sits beside the manual one, quieter. */}
+        {/* Title row with the one way in. Birthdays-at-a-glance moved to home,
+            where it has room to be read; two buttons here left neither of them
+            big enough to matter. */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.titleRow}>
           <Txt variant="display" numberOfLines={1} style={{ flex: 1 }}>{t('people')}</Txt>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Pressable
-              onPress={() => router.push('/birthdays')}
-              style={({ pressed }) => [
-                styles.headerBtn,
-                { backgroundColor: c.flameWash, borderWidth: 1, borderColor: c.flame },
-                pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
-              ]}
-            >
-              <Icon name="cake" size={17} color={c.flameDeep} />
-              <Txt variant="label" color={c.flameDeep}>{t('birthdays')}</Txt>
-            </Pressable>
-
-            <Pressable
-              onPress={() => router.push('/new-connection')}
-              style={({ pressed }) => [
-                styles.headerBtn,
-                { backgroundColor: c.flame },
-                pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
-              ]}
-            >
-              <Icon name="person-add" size={17} color={c.onFlame} />
-              <Txt variant="label" color={c.onFlame}>{t('new')}</Txt>
-            </Pressable>
-          </View>
+          <Pressable
+            onPress={() => router.push('/new-connection')}
+            style={({ pressed }) => [
+              styles.headerBtn,
+              { backgroundColor: c.flame },
+              pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
+            ]}
+          >
+            <Icon name="person-add" size={17} color={c.onFlame} />
+            <Txt variant="label" color={c.onFlame}>{t('new')}</Txt>
+          </Pressable>
         </Animated.View>
 
         <FormError message={loadError} onRetry={refreshPeople} retryLabel={t('try_again')} />

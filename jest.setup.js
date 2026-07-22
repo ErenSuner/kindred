@@ -20,4 +20,7 @@ jest.mock('expo-notifications', () => ({
 // English so the assertions (which use English formatting) stay stable.
 jest.mock('expo-localization', () => ({
   getLocales: () => [{ languageCode: 'en' }],
+  // The clock format follows the device, not the language, so it needs its own
+  // pin: a 12-hour phone, matching the English assertions.
+  getCalendars: () => [{ timeZone: 'UTC', uses24hourClock: false, calendar: 'gregory', firstWeekday: 1 }],
 }));

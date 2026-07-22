@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Pressable, Modal, Alert, Linking, Share } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, Linking, Share } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { PRIVACY_POLICY_URL, SUPPORT_EMAIL } from '@/lib/links';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { spacing, radius } from '@/theme/tokens';
 import { useTheme, type ThemePref } from '@/theme/ThemeContext';
 import { Txt } from '@/components/Txt';
@@ -15,6 +15,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DEFAULT_REMINDER_HOUR, REMINDER_HOUR_KEY, getReminderHour, syncNotifications } from '@/utils/notifications';
+import { formatClockHour } from '@/utils/dates';
 import { useNotificationPermission } from '@/utils/notificationPermission';
 import { AvatarPicker } from '@/components/AvatarPicker';
 import { FormError } from '@/components/FormError';
@@ -89,13 +90,6 @@ function Row({ icon, label, sublabel, value, trailingIcon = 'chevron-right', rig
   );
 }
 
-// 12-hour clock, matching how the rest of the app writes dates in plain English.
-function formatHour(hour: number): string {
-  const suffix = hour < 12 ? 'AM' : 'PM';
-  const h = hour % 12 === 0 ? 12 : hour % 12;
-  return `${h}:00 ${suffix}`;
-}
-
 function SectionTitle({ children }: { children: string }) {
   const { c } = useTheme();
   return (
@@ -115,7 +109,7 @@ export default function Settings() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c, cardShadow, floatShadow, pref, setPref } = useTheme();
+  const { c, cardShadow, pref, setPref } = useTheme();
   const [nudges, setNudges] = useState(true);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [reminderHour, setReminderHour] = useState(DEFAULT_REMINDER_HOUR);
@@ -154,38 +148,6 @@ export default function Settings() {
     await AsyncStorage.setItem('@settings_nudges', String(val));
     // Pass the setting directly to sync — reading it back could race the write.
     syncNotifications(people, ownEvents, HOLIDAYS.filter(h => enabledIds.includes(h.id)), val);
-  };
-
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [deleteStep, setDeleteStep] = useState(1);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const handleDeleteAccount = () => {
-    setDeleteStep(1);
-    setDeleteModalVisible(true);
-  };
-
-  const executeDelete = async () => {
-    setIsDeleting(true);
-    try {
-      const { error } = await supabase.rpc('delete_user');
-      if (error) throw error;
-
-      // If successful, log out
-      await signOut();
-    } catch (e: any) {
-      // The cause is almost always a missing delete_user RPC, which is a
-      // deployment problem — not something the person tapping the button can
-      // act on. It goes to the console; they get a plain apology.
-      console.error('Account deletion failed', e);
-      Alert.alert(
-        t('delete_failed'),
-        t('delete_failed_body'),
-      );
-    } finally {
-      setIsDeleting(false);
-      setDeleteModalVisible(false);
-    }
   };
 
   const userEmail = user?.email ?? '';
@@ -283,7 +245,7 @@ export default function Settings() {
               icon="schedule"
               label={t('reminder_time')}
               sublabel={i18n.t('when_nudges_arrive_each_day')}
-              value={formatHour(reminderHour)}
+              value={formatClockHour(reminderHour)}
               onPress={() => setHourPickerVisible(true)}
               last
             />
@@ -333,22 +295,15 @@ export default function Settings() {
           </View>
         </View>
 
+        {/* Quiet and small: leaving is a normal thing to do, not the loudest
+            thing on the screen. Deleting the account lives behind Security. */}
         <Button
           label={t('log_out')}
           variant="quiet"
           icon="logout"
-          fullWidth
-          style={{ marginTop: spacing.stackSm }}
+          small
+          style={{ alignSelf: 'center', marginTop: spacing.stackSm }}
           onPress={signOut}
-        />
-
-        <Button
-          label={t('delete_account')}
-          variant="danger"
-          icon="delete-forever"
-          fullWidth
-          style={{ marginTop: spacing.stackSm }}
-          onPress={handleDeleteAccount}
         />
 
         <Txt variant="sub" color={c.faint} style={{ textAlign: 'center', marginTop: spacing.stackMd }}>
@@ -356,58 +311,11 @@ export default function Settings() {
         </Txt>
       </ScrollView>
 
-      <Modal visible={deleteModalVisible} transparent animationType="none" onRequestClose={() => setDeleteModalVisible(false)}>
-        <Animated.View
-          entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(200)}
-          style={[styles.modalOverlay, { backgroundColor: c.overlay }]}
-        >
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setDeleteModalVisible(false)} />
-          <Animated.View
-            entering={SlideInDown.duration(300).springify()}
-            exiting={SlideOutDown.duration(200)}
-            style={[styles.modalContent, { backgroundColor: c.surface }, floatShadow]}
-          >
-            <View style={[styles.modalIconWrap, { backgroundColor: c.dangerWash }]}>
-              <Icon name="warning" size={30} color={c.danger} />
-            </View>
-            <Txt variant="heading" style={{ marginTop: 16 }}>
-              {deleteStep === 1 ? i18n.t('delete_account') : i18n.t('final_warning')}
-            </Txt>
-            <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center', marginBottom: 24 }}>
-              {deleteStep === 1
-                ? i18n.t('are_you_absolutely_sure_this_w')
-                : i18n.t('this_is_your_last_chance_all_y')}
-            </Txt>
-
-            <View style={{ width: '100%', gap: 12 }}>
-              <Button
-                label={deleteStep === 1 ? i18n.t('delete_everything') : i18n.t('yes_delete_my_account')}
-                variant="dangerSolid"
-                onPress={() => {
-                  if (deleteStep === 1) setDeleteStep(2);
-                  else executeDelete();
-                }}
-                disabled={isDeleting}
-                fullWidth
-              />
-              <Button
-                label={t('cancel')}
-                variant="quiet"
-                onPress={() => setDeleteModalVisible(false)}
-                disabled={isDeleting}
-                fullWidth
-              />
-            </View>
-          </Animated.View>
-        </Animated.View>
-      </Modal>
-
       <ScrollPickerModal
         visible={hourPickerVisible}
         onClose={() => setHourPickerVisible(false)}
         title={t('reminder_time')}
-        options={Array.from({ length: 24 }, (_, h) => ({ label: formatHour(h), value: h }))}
+        options={Array.from({ length: 24 }, (_, h) => ({ label: formatClockHour(h), value: h }))}
         selectedValue={reminderHour}
         onSelect={(val) => handlePickHour(val as number)}
       />
@@ -488,25 +396,5 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     marginHorizontal: 16,
-  },
-  modalOverlay: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.containerMobile,
-  },
-  modalContent: {
-    borderRadius: radius.xl,
-    padding: 24,
-    width: '100%',
-    maxWidth: 400,
-    alignItems: 'center',
-  },
-  modalIconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
