@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { View, Modal, StyleSheet, Pressable, ScrollView, Platform } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing, radius } from '@/theme/tokens';
 import { useTheme } from '@/theme/ThemeContext';
@@ -53,7 +53,7 @@ export function ScrollPickerModal({ visible, onClose, options, selectedValue, on
       </Animated.View>
 
       <Animated.View
-        entering={SlideInDown.duration(300).springify()}
+        entering={SlideInDown.duration(260).easing(Easing.out(Easing.cubic))}
         exiting={SlideOutDown.duration(200)}
         style={[
           styles.sheet,

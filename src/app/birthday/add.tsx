@@ -8,14 +8,17 @@ import { ReminderEditor } from '@/components/ReminderEditor';
 import { Txt } from '@/components/Txt';
 import { showHeld } from '@/components/HeldNotice';
 import { useBirthdays, DEFAULT_BIRTHDAY_EMOJI, EMOJI_CHOICES } from '@/context/BirthdaysContext';
+import { usePeople } from '@/context/PeopleContext';
+import { normalize } from '@/utils/search';
+import type { Person } from '@/data/mock';
 import { radius, spacing } from '@/theme/tokens';
 import { useTheme } from '@/theme/ThemeContext';
 import { fonts } from '@/theme/type';
 import { Nudge, serializeNudges } from '@/utils/nudges';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
@@ -33,8 +36,9 @@ export default function AddBirthday() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c } = useTheme();
+  const { c, floatShadow } = useTheme();
   const { addBirthday } = useBirthdays();
+  const { people } = usePeople();
 
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState(DEFAULT_BIRTHDAY_EMOJI);
@@ -42,6 +46,8 @@ export default function AddBirthday() {
   const { day, month, year } = date;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A person in the circle carrying the same name, if there is one.
+  const [personMatch, setPersonMatch] = useState<Person | null>(null);
 
   const [reminders, setReminders] = useState<Nudge[]>([
     { type: 'preset', label: '1 Week Before', value: '1_week' },
@@ -68,6 +74,19 @@ export default function AddBirthday() {
       return;
     }
 
+    // Someone already in the circle under this name almost certainly is this
+    // person. A loose birthday beside their card would mean two reminders and
+    // two places to edit, so the offer is to set it on the card instead.
+    const match = people.find((p) => normalize(p.name) === normalize(name.trim()));
+    if (match) {
+      setPersonMatch(match);
+      return;
+    }
+
+    await save();
+  };
+
+  const save = async () => {
     // A skipped year is stored as 1000 — the birthday still cycles yearly, it
     // just carries no age.
     const y = hasYear ? year : 1000;
@@ -165,6 +184,53 @@ export default function AddBirthday() {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Same name already in the circle */}
+      <Modal visible={personMatch !== null} transparent animationType="fade">
+        <View style={[styles.modalOverlay, { backgroundColor: c.overlay }]}>
+          <Animated.View
+            entering={FadeInDown.duration(300)}
+            exiting={FadeOut.duration(200)}
+            style={[styles.modalContent, { backgroundColor: c.surface }, floatShadow]}
+          >
+            <View style={[styles.modalIconWrap, { backgroundColor: c.flameWash }]}>
+              <Icon name="person" size={30} color={c.flameDeep} />
+            </View>
+            <Txt variant="heading" style={{ marginTop: 16 }}>{t('already_in_your_people')}</Txt>
+            <Txt variant="body" color={c.muted} style={{ marginTop: 8, textAlign: 'center' }}>
+              {t('set_their_birthday_q', { name: personMatch?.name })}
+            </Txt>
+
+            <View style={{ width: '100%', gap: 12, marginTop: 24 }}>
+              <Button
+                label={t('go_to_their_card')}
+                icon="arrow-forward"
+                onPress={() => {
+                  const personId = personMatch?.id;
+                  setPersonMatch(null);
+                  if (personId) {
+                    router.replace({
+                      pathname: '/birthday/person/[personId]',
+                      params: { personId },
+                    } as any);
+                  }
+                }}
+                fullWidth
+              />
+              <Button
+                label={t('no_someone_else')}
+                variant="quiet"
+                onPress={() => {
+                  setPersonMatch(null);
+                  save();
+                }}
+                disabled={saving}
+                fullWidth
+              />
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -190,6 +256,26 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: radius.full,
     borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.containerMobile,
+  },
+  modalContent: {
+    borderRadius: radius.xl,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  modalIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },

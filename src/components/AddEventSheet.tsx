@@ -1,5 +1,5 @@
 import { View, Modal, StyleSheet, Pressable, Platform } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing, radius } from '@/theme/tokens';
 import { useTheme } from '@/theme/ThemeContext';
@@ -42,8 +42,11 @@ export function AddEventSheet({ visible, onClose, onChoose }: Props) {
       </Animated.View>
 
       <Animated.View
-        entering={SlideInDown.duration(300).springify().damping(22)}
-        exiting={SlideOutDown.duration(200)}
+        // A spring with no stiffness set overshoots hard enough to throw the
+        // sheet past the top of the screen and wobble back. A decelerating
+        // curve arrives once and settles.
+        entering={SlideInDown.duration(260).easing(Easing.out(Easing.cubic))}
+        exiting={SlideOutDown.duration(200).easing(Easing.in(Easing.cubic))}
         style={[styles.sheet, { backgroundColor: c.surface, paddingBottom: insets.bottom + spacing.stackLg }]}
       >
         <View style={[styles.handle, { backgroundColor: c.lineStrong }]} />

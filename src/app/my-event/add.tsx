@@ -24,8 +24,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
 
-const SUGGESTION_KEYS = ['suggest_dentist','suggest_rent','suggest_passport','suggest_gym','suggest_car'];
-
 function FieldLabel({ children }: { children: React.ReactNode }) {
   const { c } = useTheme();
   return (
@@ -138,22 +136,6 @@ export default function AddMyEvent() {
                 />
               </View>
 
-              <View style={styles.chipWrap}>
-                {SUGGESTION_KEYS.map((s) => (
-                  <Pressable
-                    key={s}
-                    onPress={() => setTitle(t(s))}
-                    style={({ pressed }) => [
-                      styles.suggestChip,
-                      { borderColor: c.lineStrong },
-                      pressed && { opacity: 0.7 },
-                    ]}
-                  >
-                    <Txt variant="sub" color={c.muted}>{t(s)}</Txt>
-                  </Pressable>
-                ))}
-              </View>
-
               <View style={{ gap: 6 }}>
                 <FieldLabel>{needsYear ? t('date_year_required') : t('date_year_optional')}</FieldLabel>
                 <DateFields value={date} onChange={setDate} yearMode="future" allowSkipYear={!needsYear} />
@@ -193,12 +175,5 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontFamily: fonts.figtreeRegular,
     fontSize: 16,
-  },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  suggestChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radius.full,
-    borderWidth: 1,
   },
 });

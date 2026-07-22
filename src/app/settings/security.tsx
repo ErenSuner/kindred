@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, ScrollView, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform, Modal, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeInDown, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { spacing, radius } from '@/theme/tokens';
 import { useTheme } from '@/theme/ThemeContext';
 import { fonts } from '@/theme/type';
@@ -13,9 +13,12 @@ import { FormError } from '@/components/FormError';
 import { showHeld } from '@/components/HeldNotice';
 import { describeWriteError } from '@/utils/loadError';
 import { formatOccurrenceDate } from '@/utils/dates';
+import { authRedirectUrl } from '@/utils/authLinks';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from "react-i18next";
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // A blunt strength read: length carries most of it, character variety the rest.
 // 0-4, mapped to weak / medium / strong below.
@@ -83,6 +86,42 @@ export default function SecuritySettings() {
   const tierColor = score <= 1 ? c.danger : score < 4 ? c.flame : c.good;
 
   const memberSince = user?.created_at ? formatOccurrenceDate(new Date(user.created_at)) : null;
+
+  // Kept apart from the password fields: they save through different calls and
+  // an error in one must not clear the other.
+  const [email, setEmail] = useState(user?.email ?? '');
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+
+  const handleEmailChange = async () => {
+    setEmailError(null);
+    const next = email.trim();
+
+    if (!EMAIL.test(next)) {
+      setEmailError(t('invalid_email_format'));
+      return;
+    }
+
+    setEmailSaving(true);
+    try {
+      // Without emailRedirectTo, Supabase falls back to the project's Site URL
+      // — which is where the confirmation link used to land on localhost.
+      const { error: err } = await supabase.auth.updateUser(
+        { email: next },
+        { emailRedirectTo: authRedirectUrl() },
+      );
+      if (err) throw err;
+
+      // The address does not change until the link is opened, so the screen
+      // must not pretend it already has. The typed value stays put.
+      showHeld(t('email_confirm_sent'), t('email_confirm_sent_detail'));
+    } catch (e) {
+      console.error(e);
+      setEmailError(describeWriteError(e));
+    } finally {
+      setEmailSaving(false);
+    }
+  };
 
   const forgot = async () => {
     if (!user?.email) return;
@@ -216,6 +255,40 @@ export default function SecuritySettings() {
             </View>
           </Animated.View>
 
+          {/* Changing the address is a credential change, same as the password,
+              and it only takes effect once both mailboxes have confirmed it. */}
+          <Animated.View entering={FadeInDown.duration(400).delay(30)} style={{ gap: spacing.stackSm }}>
+            <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>{t('change_email')}</Txt>
+
+            <View style={[styles.inputWrap, { backgroundColor: c.surface, borderColor: c.line }]}>
+              <Icon name="email" size={20} color={c.faint} style={styles.inputIcon} />
+              <TextInput
+                style={[styles.input, { color: c.text }]}
+                placeholder={t('email_address')}
+                placeholderTextColor={c.faint}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+
+            <Txt variant="sub" color={c.faint} style={{ marginLeft: 4 }}>{t('email_change_note')}</Txt>
+
+            <FormError message={emailError} />
+
+            <Button
+              label={emailSaving ? t('saving') : t('update_email')}
+              variant="quiet"
+              icon="mark-email-read"
+              small
+              style={{ alignSelf: 'flex-start' }}
+              disabled={emailSaving || !email.trim() || email.trim() === user?.email}
+              onPress={handleEmailChange}
+            />
+          </Animated.View>
+
           <Animated.View entering={FadeInDown.duration(400).delay(50)} style={{ gap: spacing.stackMd }}>
             <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>{t('change_password')}</Txt>
 
@@ -283,7 +356,7 @@ export default function SecuritySettings() {
         >
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setDeleteModalVisible(false)} />
           <Animated.View
-            entering={SlideInDown.duration(300).springify()}
+            entering={SlideInDown.duration(260).easing(Easing.out(Easing.cubic))}
             exiting={SlideOutDown.duration(200)}
             style={[styles.modalContent, { backgroundColor: c.surface }, floatShadow]}
           >

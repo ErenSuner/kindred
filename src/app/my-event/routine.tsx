@@ -22,9 +22,6 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from "react-i18next";
-import i18n from "@/lib/i18n";
-
-const SUGGESTIONS = [i18n.t('class'), i18n.t('gym'), i18n.t('therapy'), i18n.t('football'), i18n.t('language_course')];
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   const { c } = useTheme();
@@ -143,22 +140,6 @@ export default function RoutineForm() {
                 />
               </View>
 
-              <View style={styles.chipWrap}>
-                {SUGGESTIONS.map((s) => (
-                  <Pressable
-                    key={s}
-                    onPress={() => setTitle(s)}
-                    style={({ pressed }) => [
-                      styles.suggestChip,
-                      { borderColor: c.lineStrong },
-                      pressed && { opacity: 0.7 },
-                    ]}
-                  >
-                    <Txt variant="sub" color={c.muted}>{s}</Txt>
-                  </Pressable>
-                ))}
-              </View>
-
               <WeekdayPicker value={weekdays} onChange={setWeekdays} />
 
               <TimeField value={timeOfDay} onChange={setTimeOfDay} />
@@ -212,13 +193,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontFamily: fonts.figtreeRegular,
     fontSize: 16,
-  },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  suggestChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radius.full,
-    borderWidth: 1,
   },
   deleteBtn: {
     flexDirection: 'row',

@@ -25,6 +25,7 @@ import { EventsProvider } from '@/context/EventsContext';
 import { BirthdaysProvider } from '@/context/BirthdaysContext';
 import { HolidaysProvider } from '@/context/HolidaysContext';
 import { NotificationSync } from '@/components/NotificationSync';
+import { AuthLinkHandler } from '@/components/AuthLinkHandler';
 import { UndoProvider } from '@/context/UndoContext';
 import { UndoSnackbar } from '@/components/UndoSnackbar';
 import { AppErrorBoundary } from '@/components/AppErrorBoundary';
@@ -124,6 +125,7 @@ function ThemedApp() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
       <NotificationSync />
+      <AuthLinkHandler />
       <RootLayoutNav key={lang} />
       <PendingWrites />
       <HeldNotice />
