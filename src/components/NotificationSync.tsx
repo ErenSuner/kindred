@@ -1,36 +1,11 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import i18n from '@/lib/i18n';
 import { usePeople } from '@/context/PeopleContext';
 import { useEvents } from '@/context/EventsContext';
 import { useBirthdays } from '@/context/BirthdaysContext';
 import { useHolidays } from '@/context/HolidaysContext';
 import { HOLIDAYS } from '@/data/holidays';
-import { syncNotifications } from '@/utils/notifications';
-import type { Person, SimpleBirthday } from '@/data/mock';
-import { YEARLY } from '@/utils/recurrence';
-
-// A standalone birthday carries no Person, but the birthday-reminder maths lives
-// in the people collector. Dressing each one as a minimal Person with a single
-// birthday special day lets it schedule through exactly the same path — birthday
-// wording, turning age, yearly repeat — with nothing duplicated.
-function asPerson(b: SimpleBirthday): Person {
-  return {
-    specialDays: [
-      {
-        id: b.id,
-        title: 'Birthday',
-        date: b.date,
-        icon: 'cake',
-        accent: 'tertiary',
-        originalDate: b.originalDate,
-        isBirthday: true,
-        recurrence: YEARLY,
-        nudges: b.nudges,
-        turningAge: b.turningAge,
-      },
-    ],
-    name: b.name,
-  } as unknown as Person;
-}
+import { birthdaysAsPeople, syncNotifications } from '@/utils/notifications';
 
 // syncNotifications cancels everything before rescheduling, so it needs people,
 // the user's own events and the shared occasions together. Mounting this once
@@ -47,14 +22,24 @@ export function NotificationSync() {
   // the same path as everything else.
   const ownEvents = useMemo(() => [...events, ...routines], [events, routines]);
   // Standalone birthdays ride the people path as minimal synthetic Persons.
-  const allPeople = useMemo(() => [...people, ...birthdays.map(asPerson)], [people, birthdays]);
+  const allPeople = useMemo(() => [...people, ...birthdaysAsPeople(birthdays)], [people, birthdays]);
+
+  // Reminder text is written when it is scheduled, so everything already booked
+  // is still in the old language after a switch. Rescheduling is the only way to
+  // translate it.
+  const [lang, setLang] = useState(i18n.language);
+  useEffect(() => {
+    const onChange = (next: string) => setLang(next);
+    i18n.on('languageChanged', onChange);
+    return () => i18n.off('languageChanged', onChange);
+  }, []);
 
   useEffect(() => {
     // Holding off until the stored selection has loaded avoids scheduling the
     // defaults and then immediately cancelling them.
     if (loading) return;
     syncNotifications(allPeople, ownEvents, enabledHolidays);
-  }, [allPeople, ownEvents, enabledHolidays, loading]);
+  }, [allPeople, ownEvents, enabledHolidays, loading, lang]);
 
   return null;
 }

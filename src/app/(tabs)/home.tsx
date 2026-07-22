@@ -25,6 +25,8 @@ import { useEvents } from '@/context/EventsContext';
 import { useHolidays } from '@/context/HolidaysContext';
 import { useAuth } from '@/context/AuthContext';
 import { formatClock } from '@/utils/dates';
+import { holidayName } from '@/utils/holidays';
+import { capitalizeFirst } from '@/utils/text';
 import { TimelineEntry, buildTimeline } from '@/utils/timeline';
 import { daysChipLabel, daysLongLabel } from '@/utils/countdownLabel';
 import { useTranslation } from "react-i18next";
@@ -93,7 +95,7 @@ export default function Home() {
         routines,
         imminent.map((u) => ({
           id: u.holiday.id,
-          name: u.holiday.name,
+          name: holidayName(u.holiday),
           icon: u.holiday.icon,
           formattedDate: u.formattedDate,
           daysAway: u.daysAway,
@@ -140,26 +142,30 @@ export default function Home() {
             it has room to be a proper button here, which it never had wedged
             next to New on the people tab. */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.welcome}>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Txt variant="sub" color={c.muted} style={{ marginBottom: 6, textTransform: 'capitalize' }}>
-              {t('home_welcome', { name: userName })}
+          {/* The pill sits beside the greeting, not beside the headline: the
+              headline is the widest thing on the screen and sharing its line
+              broke it across two. */}
+          <View style={styles.welcomeTop}>
+            <Txt variant="sub" color={c.muted} style={{ flex: 1 }} numberOfLines={1}>
+              {t('home_welcome', { name: capitalizeFirst(userName) })}
             </Txt>
-            <Txt variant="display">
-              {total === 0 ? t('all_quiet') : t('coming_up_headline')}
-            </Txt>
+
+            <Pressable
+              onPress={() => router.push('/birthdays')}
+              style={({ pressed }) => [
+                styles.birthdaysBtn,
+                { backgroundColor: c.flameWash, borderColor: c.flame },
+                pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
+              ]}
+            >
+              <Icon name="cake" size={20} color={c.flameDeep} />
+              <Txt variant="bodySemi" color={c.flameDeep}>{t('birthdays')}</Txt>
+            </Pressable>
           </View>
 
-          <Pressable
-            onPress={() => router.push('/birthdays')}
-            style={({ pressed }) => [
-              styles.birthdaysBtn,
-              { backgroundColor: c.flameWash, borderColor: c.flame },
-              pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
-            ]}
-          >
-            <Icon name="cake" size={20} color={c.flameDeep} />
-            <Txt variant="bodySemi" color={c.flameDeep}>{t('birthdays')}</Txt>
-          </Pressable>
+          <Txt variant="display">
+            {total === 0 ? t('all_quiet') : t('coming_up_headline')}
+          </Txt>
         </Animated.View>
 
         <FormError message={loadError} onRetry={refreshPeople} retryLabel={t('try_again')} />
@@ -358,12 +364,13 @@ export default function Home() {
 
 const styles = StyleSheet.create({
   wordmark: { fontFamily: fonts.frauncesSemiBold, fontSize: 15, lineHeight: 20, letterSpacing: 0.3 },
-  welcome: {
+  welcome: { marginBottom: spacing.stackLg },
+  welcomeTop: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    marginBottom: spacing.stackLg,
+    marginBottom: 10,
   },
   birthdaysBtn: {
     flexDirection: 'row',

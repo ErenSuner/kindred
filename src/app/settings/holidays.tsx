@@ -9,7 +9,8 @@ import { Icon } from '@/components/Icon';
 import { Toggle } from '@/components/Toggle';
 import { HOLIDAYS } from '@/data/holidays';
 import { HOLIDAY_HORIZON_DAYS, useHolidays } from '@/context/HolidaysContext';
-import { resolveHoliday } from '@/utils/holidays';
+import { holidayBlurb, holidayName, resolveHoliday } from '@/utils/holidays';
+import { daysChipLabel } from '@/utils/countdownLabel';
 import { useTranslation } from "react-i18next";
 
 export default function HolidaySettings() {
@@ -63,9 +64,9 @@ export default function HolidaySettings() {
                     />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Txt variant="bodyMed">{holiday.name}</Txt>
+                    <Txt variant="bodyMed">{holidayName(holiday)}</Txt>
                     <Txt variant="sub" color={c.muted} style={{ marginTop: 2 }}>
-                      {enabled ? `${formattedDate} · ${daysAway === 0 ? 'today' : `${daysAway} days away`}` : holiday.blurb}
+                      {enabled ? `${formattedDate} · ${daysChipLabel(daysAway)}` : holidayBlurb(holiday)}
                     </Txt>
                   </View>
                   <Toggle value={enabled} onChange={(v) => toggleHoliday(holiday.id, v)} />

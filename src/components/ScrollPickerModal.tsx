@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { View, Modal, StyleSheet, Pressable, ScrollView, Platform } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,8 +23,24 @@ type Props = {
 export function ScrollPickerModal({ visible, onClose, options, selectedValue, onSelect, title }: Props) {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
+  const scrollRef = useRef<ScrollView>(null);
+  // Only the first time the sheet lays out. Scrolling again on every re-layout
+  // would fight the finger.
+  const scrolled = useRef(false);
 
-  if (!visible) return null;
+  // A 24-hour list opens at midnight, so the hour actually set is off-screen
+  // and has to be hunted for. Bring it into view instead, a little below the
+  // top edge so the neighbouring options give it context.
+  const revealSelected = (y: number) => {
+    if (scrolled.current) return;
+    scrolled.current = true;
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - 96), animated: false });
+  };
+
+  if (!visible) {
+    scrolled.current = false;
+    return null;
+  }
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
@@ -49,12 +66,18 @@ export function ScrollPickerModal({ visible, onClose, options, selectedValue, on
           <Txt variant="heading">{title}</Txt>
         </View>
 
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          ref={scrollRef}
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           {options.map((opt) => {
             const isSelected = opt.value === selectedValue;
             return (
               <Pressable
                 key={String(opt.value)}
+                onLayout={isSelected ? (e) => revealSelected(e.nativeEvent.layout.y) : undefined}
                 style={({ pressed }) => [
                   styles.optionBtn,
                   isSelected && { backgroundColor: c.flameWash },
