@@ -13,6 +13,7 @@ import { FormError } from '@/components/FormError';
 import { PasswordField } from '@/components/PasswordField';
 import { showHeld } from '@/components/HeldNotice';
 import { authErrorDetail, describeAuthError } from '@/utils/authErrors';
+import { authDiagnostics, inspectEmail, type DiagContext } from '@/utils/authDiagnostics';
 import { firstPasswordProblem } from '@/utils/password';
 import { formatOccurrenceDate } from '@/utils/dates';
 import { authRedirectUrl } from '@/utils/authLinks';
@@ -90,6 +91,7 @@ export default function SecuritySettings() {
   const [emailSaving, setEmailSaving] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [emailDetail, setEmailDetail] = useState<string | null>(null);
+  const [emailDiag, setEmailDiag] = useState<string | null>(null);
   const [resendLeft, startResendCooldown] = useCountdown();
   const [resending, setResending] = useState(false);
 
@@ -98,24 +100,51 @@ export default function SecuritySettings() {
     setNewEmail('');
     setEmailError(null);
     setEmailDetail(null);
+    setEmailDiag(null);
   };
 
   // Every auth failure lands here. The code goes on screen and to Sentry,
   // because the first version of this screen swallowed both and a working Gmail
   // address ended up reported as malformed with no way to see why.
-  const reportAuthError = (e: unknown, set: (m: string | null) => void, setDetail: (d: string | null) => void) => {
+  //
+  // The one-line code was the first attempt at that and it wasn't enough: a code
+  // the server sent and a code the app guessed from an English message look
+  // identical once printed. So the full report goes on screen too, folded away
+  // — what was sent, what came back, and which of the two the code came from.
+  const reportAuthError = (
+    e: unknown,
+    ctx: DiagContext,
+    set: (m: string | null) => void,
+    setDetail: (d: string | null) => void,
+    setDiag: (d: string | null) => void,
+  ) => {
     // 'authed' — this person owns the account, so "that address already belongs
     // to an account" costs nothing to say and saves a lot of guessing.
     set(describeAuthError(e, 'authed'));
-    setDetail(authErrorDetail(e, authRedirectUrl()));
+    setDetail(authErrorDetail(e, ctx.redirect ?? undefined));
+    setDiag(authDiagnostics(e, ctx));
     Sentry.captureException(e);
   };
 
   const handleEmailChange = async () => {
     setEmailError(null);
     setEmailDetail(null);
+    setEmailDiag(null);
     const next = newEmail.trim();
 
+    // Before the format check, because a character that looks like an ordinary
+    // `i` passes the format check. The Turkish keyboard's dotless `ı`, the
+    // combining dot left behind by lowercasing `İ`, a zero-width space carried
+    // in by copy-paste — all of them survive `[^\s@]+`, and all of them come
+    // back from GoTrue as a flat "email_address_invalid" about an address that
+    // looks, on screen, entirely correct.
+    const badChar = inspectEmail(next);
+    if (badChar) {
+      setEmailError(
+        t(badChar.key, { char: badChar.char, code: badChar.codepoint, index: badChar.index }),
+      );
+      return;
+    }
     if (!EMAIL.test(next)) {
       setEmailError(t('invalid_email_format'));
       return;
@@ -125,24 +154,39 @@ export default function SecuritySettings() {
       return;
     }
 
+    // Read once and reused: the URL that goes to Supabase, the URL named in the
+    // success notice and the URL in a failure report all have to be the same
+    // string, or the report describes a request that was never made.
+    const redirect = authRedirectUrl();
+
     setEmailSaving(true);
     try {
       // Without emailRedirectTo, Supabase falls back to the project's Site URL
       // — which is where the confirmation link used to land on localhost.
       const { error: err } = await supabase.auth.updateUser(
         { email: next },
-        { emailRedirectTo: authRedirectUrl() },
+        { emailRedirectTo: redirect },
       );
       if (err) throw err;
 
       // The address does not change until both links are opened, so the screen
       // must not pretend it already has. Naming the address is what catches a
-      // typo — there is no second field to catch it any more.
-      showHeld(t('email_confirm_sent'), t('email_confirm_sent_to', { email: next }));
+      // typo — there is no second field to catch it any more, and naming the
+      // return address is what catches a link that will open the wrong place.
+      showHeld(
+        t('email_confirm_sent'),
+        `${t('email_confirm_sent_to', { email: next })}\n${t('email_confirm_redirect', { url: redirect })}`,
+      );
       startResendCooldown(RESEND_COOLDOWN_SECONDS);
       closeEmail();
     } catch (e) {
-      reportAuthError(e, setEmailError, setEmailDetail);
+      reportAuthError(
+        e,
+        { action: 'email_change', email: next, redirect },
+        setEmailError,
+        setEmailDetail,
+        setEmailDiag,
+      );
     } finally {
       setEmailSaving(false);
     }
@@ -152,18 +196,29 @@ export default function SecuritySettings() {
     if (!pendingEmail || resendLeft > 0) return;
     setEmailError(null);
     setEmailDetail(null);
+    setEmailDiag(null);
     setResending(true);
+    const redirect = authRedirectUrl();
     try {
       const { error: err } = await supabase.auth.resend({
         type: 'email_change',
         email: pendingEmail,
-        options: { emailRedirectTo: authRedirectUrl() },
+        options: { emailRedirectTo: redirect },
       });
       if (err) throw err;
-      showHeld(t('email_resent'), t('email_confirm_sent_to', { email: pendingEmail }));
+      showHeld(
+        t('email_resent'),
+        `${t('email_confirm_sent_to', { email: pendingEmail })}\n${t('email_confirm_redirect', { url: redirect })}`,
+      );
       startResendCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (e) {
-      reportAuthError(e, setEmailError, setEmailDetail);
+      reportAuthError(
+        e,
+        { action: 'email_change_resend', email: pendingEmail, redirect },
+        setEmailError,
+        setEmailDetail,
+        setEmailDiag,
+      );
     } finally {
       setResending(false);
     }
@@ -179,6 +234,7 @@ export default function SecuritySettings() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const [errorDiag, setErrorDiag] = useState<string | null>(null);
   const wrongTries = useRef(0);
   const [lockoutLeft, startLockout] = useCountdown();
 
@@ -189,6 +245,7 @@ export default function SecuritySettings() {
     setConfirmPassword('');
     setError(null);
     setErrorDetail(null);
+    setErrorDiag(null);
   };
 
   // Shown as the user types, so the rules arrive before the save button does.
@@ -208,20 +265,29 @@ export default function SecuritySettings() {
     if (!user?.email) return;
     setError(null);
     setErrorDetail(null);
+    setErrorDiag(null);
+    const redirect = authRedirectUrl();
     try {
       const { error: err } = await supabase.auth.resetPasswordForEmail(user.email, {
-        redirectTo: authRedirectUrl(),
+        redirectTo: redirect,
       });
       if (err) throw err;
-      showHeld(t('reset_email_sent'));
+      showHeld(t('reset_email_sent'), t('email_confirm_redirect', { url: redirect }));
     } catch (e) {
-      reportAuthError(e, setError, setErrorDetail);
+      reportAuthError(
+        e,
+        { action: 'password_reset', email: user.email, redirect },
+        setError,
+        setErrorDetail,
+        setErrorDiag,
+      );
     }
   };
 
   const handleSave = async () => {
     setError(null);
     setErrorDetail(null);
+    setErrorDiag(null);
 
     if (lockoutLeft > 0) {
       setError(t('too_many_attempts', { seconds: lockoutLeft }));
@@ -269,6 +335,7 @@ export default function SecuritySettings() {
           // expired session all land here and each needs its own answer.
           setError(describeAuthError(reauthErr, 'authed'));
           setErrorDetail(authErrorDetail(reauthErr));
+          setErrorDiag(authDiagnostics(reauthErr, { action: 'reauth', email: user.email }));
         }
         setLoading(false);
         return;
@@ -292,7 +359,13 @@ export default function SecuritySettings() {
       closePassword();
       router.back();
     } catch (e) {
-      reportAuthError(e, setError, setErrorDetail);
+      reportAuthError(
+        e,
+        { action: 'password_update', email: user.email },
+        setError,
+        setErrorDetail,
+        setErrorDiag,
+      );
     } finally {
       setLoading(false);
     }
@@ -451,7 +524,7 @@ export default function SecuritySettings() {
 
                 <Txt variant="sub" color={c.faint} style={{ marginLeft: 4 }}>{t('email_confirm_new')}</Txt>
 
-                <FormError message={emailError} detail={emailDetail} />
+                <FormError message={emailError} detail={emailDetail} diagnostics={emailDiag} />
 
                 <View style={styles.actionRow}>
                   <Button
@@ -474,7 +547,7 @@ export default function SecuritySettings() {
 
             {!emailOpen && emailError && (
               <View style={{ marginTop: spacing.stackSm }}>
-                <FormError message={emailError} detail={emailDetail} />
+                <FormError message={emailError} detail={emailDetail} diagnostics={emailDiag} />
               </View>
             )}
           </Animated.View>
@@ -544,7 +617,7 @@ export default function SecuritySettings() {
                   <Txt variant="sub" color={c.muted} style={{ marginLeft: 4 }}>{liveProblem}</Txt>
                 )}
 
-                <FormError message={error} detail={errorDetail} />
+                <FormError message={error} detail={errorDetail} diagnostics={errorDiag} />
 
                 <View style={styles.actionRow}>
                   <Button

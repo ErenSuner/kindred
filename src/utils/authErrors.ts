@@ -112,7 +112,12 @@ export function isRedirectRejection(err: unknown): boolean {
 
 // Older GoTrue releases answered some of these with a bare 4xx and no code.
 // Matched on the English message only as a last resort, before the fallback.
-function codeFromMessage(message: string | undefined): string | null {
+//
+// Exported so @/utils/authDiagnostics can say *which* of the two paths a code
+// came from. A guess made here and a code the server actually sent look
+// identical on screen, and telling them apart is the difference between "your
+// address is malformed" and "we have no idea, here is what GoTrue said".
+export function codeFromMessage(message: string | undefined): string | null {
   if (!message) return null;
   const m = message.toLowerCase();
   if (m.includes('already registered') || m.includes('already been registered')) return 'email_exists';

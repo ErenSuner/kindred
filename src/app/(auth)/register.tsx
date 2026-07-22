@@ -12,6 +12,8 @@ import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { PasswordField } from '@/components/PasswordField';
 import { authErrorCode, authErrorDetail, describeAuthError } from '@/utils/authErrors';
+import { authDiagnostics, inspectEmail } from '@/utils/authDiagnostics';
+import { ErrorDetails } from '@/components/ErrorDetails';
 import { authRedirectUrl } from '@/utils/authLinks';
 import { firstPasswordProblem } from '@/utils/password';
 import { supabase } from '@/lib/supabase';
@@ -33,6 +35,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const [errorDiag, setErrorDiag] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState('');
   const [emailTaken, setEmailTaken] = useState(false);
   // Only true when Supabase sent a confirmation instead of a session — the one
@@ -68,6 +71,18 @@ export default function Register() {
       return;
     }
 
+    // Before the format check: a dotless `ı` from a Turkish keyboard, or a
+    // zero-width space carried in by copy-paste, passes `[^\s@]+` and is then
+    // rejected by the server as a flat "invalid email address" — about an
+    // address that looks perfectly correct on screen.
+    const badChar = inspectEmail(email.trim());
+    if (badChar) {
+      setErrorMsg(
+        t(badChar.key, { char: badChar.char, code: badChar.codepoint, index: badChar.index }),
+      );
+      return;
+    }
+
     if (!EMAIL.test(email.trim())) {
       setErrorMsg(t('invalid_email_format'));
       return;
@@ -87,6 +102,7 @@ export default function Register() {
     setLoading(true);
     setErrorMsg('');
     setErrorDetail(null);
+    setErrorDiag(null);
     setSuccessMsg('');
 
     const full = name.trim();
@@ -131,6 +147,13 @@ export default function Register() {
     } catch (err) {
       setErrorMsg(describeAuthError(err, 'public', 'create your account'));
       setErrorDetail(authErrorDetail(err, authRedirectUrl()));
+      setErrorDiag(
+        authDiagnostics(err, {
+          action: 'sign_up',
+          email: email.trim(),
+          redirect: authRedirectUrl(),
+        }),
+      );
       Sentry.captureException(err);
       // Sign-up is the one screen where a collision has to be said out loud, or
       // the person keeps retyping an address that will never work. Offer the
@@ -149,6 +172,7 @@ export default function Register() {
     setResending(true);
     setErrorMsg('');
     setErrorDetail(null);
+    setErrorDiag(null);
     try {
       const { error } = await supabase.auth.resend({
         type: 'signup',
@@ -161,6 +185,13 @@ export default function Register() {
     } catch (err) {
       setErrorMsg(describeAuthError(err, 'public', 'send that email'));
       setErrorDetail(authErrorDetail(err, authRedirectUrl()));
+      setErrorDiag(
+        authDiagnostics(err, {
+          action: 'sign_up_resend',
+          email: email.trim(),
+          redirect: authRedirectUrl(),
+        }),
+      );
       Sentry.captureException(err);
     } finally {
       setResending(false);
@@ -199,7 +230,7 @@ export default function Register() {
           <Card style={styles.card}>
             {errorMsg ? (
               <View style={[styles.msgBox, { backgroundColor: c.dangerWash }]}>
-                <Icon name="error-outline" size={20} color={c.danger} />
+                <Icon name="error-outline" size={20} color={c.danger} style={{ marginTop: 1 }} />
                 <View style={{ flex: 1, marginLeft: 8 }}>
                   <Txt variant="sub" color={c.danger}>{errorMsg}</Txt>
                   {errorDetail ? (
@@ -218,6 +249,7 @@ export default function Register() {
                       </Txt>
                     </Pressable>
                   )}
+                  <ErrorDetails report={errorDiag} />
                 </View>
               </View>
             ) : null}
@@ -351,7 +383,9 @@ const styles = StyleSheet.create({
   },
   msgBox: {
     flexDirection: 'row',
-    alignItems: 'center',
+    // Top-aligned, not centred: the details block underneath can be a dozen
+    // lines tall, and an icon floating halfway down it reads as a bug.
+    alignItems: 'flex-start',
     borderRadius: radius.DEFAULT,
     padding: 12,
     marginBottom: spacing.stackMd,

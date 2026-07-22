@@ -13,6 +13,7 @@ import { FormError } from '@/components/FormError';
 import { PasswordField } from '@/components/PasswordField';
 import { showHeld } from '@/components/HeldNotice';
 import { authErrorDetail, describeAuthError } from '@/utils/authErrors';
+import { authDiagnostics } from '@/utils/authDiagnostics';
 import { firstPasswordProblem } from '@/utils/password';
 import { supabase } from '@/lib/supabase';
 import { Sentry } from '@/lib/sentry';
@@ -36,6 +37,7 @@ export default function NewPassword() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const [errorDiag, setErrorDiag] = useState<string | null>(null);
 
   const liveProblem = useMemo(
     () =>
@@ -51,6 +53,7 @@ export default function NewPassword() {
   const handleSave = async () => {
     setError(null);
     setErrorDetail(null);
+    setErrorDiag(null);
 
     if (!password || !confirmPassword) {
       setError(t('fill_all_fields'));
@@ -84,6 +87,7 @@ export default function NewPassword() {
     } catch (e) {
       setError(describeAuthError(e, 'authed'));
       setErrorDetail(authErrorDetail(e));
+      setErrorDiag(authDiagnostics(e, { action: 'password_recovery_set' }));
       Sentry.captureException(e);
     } finally {
       setSaving(false);
@@ -157,7 +161,7 @@ export default function NewPassword() {
               <Txt variant="sub" color={c.muted} style={{ marginLeft: 4 }}>{liveProblem}</Txt>
             )}
 
-            <FormError message={error} detail={errorDetail} />
+            <FormError message={error} detail={errorDetail} diagnostics={errorDiag} />
 
             <Button
               label={saving ? t('saving') : t('set_password')}

@@ -34,6 +34,19 @@ import { supabase } from '@/lib/supabase';
 // Only the scheme's own slashes are touched. `exp://10.0.0.2:8081/--/auth/confirm`
 // and `https://host/auth/confirm` already have a host and pass through unchanged.
 export function authRedirectUrl(): string {
+  // An escape hatch for the one case createURL cannot get right: developing in
+  // a browser. There it returns `http://localhost:8081/auth/confirm`, which is
+  // honest but useless — that URL is not in the project's redirect allowlist,
+  // and GoTrue answers an unlisted redirect by quietly falling back to the
+  // project's Site URL instead of refusing it. The mail arrives, the link goes
+  // somewhere else, and nothing anywhere reports a problem.
+  //
+  // Setting EXPO_PUBLIC_AUTH_REDIRECT_URL=kindred://auth/confirm in .env makes
+  // every environment send the address that is actually allowlisted. Unset,
+  // behaviour is exactly what it was.
+  const override = process.env.EXPO_PUBLIC_AUTH_REDIRECT_URL;
+  if (override) return override.replace(':///', '://');
+
   return Linking.createURL('/auth/confirm').replace(':///', '://');
 }
 

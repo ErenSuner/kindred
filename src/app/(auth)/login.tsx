@@ -12,6 +12,8 @@ import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { PasswordField } from '@/components/PasswordField';
 import { authErrorCode, authErrorDetail, describeAuthError } from '@/utils/authErrors';
+import { authDiagnostics } from '@/utils/authDiagnostics';
+import { ErrorDetails } from '@/components/ErrorDetails';
 import { authRedirectUrl } from '@/utils/authLinks';
 import { isOffline } from '@/utils/outbox';
 import { supabase } from '@/lib/supabase';
@@ -31,6 +33,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const [errorDiag, setErrorDiag] = useState<string | null>(null);
   const [noticeMsg, setNoticeMsg] = useState('');
   const [resetLeft, setResetLeft] = useState(0);
 
@@ -43,6 +46,7 @@ export default function Login() {
   const handleForgotPassword = async () => {
     setErrorMsg('');
     setErrorDetail(null);
+    setErrorDiag(null);
     setNoticeMsg('');
     if (!EMAIL.test(email.trim())) {
       setErrorMsg(t('reset_enter_email'));
@@ -67,6 +71,13 @@ export default function Login() {
       if (code?.startsWith('over_') || isOffline(err)) {
         setErrorMsg(describeAuthError(err, 'public', 'send that email'));
         setErrorDetail(authErrorDetail(err, authRedirectUrl()));
+        setErrorDiag(
+          authDiagnostics(err, {
+            action: 'password_reset',
+            email: email.trim(),
+            redirect: authRedirectUrl(),
+          }),
+        );
         return;
       }
       // Still worth knowing about, even though the screen stays quiet.
@@ -86,6 +97,7 @@ export default function Login() {
     setLoading(true);
     setErrorMsg('');
     setErrorDetail(null);
+    setErrorDiag(null);
     setNoticeMsg('');
 
     try {
@@ -104,6 +116,10 @@ export default function Login() {
       // or this screen becomes a tool for finding out who is registered.
       setErrorMsg(describeAuthError(err, 'public', 'sign you in'));
       setErrorDetail(authErrorDetail(err));
+      // The sentence above is deliberately vague — it has to be, on a screen
+      // anyone can reach. The report is not: whoever is looking at it is the
+      // one who just failed to sign in to their own account.
+      setErrorDiag(authDiagnostics(err, { action: 'sign_in', email: email.trim() }));
       Sentry.captureException(err);
     } finally {
       setLoading(false);
@@ -139,7 +155,7 @@ export default function Login() {
           <Card style={styles.card}>
             {errorMsg ? (
               <View style={[styles.errorBox, { backgroundColor: c.dangerWash }]}>
-                <Icon name="error-outline" size={20} color={c.danger} />
+                <Icon name="error-outline" size={20} color={c.danger} style={{ marginTop: 1 }} />
                 <View style={{ flex: 1, marginLeft: 8 }}>
                   <Txt variant="sub" color={c.danger}>{errorMsg}</Txt>
                   {errorDetail ? (
@@ -147,13 +163,14 @@ export default function Login() {
                       {errorDetail}
                     </Txt>
                   ) : null}
+                  <ErrorDetails report={errorDiag} />
                 </View>
               </View>
             ) : null}
 
             {noticeMsg ? (
               <View style={[styles.errorBox, { backgroundColor: c.goodWash }]}>
-                <Icon name="mark-email-read" size={20} color={c.good} />
+                <Icon name="mark-email-read" size={20} color={c.good} style={{ marginTop: 1 }} />
                 <Txt variant="sub" color={c.good} style={{ flex: 1, marginLeft: 8 }}>
                   {noticeMsg}
                 </Txt>
@@ -245,7 +262,9 @@ const styles = StyleSheet.create({
   },
   errorBox: {
     flexDirection: 'row',
-    alignItems: 'center',
+    // Top-aligned, not centred: the details block underneath can be a dozen
+    // lines tall, and an icon floating halfway down it reads as a bug.
+    alignItems: 'flex-start',
     borderRadius: radius.DEFAULT,
     padding: 12,
     marginBottom: spacing.stackMd,
