@@ -1,10 +1,18 @@
 import { Holiday, HolidayRule } from '@/data/holidays';
-import { getOrdinal } from '@/utils/dates';
+import { formatOccurrenceDate } from '@/utils/dates';
+import i18n from '@/lib/i18n';
 
-const MONTHS_FULL = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
+// The catalog stores English names, which is what the ids were built from. The
+// translated name lives in the locale files under the holiday's own id, and the
+// stored name is the fallback — a holiday added to the catalog before its
+// translation lands still reads sensibly.
+export function holidayName(holiday: Holiday): string {
+  return i18n.t(`holiday_${holiday.id}`, { defaultValue: holiday.name });
+}
+
+export function holidayBlurb(holiday: Holiday): string {
+  return i18n.t(`holiday_blurb_${holiday.id}`, { defaultValue: holiday.blurb });
+}
 
 export type UpcomingHoliday = {
   holiday: Holiday;
@@ -51,8 +59,9 @@ export function nextHolidayDates(rule: HolidayRule, count: number, from: Date = 
   return out;
 }
 
+// Written the same way as every other date in the app, in the same language.
 export function formatHolidayDate(date: Date): string {
-  return `${MONTHS_FULL[date.getMonth()]} ${getOrdinal(date.getDate())}, ${date.getFullYear()}`;
+  return formatOccurrenceDate(date);
 }
 
 export function resolveHoliday(holiday: Holiday, from: Date = startOfToday()): UpcomingHoliday {

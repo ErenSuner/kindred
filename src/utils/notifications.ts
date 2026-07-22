@@ -1,14 +1,33 @@
 import * as Notifications from 'expo-notifications';
-import { MyEvent, Person } from '@/data/mock';
+import { MyEvent, Person, SimpleBirthday } from '@/data/mock';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DAY_OF, Nudge, offsetDaysFor, parseNudge, parseNudges } from '@/utils/nudges';
 import { Recurrence, YEARLY } from '@/utils/recurrence';
-import { getUpcomingOccurrences } from '@/utils/dates';
+import { formatClock, getUpcomingOccurrences } from '@/utils/dates';
 import { Weekday, isRoutine } from '@/utils/routines';
-import { HEADS_UP_HOURS, dayOfFirings, formatTimeOfDay } from '@/utils/eventTime';
+import { HEADS_UP_HOURS, dayOfFirings } from '@/utils/eventTime';
 import { Holiday } from '@/data/holidays';
-import { formatHolidayDate, nextHolidayDates } from '@/utils/holidays';
+import { formatHolidayDate, holidayName, nextHolidayDates } from '@/utils/holidays';
+import i18n from '@/lib/i18n';
+
+// Notification text is written when the reminder is scheduled, not when it
+// arrives, so it is translated here rather than at delivery. Changing the app's
+// language reschedules everything — see NotificationSync.
+//
+// "in N days" / "tomorrow" is worked out from the lead time rather than reusing
+// the nudge's own label ("1 week before"), which reads backwards inside a
+// sentence and only ever had its " before" trimmed off in English.
+function leadPhrase(key: string, offsetDays: number, vars: Record<string, unknown>): string {
+  if (offsetDays === 1) return i18n.t(`${key}_tomorrow`, vars);
+  return i18n.t(`${key}_days`, { ...vars, n: offsetDays });
+}
+
+// " at 18:30" — the same clock the rest of the app shows, or nothing at all for
+// something that only has a day.
+function atTime(time: { hour: number; minute: number } | null | undefined): string {
+  return time ? i18n.t('notif_at', { time: formatClock(time) }) : '';
+}
 
 // How many notifications to schedule in advance. iOS has a limit of 64.
 export const MAX_NOTIFICATIONS = 60;
@@ -38,6 +57,37 @@ export async function getReminderHour(): Promise<number> {
 }
 
 export type PendingNotification = { title: string; body: string; date: Date; id: string };
+
+// A standalone birthday carries no Person, but the birthday-reminder maths lives
+// in the people collector. Dressing each one as a minimal Person with a single
+// birthday special day lets it schedule through exactly the same path —
+// birthday wording, turning age, yearly repeat — with nothing duplicated.
+//
+// Every caller of syncNotifications has to include these. Leaving them out
+// doesn't schedule fewer reminders, it deletes the ones already booked, because
+// the sync cancels everything it isn't told about.
+export function birthdaysAsPeople(birthdays: SimpleBirthday[]): Person[] {
+  return birthdays.map(
+    (b) =>
+      ({
+        specialDays: [
+          {
+            id: b.id,
+            title: 'Birthday',
+            date: b.date,
+            icon: 'cake',
+            accent: 'tertiary',
+            originalDate: b.originalDate,
+            isBirthday: true,
+            recurrence: YEARLY,
+            nudges: b.nudges,
+            turningAge: b.turningAge,
+          },
+        ],
+        name: b.name,
+      }) as unknown as Person,
+  );
+}
 
 // Nudges fire relative to an occurrence — a preset or a custom lead time is N
 // days before it. A legacy absolute date is pinned to itself and ignores the
@@ -96,8 +146,10 @@ function collectPeopleNotifications(people: Person[], hour: number): Collected {
 
       const isBirthday = sd.isBirthday === true;
       const recurrence = sd.recurrence ?? YEARLY;
-      const title = isBirthday ? `Birthday Reminder: ${person.name}` : `Special Day: ${person.name}`;
-      const what = isBirthday ? 'birthday' : sd.title;
+      const title = isBirthday
+        ? i18n.t('notif_title_birthday', { name: person.name })
+        : i18n.t('notif_title_special', { name: person.name });
+      const what = isBirthday ? i18n.t('notif_word_birthday') : sd.title;
 
       for (const nudge of nudgesFor(sd.nudges)) {
         const offsetDays = offsetDaysFor(nudge) ?? 0;
@@ -113,8 +165,8 @@ function collectPeopleNotifications(people: Person[], hour: number): Collected {
             title,
             body:
               nudge.value === DAY_OF
-                ? `It's ${person.name}'s ${what} today!`
-                : `${person.name}'s ${what} is ${nudge.label.replace(' before', '')} away.`,
+                ? i18n.t('notif_person_today', { name: person.name, what })
+                : leadPhrase('notif_person_lead', offsetDays, { name: person.name, what }),
             repeat: spec,
             hour,
             minute: 0,
@@ -124,7 +176,7 @@ function collectPeopleNotifications(people: Person[], hour: number): Collected {
 
         // Only a fixed run of dates gets the age, because it is rewritten every
         // time the app schedules.
-        const turningStr = isBirthday && sd.turningAge ? ` (turning ${sd.turningAge})` : '';
+        const age = isBirthday && sd.turningAge ? sd.turningAge : null;
 
         notificationDatesFor(dateStr, recurrence, nudge, hour).forEach((date, i) => {
           dated.push({
@@ -132,8 +184,12 @@ function collectPeopleNotifications(people: Person[], hour: number): Collected {
             title,
             body:
               nudge.value === DAY_OF
-                ? `It's ${person.name}'s ${what} today!${turningStr}`
-                : `${person.name}'s ${what}${turningStr} is on ${sd.date}.`,
+                ? age
+                  ? i18n.t('notif_person_today_age', { name: person.name, what, age })
+                  : i18n.t('notif_person_today', { name: person.name, what })
+                : age
+                  ? i18n.t('notif_person_dated_age', { name: person.name, what, age, date: sd.date })
+                  : i18n.t('notif_person_dated', { name: person.name, what, date: sd.date }),
             date,
           });
         });
@@ -153,7 +209,7 @@ function collectMyEventNotifications(myEvents: MyEvent[], hour: number): Collect
     // collectRoutineTriggers.
     if (isRoutine(event.weekdays)) continue;
 
-    const at = event.timeOfDay ? ` at ${formatTimeOfDay(event.timeOfDay)}` : '';
+    const at = atTime(event.timeOfDay);
 
     for (const nudge of nudgesFor(event.nudges)) {
       // The day itself is where a time of day changes things: instead of one
@@ -172,15 +228,15 @@ function collectMyEventNotifications(myEvents: MyEvent[], hour: number): Collect
 
         const body =
           firing.kind === 'imminent'
-            ? `${event.title} is in ${HEADS_UP_HOURS} hours${at}.`
+            ? i18n.t('notif_event_imminent', { title: event.title, hours: HEADS_UP_HOURS, at })
             : nudge.value === DAY_OF
-            ? `${event.title} is today${at}!`
-            : `${event.title} is ${nudge.label.replace(' before', '')} away${at}.`;
+              ? i18n.t('notif_event_today', { title: event.title, at })
+              : leadPhrase('notif_event_lead', offsetDays - firing.dayOffset, { title: event.title, at });
 
         if (spec) {
           repeating.push({
             id: `me_${event.id}_${nudge.value}_${firing.kind}`,
-            title: 'Your Reminder',
+            title: i18n.t('notif_title_event'),
             body,
             repeat: spec,
             hour: firing.hour,
@@ -195,11 +251,11 @@ function collectMyEventNotifications(myEvents: MyEvent[], hour: number): Collect
         }).forEach((date, i) => {
           dated.push({
             id: `me_${event.id}_${nudge.value}_${firing.kind}_${i}`,
-            title: 'Your Reminder',
+            title: i18n.t('notif_title_event'),
             // A one-off can name its actual date; a repeating one can't.
             body:
               firing.kind === 'heads-up' && nudge.value !== DAY_OF
-                ? `${event.title} is on ${event.date}${at}.`
+                ? i18n.t('notif_event_dated', { title: event.title, date: event.date, at })
                 : body,
             date,
           });
@@ -291,7 +347,7 @@ function collectRoutineTriggers(myEvents: MyEvent[], hour: number): RoutineTrigg
   for (const event of myEvents) {
     if (!isRoutine(event.weekdays)) continue;
 
-    const at = event.timeOfDay ? ` at ${formatTimeOfDay(event.timeOfDay)}` : '';
+    const at = atTime(event.timeOfDay);
 
     for (const nudge of nudgesFor(event.nudges)) {
       const offsetDays = offsetDaysFor(nudge) ?? 0;
@@ -313,15 +369,13 @@ function collectRoutineTriggers(myEvents: MyEvent[], hour: number): RoutineTrigg
 
           triggers.push({
             id: `rt_${event.id}_${nudge.value}_${firing.kind}_${weekday}`,
-            title: 'Your Routine',
+            title: i18n.t('notif_title_routine'),
             body:
               firing.kind === 'imminent'
-                ? `${event.title} is in ${HEADS_UP_HOURS} hours${at}.`
+                ? i18n.t('notif_event_imminent', { title: event.title, hours: HEADS_UP_HOURS, at })
                 : offsetDays === 0
-                ? `${event.title} is today${at}.`
-                : offsetDays === 1
-                ? `${event.title} is tomorrow${at}.`
-                : `${event.title} is in ${offsetDays} days${at}.`,
+                  ? i18n.t('notif_routine_today', { title: event.title, at })
+                  : leadPhrase('notif_routine_lead', offsetDays, { title: event.title, at }),
             repeat: { every: 'week', weekday: fireOn as Weekday },
             hour: firing.hour,
             minute: firing.minute,
@@ -334,31 +388,58 @@ function collectRoutineTriggers(myEvents: MyEvent[], hour: number): RoutineTrigg
   return triggers;
 }
 
-function collectHolidayNotifications(holidays: Holiday[], hour: number): PendingNotification[] {
-  const pending: PendingNotification[] = [];
+function collectHolidayNotifications(holidays: Holiday[], hour: number): Collected {
+  const dated: PendingNotification[] = [];
+  const repeating: RepeatingNotification[] = [];
   const now = new Date();
 
   for (const holiday of holidays) {
-    for (const date of nextHolidayDates(holiday.rule, HOLIDAY_YEARS_AHEAD)) {
-      for (const offset of HOLIDAY_OFFSET_DAYS) {
+    const name = holidayName(holiday);
+
+    for (const offset of HOLIDAY_OFFSET_DAYS) {
+      // A holiday pinned to a date lands on the same day every year, so its
+      // reminder is one yearly slot that never expires. Ten of those used to
+      // cost forty dated slots and still ran out after two years.
+      if (holiday.rule.kind === 'fixed') {
+        const first = nextHolidayDates(holiday.rule, 1)[0];
+        const fireOn = new Date(first.getFullYear(), first.getMonth(), first.getDate());
+        fireOn.setDate(fireOn.getDate() - offset);
+
+        repeating.push({
+          id: `hd_${holiday.id}_${offset}`,
+          title: name,
+          body:
+            offset === 1
+              ? i18n.t('notif_holiday_tomorrow', { name })
+              : i18n.t('notif_holiday_week', { name }),
+          repeat: { every: 'year', month: fireOn.getMonth() + 1, day: fireOn.getDate() },
+          hour,
+          minute: 0,
+        });
+        continue;
+      }
+
+      // Mother's Day and the like move every year, so each occurrence has to be
+      // booked on its own date.
+      for (const date of nextHolidayDates(holiday.rule, HOLIDAY_YEARS_AHEAD)) {
         const at = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, 0, 0, 0);
         at.setDate(at.getDate() - offset);
         if (at.getTime() <= now.getTime()) continue;
 
-        pending.push({
+        dated.push({
           id: `hd_${holiday.id}_${date.getFullYear()}_${offset}`,
-          title: holiday.name,
+          title: name,
           body:
             offset === 1
-              ? `${holiday.name} is tomorrow — a good moment to reach out.`
-              : `${holiday.name} is a week away, on ${formatHolidayDate(date)}.`,
+              ? i18n.t('notif_holiday_tomorrow', { name })
+              : i18n.t('notif_holiday_week_on', { name, date: formatHolidayDate(date) }),
           date: at,
         });
       }
     }
   }
 
-  return pending;
+  return { dated, repeating };
 }
 
 // What should be scheduled, worked out without touching the notification API.
@@ -384,6 +465,7 @@ export function planNotifications(
 ): NotificationPlan {
   const people$ = collectPeopleNotifications(people, hour);
   const events$ = collectMyEventNotifications(myEvents, hour);
+  const holidays$ = collectHolidayNotifications(holidays, hour);
 
   // Repeating triggers are booked first. They cost one slot each rather than
   // six, which is what stops a handful of birthdays from filling the whole
@@ -392,12 +474,13 @@ export function planNotifications(
     ...collectRoutineTriggers(myEvents, hour),
     ...people$.repeating,
     ...events$.repeating,
+    ...holidays$.repeating,
   ].slice(0, MAX_NOTIFICATIONS);
 
   const all = [
     ...people$.dated,
     ...events$.dated,
-    ...collectHolidayNotifications(holidays, hour),
+    ...holidays$.dated,
   ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
   const room = Math.max(0, MAX_NOTIFICATIONS - routines.length);
@@ -439,11 +522,42 @@ function repeatTriggerInput(item: RepeatingNotification): Notifications.Notifica
   }
 }
 
+// Everything scheduled, as one comparable string. Two runs with the same
+// signature would cancel and rebook the identical set of reminders, so the
+// second one is skipped.
+function signatureOf(plan: NotificationPlan, hour: number): string {
+  return JSON.stringify([
+    hour,
+    plan.routines.map((r) => [r.id, r.title, r.body, r.hour, r.minute, r.repeat]),
+    plan.dated.map((d) => [d.id, d.title, d.body, d.date.getTime()]),
+  ]);
+}
+
+// Each provider settles separately on a cold start, so this is called several
+// times in a row with a growing picture. Every call cancels everything before
+// rescheduling, which means two overlapping runs can cancel work the other one
+// is halfway through writing. Runs are queued end to end, and a run that would
+// reproduce the last applied plan does nothing at all.
+let syncQueue: Promise<void> = Promise.resolve();
+let appliedSignature: string | null = null;
+
 // Cancels every scheduled notification and reschedules from scratch, so this has
 // to be given the complete picture — people, the user's own events AND the
 // shared occasions — in one call. Two partial callers would wipe each other's
 // reminders.
-export async function syncNotifications(
+export function syncNotifications(
+  people: Person[],
+  myEvents: MyEvent[] = [],
+  holidays: Holiday[] = [],
+  nudgesEnabled?: boolean,
+): Promise<void> {
+  syncQueue = syncQueue
+    .catch(() => {})
+    .then(() => runSync(people, myEvents, holidays, nudgesEnabled));
+  return syncQueue;
+}
+
+async function runSync(
   people: Person[],
   myEvents: MyEvent[] = [],
   holidays: Holiday[] = [],
@@ -457,6 +571,17 @@ export async function syncNotifications(
     isEnabled = val === null ? true : val === 'true';
   }
 
+  const hour = await getReminderHour();
+  const plan = isEnabled
+    ? planNotifications(people, myEvents, holidays, hour)
+    : { dated: [], routines: [], dropped: 0 };
+
+  // Worked out before anything is cancelled: if this run would rebuild exactly
+  // what is already scheduled, leaving it alone is both cheaper and safer than
+  // tearing it down and writing it again.
+  const signature = isEnabled ? signatureOf(plan, hour) : 'off';
+  if (signature === appliedSignature) return;
+
   // 1. Cancel all existing scheduled notifications to avoid duplicates
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
@@ -464,12 +589,14 @@ export async function syncNotifications(
     console.warn('Could not cancel notifications', e);
   }
 
+  // Recorded before the writes rather than after: a failure partway through
+  // leaves the schedule in an unknown state, and the next run has to redo it.
+  appliedSignature = null;
+
   if (!isEnabled) {
+    appliedSignature = 'off';
     return;
   }
-
-  const hour = await getReminderHour();
-  const plan = planNotifications(people, myEvents, holidays, hour);
 
   // Route everything through the 'reminders' channel created at startup so
   // Android gives it the right importance and sound. No-op on iOS.
@@ -496,10 +623,20 @@ export async function syncNotifications(
           body: notification.body,
           sound: true,
         },
-        trigger: { date: notification.date, channelId } as any,
+        // `type` is not optional. Without it expo walks past every schedulable
+        // trigger, falls through to the Android channel branch, and the
+        // notification is delivered on the spot — which is how a fresh account
+        // received a year of reminders the moment it signed in.
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: notification.date,
+          channelId,
+        } as any,
       });
     } catch (e) {
       console.warn(`Failed to schedule notification for ${notification.title}:`, e);
     }
   }
+
+  appliedSignature = signature;
 }

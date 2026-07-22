@@ -14,7 +14,7 @@ import { Button } from '@/components/Button';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DEFAULT_REMINDER_HOUR, REMINDER_HOUR_KEY, getReminderHour, syncNotifications } from '@/utils/notifications';
+import { DEFAULT_REMINDER_HOUR, REMINDER_HOUR_KEY, birthdaysAsPeople, getReminderHour, syncNotifications } from '@/utils/notifications';
 import { formatClockHour } from '@/utils/dates';
 import { useNotificationPermission } from '@/utils/notificationPermission';
 import { AvatarPicker } from '@/components/AvatarPicker';
@@ -22,6 +22,7 @@ import { FormError } from '@/components/FormError';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
 import { usePeople } from '@/context/PeopleContext';
 import { useEvents } from '@/context/EventsContext';
+import { useBirthdays } from '@/context/BirthdaysContext';
 import { useHolidays } from '@/context/HolidaysContext';
 import { HOLIDAYS } from '@/data/holidays';
 import { Toggle } from '@/components/Toggle';
@@ -120,12 +121,15 @@ export default function Settings() {
   const { user, signOut } = useAuth();
   const { people } = usePeople();
   const { events, routines } = useEvents();
+  const { birthdays } = useBirthdays();
   const { enabledIds } = useHolidays();
 
   // syncNotifications cancels everything and reschedules from scratch, so every
   // caller has to hand over the complete picture. Leaving routines out here
-  // silently wiped them until the next app launch.
+  // silently wiped them until the next app launch — and standalone birthdays,
+  // which carry no Person, went the same way until they were added here too.
   const ownEvents = [...events, ...routines];
+  const allPeople = [...people, ...birthdaysAsPeople(birthdays)];
 
   useEffect(() => {
     AsyncStorage.getItem('@settings_nudges').then(val => {
@@ -140,14 +144,14 @@ export default function Settings() {
     await AsyncStorage.setItem(REMINDER_HOUR_KEY, String(hour));
     // Everything already scheduled is pinned to the old time, so it all has to
     // be laid down again.
-    syncNotifications(people, ownEvents, HOLIDAYS.filter(h => enabledIds.includes(h.id)), nudges);
+    syncNotifications(allPeople, ownEvents, HOLIDAYS.filter(h => enabledIds.includes(h.id)), nudges);
   };
 
   const handleToggleNudges = async (val: boolean) => {
     setNudges(val);
     await AsyncStorage.setItem('@settings_nudges', String(val));
     // Pass the setting directly to sync — reading it back could race the write.
-    syncNotifications(people, ownEvents, HOLIDAYS.filter(h => enabledIds.includes(h.id)), val);
+    syncNotifications(allPeople, ownEvents, HOLIDAYS.filter(h => enabledIds.includes(h.id)), val);
   };
 
   const userEmail = user?.email ?? '';
