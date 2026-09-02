@@ -12,7 +12,7 @@
 // for the user; it is written for whoever has to fix it.
 
 import { Platform } from 'react-native';
-import { isOffline } from '@/utils/outbox';
+import { isOffline } from '@/utils/loadError';
 import { authErrorCode, codeFromMessage } from '@/utils/authErrors';
 
 // A character in a typed address that a mail server will refuse, described

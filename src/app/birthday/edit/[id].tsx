@@ -1,221 +1,125 @@
-import { describeWriteError } from '@/utils/loadError';
+import { useState } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
+
 import { Button } from '@/components/Button';
-import { Card } from '@/components/Card';
-import { DateFields, DateValue } from '@/components/DateFields';
+import {
+  BirthdayForm,
+  fromStoredDate,
+  toStoredDate,
+  validate,
+  type BirthdayDraft,
+} from '@/components/BirthdayForm';
 import { FormError } from '@/components/FormError';
 import { Icon } from '@/components/Icon';
-import { ReminderEditor } from '@/components/ReminderEditor';
 import { Txt } from '@/components/Txt';
 import { showHeld } from '@/components/HeldNotice';
-import { useBirthdays, EMOJI_CHOICES } from '@/context/BirthdaysContext';
-import { radius, spacing } from '@/theme/tokens';
+import { useBirthdays } from '@/context/BirthdaysContext';
+import { spacing } from '@/theme/tokens';
 import { useTheme } from '@/theme/ThemeContext';
-import { fonts } from '@/theme/type';
-import { Nudge, parseNudges, serializeNudges } from '@/utils/nudges';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import Animated, { FadeInDown, SlideInDown } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTranslation } from "react-i18next";
-import i18n from "@/lib/i18n";
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  const { c } = useTheme();
-  return (
-    <Txt variant="eyebrow" color={c.faint} style={styles.fieldLabel}>
-      {children}
-    </Txt>
-  );
-}
+import { describeWriteError } from '@/utils/loadError';
+import { leadDaysFor } from '@/utils/importance';
 
 export default function EditBirthday() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { c, floatShadow } = useTheme();
+  const { c } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getBirthday, updateBirthday, deleteBirthdayWithUndo } = useBirthdays();
-  const birthday = getBirthday(id ?? '');
 
-  const [name, setName] = useState('');
-  const [emoji, setEmoji] = useState('🎂');
-  const [date, setDate] = useState<DateValue>({ day: null, month: null, year: null });
-  const { day, month, year } = date;
-  const [reminders, setReminders] = useState<Nudge[]>([]);
-  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const birthday = getBirthday(String(id));
+
+  const [draft, setDraft] = useState<BirthdayDraft | null>(
+    birthday
+      ? {
+          name: birthday.name,
+          date: fromStoredDate(birthday.originalDate),
+          importance: birthday.importance,
+        }
+      : null,
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hydrated, setHydrated] = useState(false);
 
-  useEffect(() => {
-    if (!birthday || hydrated) return;
-    setName(birthday.name);
-    setEmoji(birthday.emoji);
-    setReminders(parseNudges(birthday.nudges));
+  // Reached by a stale link, or after the row was deleted from under this
+  // screen. Nothing useful to edit, so say so rather than showing a blank form.
+  if (!birthday || !draft) {
+    return (
+      <View style={[styles.missing, { backgroundColor: c.bg, paddingTop: insets.top + 60 }]}>
+        <Txt variant="heading">{t('birthday_not_found')}</Txt>
+        <Button label={t('back')} variant="quiet" onPress={() => router.back()} />
+      </View>
+    );
+  }
 
-    const [y, m, d] = birthday.originalDate.split('-').map(Number);
-    setDate({ year: y, month: m, day: d });
-    setHydrated(true);
-  }, [birthday, hydrated]);
+  const save = async () => {
+    const problem = validate(draft);
+    if (problem) {
+      setError(t(problem));
+      return;
+    }
 
-  const hasYear = year !== null && year !== 1000;
-
-  const eventDate = (): Date | null => {
-    if (!day || !month) return null;
-    const y = hasYear ? (year as number) : new Date().getFullYear();
-    return new Date(y, month - 1, day);
-  };
-
-  const handleSave = async () => {
     setError(null);
-
-    if (!name.trim()) {
-      setError(i18n.t('give_the_birthday_a_name'));
-      return;
-    }
-    if (!day || !month) {
-      setError(i18n.t('pick_a_day_and_a_month'));
-      return;
-    }
-
-    const y = hasYear ? year : 1000;
-    const formattedDate = `${y}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-
     setSaving(true);
     try {
-      await updateBirthday(id ?? '', {
-        name: name.trim(),
-        date: formattedDate,
-        emoji,
-        nudges: serializeNudges(reminders),
+      await updateBirthday(birthday.id, {
+        name: draft.name.trim(),
+        date: toStoredDate(draft.date),
+        importance: draft.importance,
       });
       router.back();
-      showHeld(t('is_remembered', { title: name.trim() }), i18n.t('reminders_updated'));
+      const lead = leadDaysFor(draft.importance);
+      showHeld(
+        t('is_remembered', { title: draft.name.trim() }),
+        lead > 0 ? t('remind_lead', { n: lead }) : t('remind_on_the_day'),
+      );
     } catch (e) {
-      console.error(e);
       setError(describeWriteError(e));
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = () => {
-    if (!birthday) return;
-    setDeleteConfirmVisible(false);
+  // No confirmation dialog: the undo window is the confirmation, and it does
+  // not make the user answer a question about something they have not done yet.
+  const remove = () => {
     deleteBirthdayWithUndo(birthday);
     router.back();
   };
 
-  if (!birthday) {
-    return (
-      <View style={{ flex: 1, backgroundColor: c.bg }}>
-        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-          <Pressable onPress={() => router.back()} hitSlop={8}>
-            <Icon name="arrow-back" size={24} color={c.muted} />
-          </Pressable>
-        </View>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.containerMobile }}>
-          <Icon name="cake" size={44} color={c.lineStrong} />
-          <Txt variant="heading" style={{ marginTop: 16, textAlign: 'center' }}>
-            {t('birthday_not_found')}</Txt>
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => router.back()} hitSlop={8}>
+        <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('back')}>
           <Icon name="arrow-back" size={24} color={c.muted} />
         </Pressable>
-        <Txt variant="title" style={{ flex: 1, textAlign: 'center' }}>
-          {t('edit_birthday')}</Txt>
-        <Pressable onPress={() => setDeleteConfirmVisible(true)} hitSlop={8}>
-          <Icon name="delete-outline" size={24} color={c.danger} />
-        </Pressable>
+        <Txt variant="title" style={styles.headerTitle}>
+          {t('edit_birthday')}
+        </Txt>
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
-          contentContainerStyle={{ padding: spacing.containerMobile, gap: spacing.stackLg, paddingBottom: insets.bottom + 40 }}
-          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]}
           keyboardShouldPersistTaps="handled"
         >
-          <Animated.View entering={FadeInDown.duration(500).delay(100)}>
-            <Card style={{ gap: spacing.stackMd }}>
-              <View style={{ gap: 6 }}>
-                <FieldLabel>{t('name')}</FieldLabel>
-                <TextInput
-                  value={name}
-                  onChangeText={setName}
-                  placeholder={t('e_g_aunt_ayse')}
-                  placeholderTextColor={c.faint}
-                  style={[styles.input, { backgroundColor: c.surfaceAlt, color: c.text }]}
-                />
-              </View>
-
-              <View style={{ gap: 6 }}>
-                <FieldLabel>{t('emoji')}</FieldLabel>
-                <View style={styles.chipWrap}>
-                  {EMOJI_CHOICES.map((e) => {
-                    const active = emoji === e;
-                    return (
-                      <Pressable
-                        key={e}
-                        onPress={() => setEmoji(e)}
-                        style={[
-                          styles.emojiChip,
-                          {
-                            backgroundColor: active ? c.flameWash : c.surfaceAlt,
-                            borderColor: active ? c.flame : 'transparent',
-                          },
-                        ]}
-                      >
-                        <Txt style={{ fontSize: 22, lineHeight: 28 }}>{e}</Txt>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-
-              <View style={{ gap: 6 }}>
-                <FieldLabel>{t('date_year_optional')}</FieldLabel>
-                <DateFields value={date} onChange={setDate} yearMode="past" allowSkipYear />
-              </View>
-
-              <ReminderEditor reminders={reminders} onChange={setReminders} eventDate={eventDate()} />
-            </Card>
-          </Animated.View>
+          <BirthdayForm draft={draft} onChange={setDraft} />
 
           <FormError message={error} />
 
-          <Animated.View entering={FadeInDown.duration(500).delay(200)} style={{ alignItems: 'center' }}>
-            <Button label={saving ? i18n.t('saving') : i18n.t('save_changes')} icon="check" onPress={handleSave} disabled={saving} />
-          </Animated.View>
+          <Button
+            label={saving ? t('saving') : t('save')}
+            onPress={save}
+            disabled={saving}
+            fullWidth
+          />
+
+          <Button label={t('delete')} variant="danger" icon="delete-outline" onPress={remove} fullWidth />
         </ScrollView>
       </KeyboardAvoidingView>
-
-      <Modal visible={deleteConfirmVisible} transparent animationType="fade">
-        <Pressable style={[styles.modalOverlay, { backgroundColor: c.overlay }]} onPress={() => setDeleteConfirmVisible(false)}>
-          <Animated.View
-            entering={SlideInDown.duration(250)}
-            style={[styles.confirmSheet, { backgroundColor: c.surface }, floatShadow]}
-          >
-            <Pressable onPress={(e) => e.stopPropagation()}>
-              <Txt variant="heading" style={{ marginBottom: 8 }}>
-                {t('delete_this_birthday')}</Txt>
-              <Txt variant="body" color={c.muted} style={{ marginBottom: 24 }}>
-                {t('delete_birthday_body', { name: birthday.name })}</Txt>
-              <View style={{ gap: 8 }}>
-                <Button label={t('delete')} icon="delete-outline" variant="dangerSolid" fullWidth onPress={handleDelete} />
-                <Button label={t('keep_it')} variant="quiet" fullWidth onPress={() => setDeleteConfirmVisible(false)} />
-              </View>
-            </Pressable>
-          </Animated.View>
-        </Pressable>
-      </Modal>
     </View>
   );
 }
@@ -225,33 +129,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.containerMobile,
-    paddingBottom: spacing.stackMd,
+    paddingBottom: 12,
   },
-  fieldLabel: { marginLeft: 2 },
-  input: {
-    borderRadius: radius.DEFAULT,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontFamily: fonts.figtreeRegular,
-    fontSize: 16,
+  headerTitle: { flex: 1, textAlign: 'center', marginRight: 24 },
+  scroll: {
+    padding: spacing.containerMobile,
+    gap: spacing.stackLg,
   },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  emojiChip: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.full,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalOverlay: {
+  missing: {
     flex: 1,
-    justifyContent: 'flex-end',
-  },
-  confirmSheet: {
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    padding: 24,
-    paddingBottom: 48,
+    alignItems: 'center',
+    gap: 20,
+    padding: spacing.containerMobile,
   },
 });

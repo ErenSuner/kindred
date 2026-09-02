@@ -12,8 +12,7 @@
 // releases.
 
 import i18n from '@/lib/i18n';
-import { isOffline } from '@/utils/outbox';
-import { describeWriteError } from '@/utils/loadError';
+import { describeWriteError, isOffline } from '@/utils/loadError';
 
 // Where the message will be shown, which decides how much it may admit.
 //

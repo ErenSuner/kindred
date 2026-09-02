@@ -47,14 +47,6 @@ export type Palette = {
   /** Confetti fleck accent on celebration cards. */
   partyDot: string;
 
-  /** Shared-occasion (holiday) accent — cool and communal, deliberately set
-   *  apart from the warm personal amber. Frame + icon for shared days. */
-  sharedAccent: string;
-  sharedWash: string;
-  /** Cool celebration sweep for shared-occasion cards. */
-  sharedGradient: string[];
-  sharedDot: string;
-
   overlay: string;
 };
 
@@ -90,11 +82,6 @@ export const light: Palette = {
   partyGradient: ['#F4A93C', '#EC7C6B', '#C77DBB'],
   partyDot: '#FBE3A8',
 
-  sharedAccent: '#4E7BB0',
-  sharedWash: '#E4EDF6',
-  sharedGradient: ['#4E7BB0', '#6E86C4', '#9B8AC9'],
-  sharedDot: '#CFE0F2',
-
   overlay: 'rgba(18, 21, 26, 0.55)',
 };
 
@@ -127,11 +114,6 @@ export const dark: Palette = {
 
   partyGradient: ['#E7963A', '#D96E5E', '#B06AA8'],
   partyDot: '#F2D28C',
-
-  sharedAccent: '#8AA9DC',
-  sharedWash: '#1E2A38',
-  sharedGradient: ['#3E5C86', '#4E5E96', '#6E5E9A'],
-  sharedDot: '#AFC4E4',
 
   overlay: 'rgba(0, 0, 0, 0.6)',
 };

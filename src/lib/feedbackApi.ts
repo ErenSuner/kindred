@@ -1,10 +1,9 @@
 // The one database call the feedback screen makes.
 //
-// Same shape as peopleApi: a plain async function that takes arguments, talks to
-// Supabase, and throws if it goes wrong. It lives in its own file rather than in
-// peopleApi because that file is the people/days/notes surface and this has
-// nothing to do with it — but it belongs here, not in a screen. Screens never
-// call Supabase.
+// A plain async function: takes arguments, talks to Supabase, throws if it goes
+// wrong. It lives here rather than in the screen because screens never call
+// Supabase, and it is not in a context because there is no state to hold — the
+// form sends once and forgets.
 
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';

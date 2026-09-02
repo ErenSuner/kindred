@@ -7,20 +7,13 @@ import { YEARLY } from '@/utils/recurrence';
 import { describeLoadError } from '@/utils/loadError';
 import { useUndo } from './UndoContext';
 import { cacheKey, readCache, writeCache } from '@/utils/cache';
-
-// The default emoji when the user doesn't pick one — a birthday cake reads
-// clearly at avatar size.
-export const DEFAULT_BIRTHDAY_EMOJI = '🎂';
-
-// A short spread of faces to stand in for the person. The cake leads because
-// it's the safe default; the rest cover the common "who is this" at a glance.
-export const EMOJI_CHOICES = ['🎂', '🎈', '🎉', '🌸', '⭐', '❤️', '🐣', '🦋', '🍰', '🎁'];
+import { Importance, importanceFromNudges, nudgesForImportance } from '@/utils/importance';
+import i18n from '@/lib/i18n';
 
 type BirthdayInput = {
   name: string;
   date: string; // YYYY-MM-DD (year 1000 = skipped)
-  emoji?: string;
-  nudges?: string[];
+  importance: Importance;
 };
 
 type BirthdaysContextValue = {
@@ -38,16 +31,16 @@ type BirthdaysContextValue = {
 
 const BirthdaysContext = createContext<BirthdaysContextValue | null>(null);
 
-// A birthday is a yearly cycle that counts an age — the same maths people's
-// birthdays already use, just without a Person around it.
+// A birthday is a yearly cycle that counts an age. The countdown is worked out
+// on every read rather than stored, so a list left open overnight is correct
+// again the moment it refreshes.
 function mapRow(row: any): SimpleBirthday {
   const { formattedDate, daysAway, turningAge } = getNextOccurrence(row.date, YEARLY, true);
   return {
     id: row.id,
     name: row.name,
     originalDate: row.date,
-    emoji: row.emoji || DEFAULT_BIRTHDAY_EMOJI,
-    nudges: row.nudges || [],
+    importance: importanceFromNudges(row.nudges),
     date: formattedDate,
     daysAway,
     turningAge,
@@ -57,7 +50,11 @@ function mapRow(row: any): SimpleBirthday {
 export function BirthdaysProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [birthdays, setBirthdays] = useState<SimpleBirthday[]>([]);
-  const [loading, setLoading] = useState(false);
+  // True until the first load settles, one way or the other. It starts true
+  // rather than false because "nothing yet" and "nothing at all" are different
+  // answers, and NotificationSync acts on the difference: a single frame of
+  // "loaded, and empty" would cancel every scheduled reminder.
+  const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const { stage } = useUndo();
@@ -86,7 +83,7 @@ export function BirthdaysProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('simple_birthdays')
-        .select('id, name, date, emoji, nudges');
+        .select('id, name, date, nudges');
 
       if (error) throw error;
       if (!data) return;
@@ -109,6 +106,9 @@ export function BirthdaysProvider({ children }: { children: React.ReactNode }) {
     } else {
       setBirthdays([]);
       setLoadError(null);
+      // Signed out is a settled answer too: there is nothing to load and
+      // nothing to wait for.
+      setLoading(false);
     }
   }, [user]);
 
@@ -120,8 +120,7 @@ export function BirthdaysProvider({ children }: { children: React.ReactNode }) {
         user_id: user.id,
         name: data.name,
         date: data.date,
-        emoji: data.emoji || DEFAULT_BIRTHDAY_EMOJI,
-        nudges: data.nudges || [],
+        nudges: nudgesForImportance(data.importance),
       });
       if (error) throw error;
       await refreshBirthdays();
@@ -139,8 +138,7 @@ export function BirthdaysProvider({ children }: { children: React.ReactNode }) {
       const updates: Record<string, unknown> = {};
       if (data.name !== undefined) updates.name = data.name;
       if (data.date !== undefined) updates.date = data.date;
-      if (data.emoji !== undefined) updates.emoji = data.emoji;
-      if (data.nudges !== undefined) updates.nudges = data.nudges;
+      if (data.importance !== undefined) updates.nudges = nudgesForImportance(data.importance);
 
       const { error } = await supabase.from('simple_birthdays').update(updates).eq('id', id);
       if (error) throw error;
@@ -169,7 +167,7 @@ export function BirthdaysProvider({ children }: { children: React.ReactNode }) {
   const deleteBirthdayWithUndo = (birthday: SimpleBirthday) => {
     setHiddenIds((prev) => [...prev, birthday.id]);
     stage({
-      message: `${birthday.name} deleted`,
+      message: i18n.t('deleted_name', { name: birthday.name }),
       commit: async () => {
         try {
           await deleteBirthday(birthday.id);

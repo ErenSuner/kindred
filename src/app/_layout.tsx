@@ -21,16 +21,12 @@ import {
 } from '@expo-google-fonts/figtree';
 import { ThemeProvider, useTheme } from '@/theme/ThemeContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
-import { PeopleProvider } from '@/context/PeopleContext';
-import { EventsProvider } from '@/context/EventsContext';
 import { BirthdaysProvider } from '@/context/BirthdaysContext';
-import { HolidaysProvider } from '@/context/HolidaysContext';
 import { NotificationSync } from '@/components/NotificationSync';
 import { AuthLinkHandler } from '@/components/AuthLinkHandler';
 import { UndoProvider } from '@/context/UndoContext';
 import { UndoSnackbar } from '@/components/UndoSnackbar';
 import { AppErrorBoundary } from '@/components/AppErrorBoundary';
-import { PendingWrites } from '@/components/PendingWrites';
 import { HeldNotice } from '@/components/HeldNotice';
 import { Sentry } from '@/lib/sentry';
 
@@ -80,12 +76,12 @@ function RootLayoutNav() {
     const onPasswordReset = seg0 === 'settings' && (segments as any)[1] === 'new-password';
 
     if (!user) {
-      // Not logged in: send them to welcome screen if they attempt to view secure tabs
+      // Not signed in: anything behind the wall bounces back to the welcome screen.
       if (!inAuthGroup && !onIndex && !onAuthLanding && !onPasswordReset) {
         router.replace('/');
       }
     } else {
-      // Logged in: send them to home tab if they attempt to view welcome/auth
+      // Signed in: the welcome and auth screens have nothing left to say.
       if ((inAuthGroup || onIndex) && !onAuthLanding) {
         router.replace('/home');
       }
@@ -110,18 +106,16 @@ function RootLayoutNav() {
     >
       <Stack.Screen name="index" />
       <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="home" />
       <Stack.Screen name="auth/confirm" />
+      <Stack.Screen name="settings/index" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="settings/profile" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="settings/security" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="settings/help" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="settings/new-password" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="settings/feedback" options={{ animation: 'slide_from_right' }} />
-      <Stack.Screen name="person/[id]" options={{ animation: 'slide_from_right' }} />
-      <Stack.Screen name="new-connection" options={{ animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="import-contacts" options={{ animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="my-event/add" options={{ animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="my-event/edit/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="birthday/add" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="birthday/edit/[id]" options={{ animation: 'slide_from_right' }} />
-      <Stack.Screen name="birthday/person/[personId]" options={{ animation: 'slide_from_right' }} />
     </Stack>
   );
 }
@@ -144,7 +138,6 @@ function ThemedApp() {
       <NotificationSync />
       <AuthLinkHandler />
       <RootLayoutNav key={lang} />
-      <PendingWrites />
       <HeldNotice />
       <UndoSnackbar />
 
@@ -152,7 +145,7 @@ function ThemedApp() {
           bar is transparent and the screen's own content scrolls underneath it.
           The platform APIs for colouring it are no-ops under edge-to-edge, so
           the strip is painted here — last, over everything, and untouchable.
-          The tab bar clears it through its own bottom inset. */}
+          Screens clear it through their own bottom inset. */}
       {Platform.OS === 'android' && insets.bottom > 0 && (
         <View
           pointerEvents="none"
@@ -225,15 +218,9 @@ function RootLayout() {
       <ThemeProvider>
         <AuthProvider>
           <UndoProvider>
-            <PeopleProvider>
-              <EventsProvider>
-                <BirthdaysProvider>
-                  <HolidaysProvider>
-                    <ThemedApp />
-                  </HolidaysProvider>
-                </BirthdaysProvider>
-              </EventsProvider>
-            </PeopleProvider>
+            <BirthdaysProvider>
+              <ThemedApp />
+            </BirthdaysProvider>
           </UndoProvider>
         </AuthProvider>
       </ThemeProvider>
