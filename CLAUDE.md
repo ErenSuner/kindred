@@ -23,10 +23,13 @@ before touching anything — they are not optional background.
 
 ## What this app is
 
-**Kindred** — a private mobile app that remembers the people you care about:
-their birthdays, special days, and short notes/photos about them. Not a CRM, not
-a calendar, not a productivity app. Single-user, everything private to one
-account. Used a few times a week, usually triggered by a birthday notification.
+**Kindred** — a private mobile app that remembers birthdays. Add a name and a
+date, get told before the day arrives. That is the whole product.
+
+It used to be much bigger — people with relationships and photos, notes and gift
+ideas, special days, personal events, weekly routines, shared holidays, contacts
+import, search. All of that was deliberately removed. If a change would add a
+capability back, that is a product decision, not a refactor: raise it first.
 
 ## Stack
 
@@ -34,9 +37,10 @@ account. Used a few times a week, usually triggered by a birthday notification.
 - **expo-router** — file-based routing, typed routes enabled, React Compiler on
   (see `app.json` `experiments`).
 - **Supabase** (`@supabase/supabase-js`) — auth + Postgres backend. Session
-  persisted via AsyncStorage.
+  persisted via AsyncStorage. One table: `simple_birthdays`.
 - **i18next / react-i18next** — English + Turkish (`src/locales/{en,tr}.json`).
-- **react-native-reanimated** + **gesture-handler** for animation.
+- **react-native-reanimated** + **gesture-handler** for animation and the
+  importance slider.
 - Fonts: Fraunces (display) + Figtree (UI), via `@expo-google-fonts`.
 - Targets iOS, Android, and web (static export, deployed on Vercel).
 
@@ -70,11 +74,11 @@ src/components/**  UI components. REWRITE FREELY.
 src/theme/**       tokens, type scale, ThemeContext. REWRITE FREELY.
 
 src/context/**    React providers exposing the Context APIs. READ, DON'T RESTRUCTURE.
-src/lib/**         Supabase client + every DB call (peopleApi.ts). LEAVE ALONE.
-src/utils/**       dates, recurrence, routines, nudges, notifications, outbox,
-                   timeline, search, holidays, notes, etc. LEAVE ALONE.
-src/data/mock.ts   Shared domain types. LEAVE ALONE.
-supabase/**        SQL migrations. LEAVE ALONE.
+src/lib/supabase.ts  the client. LEAVE ALONE.
+src/utils/**       dates, recurrence, nudges, importance, notifications,
+                   notificationPermission, cache, loadError, auth*. LEAVE ALONE.
+src/data/mock.ts   the SimpleBirthday type. LEAVE ALONE.
+supabase/**        SQL. LEAVE ALONE. (`supabase/legacy/` is history — nothing reads it.)
 **/__tests__/**    Logic tests. LEAVE ALONE.
 ```
 
@@ -83,21 +87,18 @@ the logic layer* rather than reaching around it. Never call Supabase from a
 screen. Never compute or format a date by hand in a component — use
 `@/utils/dates`. If a test fails, the change reached past the boundary.
 
-`src/utils/timeline.ts` is the one exception: it feeds the home screen and may
-change shape with it.
-
 ### Data flow
 
-`peopleApi.ts` (plain async DB functions) → Context providers (state, refresh,
-offline outbox, undo) → screens read via hooks. The Context APIs are documented
-exhaustively in CONTRACT.md: `usePeople()`, `useEvents()`, `useHolidays()`,
-`useAuth()`, `useUndo()`.
+`BirthdaysContext` talks to Supabase directly (one table, a handful of queries)
+and exposes `useBirthdays()`; screens read from that hook. The Context APIs are
+documented exhaustively in CONTRACT.md: `useBirthdays()`, `useAuth()`,
+`useUndo()`.
 
 ### Provider tree
 
 Set in `src/app/_layout.tsx`, outermost first:
-`AppErrorBoundary → ThemeProvider → AuthProvider → UndoProvider → PeopleProvider
-→ EventsProvider → BirthdaysProvider → HolidaysProvider → ThemedApp`.
+`AppErrorBoundary → ThemeProvider → AuthProvider → UndoProvider →
+BirthdaysProvider → ThemedApp`.
 
 ### Global furniture — must stay mounted near root
 
@@ -108,25 +109,26 @@ removed):
 |---|---|
 | `<NotificationSync />` | All scheduled reminders |
 | `<UndoSnackbar />` | Undo — deletions become final |
-| `<PendingWrites />` | Offline queue visibility + background write errors |
 | `<AppErrorBoundary>` | Render errors become a blank white screen |
 
 ## Conventions
 
 - **Path alias:** `@/*` → `src/*`, `@/assets/*` → `assets/*`.
-- **Domain types** live in `src/data/mock.ts` (Person, SpecialDay, Note,
-  MyEvent, SimpleBirthday, etc.). Import types from there.
+- **Domain type** lives in `src/data/mock.ts` (`SimpleBirthday`).
 - **Every date** the user sees is formatted by `src/utils/dates.ts`. Formatting
   by hand in a component causes screens to disagree about "today".
+- **Importance is stored as reminder presets**, not as a column. Go through
+  `@/utils/importance` (`nudgesForImportance`, `importanceFromNudges`) — never
+  write the `nudges` array by hand. See CONTRACT.md for the mapping.
 - **Write errors must be surfaced**, never swallowed into `console.error`. Use
   `describeWriteError(e)` from `@/utils/loadError` and never clear the user's
   input on failure. Read failures must show `loadError` + retry — an empty list
   after a failed load is "could not fetch", not "you have nothing".
-- **Note writes queue offline** (optimistic); people/days/events surface an
-  error instead. This asymmetry is intentional (FEATURES.md §5).
+- **Nothing queues offline.** Reads fall back to the AsyncStorage cache; writes
+  throw and the screen says so.
 - **i18n:** all user-facing strings go through `t('key')` with entries in both
-  `en.json` and `tr.json`. Search/normalize is Turkish-aware (`@/utils/search`).
-  Helper scripts: `scripts/{add-i18n,find-untranslated,translate-manual}.ts`.
+  `en.json` and `tr.json`. Helper scripts: `scripts/{add-i18n,find-untranslated,
+  translate-manual}.ts`.
 - **Theming:** `useTheme()` gives `{ c, mode, pref, setPref, cardShadow,
   floatShadow }`. `c` is the active semantic `Palette` (see `src/theme/tokens.ts`
   — light + dark both first-class, swapped at runtime). Never hardcode hex in a
@@ -136,9 +138,9 @@ removed):
 
 Jest with the `jest-expo` preset; setup in `jest.setup.js`. Tests are
 **logic-level only** — they live in `src/utils/__tests__/` and cover dates,
-recurrence, routines, nudges, notifications, outbox, timeline, eventTime, and
-applyOutbox. Screens and write/read-error handling are **not** covered by tests
-(CONTRACT.md lists what to preserve by hand).
+importance, notifications, password and the auth error/link helpers. Screens and
+write/read-error handling are **not** covered by tests (CONTRACT.md lists what to
+preserve by hand).
 
 ## Environment
 
@@ -150,5 +152,5 @@ SQL under `supabase/` and applied manually.
 
 `RootLayoutNav` in `_layout.tsx` gates navigation on `useAuth()`: signed-out
 users are pushed to `/` (welcome) and the `(auth)` group; signed-in users land
-on `/home`. Tabs: home, add (people), events, settings — with a custom floating
-`TabBar` in `src/app/(tabs)/_layout.tsx`.
+on `/home`. There is no tab bar — `/home` is the only main screen, with settings
+behind a gear in its header and a `+` FAB for adding a birthday.
