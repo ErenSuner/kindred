@@ -24,18 +24,14 @@ const CONFETTI: {
   { top: '58%', left: '82%', size: 5, round: false, opacity: 0.75, rot: '55deg' },
 ];
 
-export function CelebrationBg({ tone = 'party' }: { tone?: 'party' | 'shared' }) {
+export function CelebrationBg() {
   const { c } = useTheme();
-  const gradient = tone === 'shared' ? c.sharedGradient : c.partyGradient;
-  const dotColors =
-    tone === 'shared'
-      ? [c.sharedAccent, c.sharedDot, c.onInkMuted, c.flame]
-      : [c.flame, c.partyDot, c.good, c.danger, c.onInkMuted];
+  const dotColors = [c.flame, c.partyDot, c.good, c.danger, c.onInkMuted];
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <LinearGradient
-        colors={gradient as [string, string, string]}
+        colors={c.partyGradient as [string, string, string]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[StyleSheet.absoluteFill, { opacity: 0.28 }]}

@@ -1,7 +1,6 @@
 import {
   SKIPPED_YEAR,
   getNextOccurrence,
-  getPastOccurrences,
   getUpcomingOccurrences,
   getOrdinal,
   toISODate,
@@ -115,19 +114,3 @@ describe('getUpcomingOccurrences', () => {
   });
 });
 
-describe('getPastOccurrences', () => {
-  it('never reaches back past the anchor', () => {
-    // Anchored 2025, so there is exactly one past occurrence, not two.
-    const past = getPastOccurrences('2025-03-02', YEARLY, 5);
-    expect(past.map(iso)).toEqual(['2026-03-02', '2025-03-02']);
-  });
-
-  it('returns newest first', () => {
-    const past = getPastOccurrences('2020-01-10', YEARLY, 3);
-    expect(past.map(iso)).toEqual(['2026-01-10', '2025-01-10', '2024-01-10']);
-  });
-
-  it('is empty for a one-time date still ahead', () => {
-    expect(getPastOccurrences('2026-09-05', ONE_TIME, 3)).toEqual([]);
-  });
-});

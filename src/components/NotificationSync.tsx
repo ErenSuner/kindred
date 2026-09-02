@@ -1,32 +1,26 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import i18n from '@/lib/i18n';
-import { usePeople } from '@/context/PeopleContext';
-import { useEvents } from '@/context/EventsContext';
+import { useAuth } from '@/context/AuthContext';
 import { useBirthdays } from '@/context/BirthdaysContext';
-import { useHolidays } from '@/context/HolidaysContext';
-import { HOLIDAYS } from '@/data/holidays';
-import { birthdaysAsPeople, syncNotifications } from '@/utils/notifications';
+import { syncBirthdayNotifications } from '@/utils/notifications';
+import { useNotificationPermission } from '@/utils/notificationPermission';
 
-// syncNotifications cancels everything before rescheduling, so it needs people,
-// the user's own events and the shared occasions together. Mounting this once
-// under all three providers keeps that the only place reminders get scheduled
-// from data changes.
+// syncBirthdayNotifications cancels everything before rescheduling, so it needs
+// the whole list in one call. Mounting this once under the provider keeps that
+// the only place reminders are scheduled from data changes.
 export function NotificationSync() {
-  const { people } = usePeople();
-  const { events, routines } = useEvents();
-  const { birthdays } = useBirthdays();
-  const { enabledIds, loading } = useHolidays();
+  const { loading: authLoading } = useAuth();
+  const { birthdays, loading } = useBirthdays();
 
-  const enabledHolidays = useMemo(() => HOLIDAYS.filter((h) => enabledIds.includes(h.id)), [enabledIds]);
-  // Routines are kept in their own list for display, but they schedule through
-  // the same path as everything else.
-  const ownEvents = useMemo(() => [...events, ...routines], [events, routines]);
-  // Standalone birthdays ride the people path as minimal synthetic Persons.
-  const allPeople = useMemo(() => [...people, ...birthdaysAsPeople(birthdays)], [people, birthdays]);
+  // Permission is asked for at startup, on its own timeline, and can be given
+  // or taken away in system settings long after that. The list does not change
+  // when it happens, so without watching the status the sync that would finally
+  // book the reminders never runs. The hook re-reads on every foreground.
+  const { status } = useNotificationPermission();
 
   // Reminder text is written when it is scheduled, so everything already booked
-  // is still in the old language after a switch. Rescheduling is the only way to
-  // translate it.
+  // is still in the old language after a switch. Rescheduling is the only way
+  // to translate it.
   const [lang, setLang] = useState(i18n.language);
   useEffect(() => {
     const onChange = (next: string) => setLang(next);
@@ -35,11 +29,14 @@ export function NotificationSync() {
   }, []);
 
   useEffect(() => {
-    // Holding off until the stored selection has loaded avoids scheduling the
-    // defaults and then immediately cancelling them.
-    if (loading) return;
-    syncNotifications(allPeople, ownEvents, enabledHolidays);
-  }, [allPeople, ownEvents, enabledHolidays, loading, lang]);
+    // The list is empty before it is loaded, and an empty list means "cancel
+    // everything". Syncing on the way up would wipe the schedule on every cold
+    // start and rebuild it a moment later — fine until the app is killed, or
+    // the load fails, in the gap.
+    if (authLoading || loading) return;
+
+    syncBirthdayNotifications(birthdays);
+  }, [birthdays, loading, authLoading, lang, status]);
 
   return null;
 }

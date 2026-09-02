@@ -9,7 +9,6 @@ import { fonts } from '@/theme/type';
 import { Txt } from '@/components/Txt';
 import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
-import { AvatarPicker } from '@/components/AvatarPicker';
 import { FormError } from '@/components/FormError';
 import { ScrollPickerModal } from '@/components/ScrollPickerModal';
 import { showHeld } from '@/components/HeldNotice';
@@ -62,25 +61,12 @@ export default function ProfileSettings() {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerType, setPickerType] = useState<'day' | 'month' | 'year'>('day');
 
-  // Read only here — the address is edited on the Security screen. Kept for the
-  // avatar's fallback initial, which needs something to fall back to before a
-  // name has been typed.
+  // Read only here — the address is edited on the Security screen.
   const email = user?.email ?? '';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const ownAvatarUrl: string | null = user?.user_metadata?.avatar_url ?? null;
   const previewName = [name, surname].filter(Boolean).join(' ').trim();
-
-  // Same field the settings hub writes — it lives on the auth user, not a table.
-  const saveOwnAvatar = async (publicUrl: string) => {
-    setError(null);
-    const { error: err } = await supabase.auth.updateUser({ data: { avatar_url: publicUrl } });
-    if (err) {
-      console.error('Could not save avatar', err);
-      setError(describeWriteError(err));
-    }
-  };
 
   const handleSave = async () => {
     setError(null);
@@ -142,22 +128,17 @@ export default function ProfileSettings() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Identity — see who you're editing, and change the photo here too. */}
-          <Animated.View entering={FadeInDown.duration(400)} style={styles.identity}>
-            <AvatarPicker
-              uri={ownAvatarUrl}
-              initials={(previewName || email).charAt(0).toUpperCase() || undefined}
-              size={88}
-              subjectId="me"
-              onUploaded={saveOwnAvatar}
-              onError={setError}
-            />
-            {!!previewName && (
-              <Txt variant="title" style={{ marginTop: 10, textTransform: 'capitalize' }}>
+          {/* Who you're editing. */}
+          {!!previewName && (
+            <Animated.View entering={FadeInDown.duration(400)} style={styles.identity}>
+              <Txt variant="title" style={{ textTransform: 'capitalize' }}>
                 {previewName}
               </Txt>
-            )}
-          </Animated.View>
+              <Txt variant="sub" color={c.muted} style={{ marginTop: 2 }}>
+                {email}
+              </Txt>
+            </Animated.View>
+          )}
 
           <Txt variant="eyebrow" color={c.faint} style={styles.sectionTitle}>{t('personal_info')}</Txt>
 

@@ -15,7 +15,7 @@ import { authErrorCode, authErrorDetail, describeAuthError } from '@/utils/authE
 import { authDiagnostics } from '@/utils/authDiagnostics';
 import { ErrorDetails } from '@/components/ErrorDetails';
 import { authRedirectUrl } from '@/utils/authLinks';
-import { isOffline } from '@/utils/outbox';
+import { isOffline } from '@/utils/loadError';
 import { supabase } from '@/lib/supabase';
 import { Sentry } from '@/lib/sentry';
 import { useTranslation } from 'react-i18next';

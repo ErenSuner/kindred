@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, ScrollView, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform, Modal, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform, Modal, Alert, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { Easing, FadeIn, FadeInDown, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
@@ -18,6 +18,7 @@ import { firstPasswordProblem } from '@/utils/password';
 import { formatOccurrenceDate } from '@/utils/dates';
 import { authRedirectUrl } from '@/utils/authLinks';
 import { supabase } from '@/lib/supabase';
+import { DELETE_ACCOUNT_URL } from '@/lib/links';
 import { Sentry } from '@/lib/sentry';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
@@ -651,6 +652,20 @@ export default function SecuritySettings() {
                 style={{ alignSelf: 'flex-start', marginTop: 14 }}
                 onPress={handleDeleteAccount}
               />
+
+              {/* The same thing, spelled out on a page anyone can reach. The
+                  button above is behind a sign-in, and someone locked out of
+                  their account is exactly who needs this most. */}
+              <Pressable
+                onPress={() => Linking.openURL(DELETE_ACCOUNT_URL)}
+                hitSlop={8}
+                accessibilityRole="link"
+                style={{ marginTop: 14 }}
+              >
+                <Txt variant="sub" color={c.muted} style={styles.deleteLink}>
+                  {t('delete_account_page')}
+                </Txt>
+              </Pressable>
             </View>
           </Animated.View>
         </ScrollView>
@@ -759,6 +774,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 16,
   },
+  deleteLink: { textDecorationLine: 'underline' },
   modalOverlay: {
     flex: 1,
     alignItems: 'center',

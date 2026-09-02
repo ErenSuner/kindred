@@ -1,7 +1,7 @@
 {
   "cli": {
     "version": ">= 12.0.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -22,9 +22,6 @@
     },
     "production": {
       "autoIncrement": true,
-      "env": {
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
-      },
       "android": {
         "buildType": "app-bundle"
       }

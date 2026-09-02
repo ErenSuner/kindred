@@ -1,8 +1,7 @@
-// Date helpers shared by people's special days and the user's own events.
+// Date arithmetic for birthdays. Every date the user sees is formatted here,
+// so no two screens can disagree about what day it is.
 
 import { Recurrence, YEARLY } from '@/utils/recurrence';
-import type { TimeOfDay } from '@/utils/eventTime';
-import * as Localization from 'expo-localization';
 import i18n from '@/lib/i18n';
 
 // A stored year of 1000 means the user skipped the year field.
@@ -156,82 +155,10 @@ export function getUpcomingOccurrences(dateStr: string, recurrence: Recurrence, 
   return out;
 }
 
-// The most recent `count` occurrences strictly before `from`, newest first.
-// Never reaches back past the anchor itself: a birthday recorded with the year
-// 1990 has no occurrences in 1989.
-export function getPastOccurrences(dateStr: string, recurrence: Recurrence, count: number, from: Date = startOfToday()): Date[] {
-  const anchor = resolveAnchor(dateStr, recurrence);
-
-  if (recurrence.unit === 'none') {
-    const only = occurrenceAt(anchor, recurrence, 0);
-    return only.getTime() < from.getTime() ? [only] : [];
-  }
-
-  // firstIndexOnOrAfter lands on the next one due, so everything below it is past.
-  const next = firstIndexOnOrAfter(anchor, recurrence, from);
-
-  const out: Date[] = [];
-  for (let k = next - 1; k >= 0 && out.length < count; k--) {
-    out.push(occurrenceAt(anchor, recurrence, k));
-  }
-  return out;
-}
 
 // Formats a date the way the rest of the app writes them.
 export function formatOccurrenceDate(date: Date): string {
   return formatLongDate(date);
-}
-
-// Which clock this phone writes: 18:00 or 6:00 PM. It is the device's own
-// setting, not the app's language — someone reading Kindred in English in
-// Ankara still has a 24-hour phone, and a Turkish speaker in Chicago does not.
-// Language is only the fallback for platforms that don't report it (the web
-// build, on browsers without Intl's hourCycle).
-//
-// Read once: changing the region on iOS or Android restarts the app anyway.
-let clockPref: boolean | null | undefined;
-
-function uses24HourClock(): boolean {
-  if (clockPref === undefined) {
-    try {
-      clockPref = Localization.getCalendars()[0]?.uses24hourClock ?? null;
-    } catch {
-      clockPref = null;
-    }
-  }
-  return clockPref ?? i18n.language === 'tr';
-}
-
-// A wall-clock time, written the way this phone writes one.
-//
-// `formatTimeOfDay` in @/utils/eventTime stays 24-hour on purpose — that is the
-// shape the database and the notification payloads speak. This one is for
-// anything a person reads.
-export function formatClock(time: TimeOfDay | null | undefined): string {
-  if (!time) return '';
-  const minute = String(time.minute).padStart(2, '0');
-  if (uses24HourClock()) return `${String(time.hour).padStart(2, '0')}:${minute}`;
-  return `${to12(time.hour)}:${minute} ${meridiem(time.hour)}`;
-}
-
-// A whole hour, for the pickers that only choose one: "09:00" / "9:00 AM".
-export function formatClockHour(hour: number): string {
-  return formatClock({ hour, minute: 0 });
-}
-
-// The hour on its own, for a stepper sitting next to a separate minute field:
-// "06" / "6 PM". Written without the minutes, which the field beside it owns.
-export function formatHourLabel(hour: number): string {
-  if (uses24HourClock()) return String(hour).padStart(2, '0');
-  return `${to12(hour)} ${meridiem(hour)}`;
-}
-
-function to12(hour: number): number {
-  return hour % 12 === 0 ? 12 : hour % 12;
-}
-
-function meridiem(hour: number): string {
-  return hour < 12 ? 'AM' : 'PM';
 }
 
 // 'YYYY-MM-DD' for a Date, in local time — matching how dates are stored.

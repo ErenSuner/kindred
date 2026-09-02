@@ -1,275 +1,171 @@
 # Kindred — complete feature inventory
 
-A brief for redesigning the interface from scratch.
+A brief for the interface.
 
 This document describes **what the app does** and **what information needs a
-home**. It deliberately does not defend the current layout. Tabs, hierarchy,
-screen boundaries and navigation are all open — the current arrangement is one
+home**. It deliberately does not defend the current layout. Hierarchy, screen
+boundaries and navigation are all open — the current arrangement is one
 solution, not a requirement.
 
 ---
 
 ## 1. What the app is
 
-Kindred remembers the people you care about, so you don't have to.
+**Kindred remembers birthdays, so you don't have to.**
 
-It is **not** a productivity app, a CRM, or a calendar. There is no inbox, no
-streak, no completion rate. The emotional register is closer to a private
-notebook than to a dashboard.
+That is the whole product. Not a CRM, not a calendar, not a contacts app, not a
+productivity tool. There is no inbox, no streak, no completion rate, no notes,
+no photographs. The emotional register is closer to a friend nudging you than to
+a dashboard.
 
-**How it is actually used:** a few times a week, usually because a notification
-said someone's birthday is coming up. Sessions are short. The user opens it,
-sees what is near, maybe writes down a gift idea, and closes it. Occasionally
-they sit with it longer — adding photos, reading back over what happened last
-year.
+It used to be much bigger — people with relationships and photos, notes and gift
+ideas, personal events, weekly routines, shared holidays. All of it was removed.
+The app was doing eleven things adequately and the one thing badly. Now it does
+one thing.
 
-**What the content is:** faces, dates, short notes, photographs. The people are
-the interesting part. The interface should not compete with them.
+**How it is actually used:** rarely, and always because a notification arrived.
+The user is told a birthday is coming, they act on it in the world, and they
+close the app. The other kind of session is adding a birthday they just learned
+about, which takes fifteen seconds. Nothing else should take longer.
 
-**Who it is for:** individuals, not teams. Everything is private to one account.
-There is no sharing, no collaboration, no social layer.
+**Who it is for:** individuals. Everything is private to one account. No
+sharing, no collaboration, no social layer.
 
 ---
 
-## 2. The things the app knows about
+## 2. The thing the app knows about
 
-Six objects. Everything in the app is one of these.
+One object.
 
-**Person** — someone you care about. Has a name, a relationship (Family, Friend,
-Partner, Colleague, Acquaintance), an optional photo, and a pinned flag. May be
-linked to a phone contact.
+**Birthday** — a name, a date, and how much it matters.
 
-**Special day** — a date attached to a person. Birthdays, anniversaries,
-graduations, memorial days. Has a title, a date, a repeat cycle, and its own set
-of reminders. A birthday is a special day with its title and cycle fixed.
+- **Name** — free text. Whatever the user calls this person.
+- **Date** — day and month, required. Year optional; without it there is no age.
+- **Importance** — one of three levels, chosen on a slider. It decides how much
+  warning the reminder gives.
 
-**My event** — a date that belongs to the user, with no person attached. Dentist
-appointments, passport renewals, rent. Has a title, date, repeat cycle, optional
-time of day, and reminders.
-
-**Routine** — something on the same weekdays every week. A course on Tuesdays and
-Thursdays, a standing therapy appointment. Has a name, a set of weekdays, an
-optional time, and reminders. No date, because it never ends.
-
-**Note** — text attached to a person or to one of their days. Comes in four
-flavours that behave differently:
-- *Gift idea* — one short line, can be ticked off as bought
-- *Memory* — a photograph, optionally tied to one past occurrence
-- *Notebook* — one free-form document per person, edited in place
-- *Day note* — plans and details for one specific occasion
-
-**Shared occasion** — dates everyone has: Mother's Day, Valentine's Day, New
-Year. Not tied to any person. The user chooses which ones they want to hear
-about.
+Nothing else. No photo, no emoji, no relationship, no phone number, no notes.
+Anything the user wants to remember beyond the date belongs in a different app.
 
 ---
 
 ## 3. Every capability
 
-### Remembering people
+**Adding** — name, date, importance. One screen, three fields, one button.
 
-- Add a person by hand: name, relationship, photo
-- Import people from the phone's address book — name, photo and birthday only.
-  Multi-select, search, "select all with birthdays" shortcut, progress while it
-  runs, and one undo for the whole import. **Phone numbers are never read**, and
-  the interface says so.
-- Edit a person's name, relationship and photo
-- Delete a person, with a grace period to undo
-- Pin someone so they stay near the top
-- Open the linked address-book entry in the phone's own Contacts app (this is
-  how calling and messaging happen — Kindred stores no way to reach anyone)
-- Tap a photo to see it uncropped
+**Editing** — the same screen with the values filled in, plus delete.
 
-### Dates
+**Deleting** — immediate, with five seconds of undo. Never a confirmation
+dialog; the undo is the confirmation.
 
-- Add a birthday to a person (day, month, year optional)
-- Add any other special day: title, date, repeat cycle, reminders, notes
-- Add a personal reminder with an optional time of day
-- Add a weekly routine: pick weekdays, optional time
-- Edit or delete any of the above
-- Repeat cycles: one-time, or every N days / weeks / months, or yearly. Four
-  quick choices plus a custom interval.
-- The year is optional for anything that repeats. A date pinned to a real year
-  cannot be set in the past, and if the user tries, it is moved forward and told
-  so.
+**Browsing** — a single chronological list, soonest first. The next birthday is
+given more room than the rest, because it is the one thing the user came to see.
 
-### Reminders
+**Age** — when a year was given, the list and the notification both say what age
+this one turns. When it was skipped, neither mentions age at all.
 
-- Every date always notifies on the day itself — this is not switchable
-- Up to four earlier reminders per date, chosen from presets (1 day, 3 days,
-  1 week, 2 weeks, 1 month, 2 months) or a custom amount
-- One global time of day for all reminders, set once in settings
-- A dated thing with its own time gets two notifications: a morning heads-up
-  and a warning two hours before
-- Shared occasions notify a week and a day ahead
-- The app shows a warning if notification permission was denied, because
-  otherwise reminders silently never arrive
+**Reminding** — the job the app exists to do. The day itself always fires,
+whatever else is set. Importance adds one earlier warning:
 
-### Notes and memories
+| Importance | Reminder |
+|---|---|
+| Low | On the morning of the day |
+| Medium | Three days before, and on the day |
+| High | A week before, and on the day |
 
-Per person:
-- **Gift ideas** — a short line each. Tick one off when bought; it moves to a
-  collapsed "bought" list and can be un-ticked.
-- **Memories** — photographs. A grid, tap to view full size, delete.
-- **Notebook** — one long free-form document. Sizes, allergies, what they love,
-  what they said last time.
+Reminders arrive at 09:00 local time. There is a master switch in settings to
+turn them off entirely, and a warning if the operating system has denied
+permission.
 
-Per occasion:
-- Notes attached to a specific day, previewed on that day's card
+**Account** — email and password sign-in, email confirmation, password reset,
+email change, password change, account deletion. Name and surname on the
+profile. Language (English, Turkish) and theme (light, dark, system).
 
-Looking back:
-- Every past occurrence of a person's recurring days, listed newest first
-- The user can write what actually happened on any of them
-- Collapsed after four entries
-
-### Finding things
-
-- Search across people's names, relationships, day titles, dates and note text
-- Accent- and case-insensitive, with Turkish character folding — typing "dogum"
-  finds "Doğum", "cigdem" finds "Çiğdem"
-- Word-start matches rank above mid-word ones; people rank above their days
-
-### Browsing
-
-- A chronological view of everything coming up, whoever it belongs to
-- A birthday-only view, filterable by month
-- The full list of people
-- The user's own events and routines
-
-### Settings
-
-- Own profile: photo, name, surname, birth date, email
-- Change password
-- Turn all reminders on or off
-- Choose which shared occasions to observe
-- Choose what time of day reminders arrive
-- Log out
-- Delete account, behind a two-step confirmation
+**Support** — a short FAQ and a feedback form.
 
 ---
 
-## 4. Screens that exist today
+## 4. Screens
 
-Listed so nothing is forgotten. **The grouping is negotiable** — if a better
-structure merges, splits or reorders these, take it.
-
-| Screen | Must be able to show / do |
+| Screen | What it is |
 |---|---|
-| Welcome | App name, one-line pitch, sign up, log in |
-| Log in / Register | Email, password, errors |
-| Home | What is coming up, soonest first, across people + events + routines + shared occasions |
-| People | Every person, search, pin, delete, add by hand, import from contacts |
-| Person detail | Photo, name, relationship, next occasion, birthday, their other days, past occurrences, gift ideas, photos, notebook, open in Contacts, edit, delete |
-| Events | The user's own dated reminders, their weekly routines, and ones that already happened |
-| Settings | Profile, security, notification settings, shared occasions, account actions |
-| Birthdays | Every birthday, filtered by month, split into upcoming and later |
-| Add / edit person | Name, relationship, photo, duplicate-name warning |
-| Add / edit special day | Title, date, repeat cycle, reminders, notes |
-| Add / edit birthday | Date, reminders, notes |
-| Add / edit personal reminder | Title, suggestions, date, repeat cycle, time, reminders |
-| Add / edit routine | Name, suggestions, weekdays, time, reminders |
-| Import contacts | Searchable contact list, selection, birthday badges, progress, privacy note |
-| Shared occasions | List of holidays with on/off switches |
-| Profile / Security | Form fields, save |
+| Welcome | Signed-out landing; leads to sign in or register |
+| Log in / Register | Email and password |
+| Home | The list of birthdays. The only main screen. |
+| Add / Edit birthday | Name, date, importance |
+| Settings | Reminders, theme, language, account, support |
+
+Settings has a small stack behind it: profile, security, feedback, help. The
+grouping is negotiable; the list is not much longer than this.
 
 ---
 
 ## 5. States the design must handle
 
-These are easy to forget and expensive to add later.
-
-**Empty** — no people at all; people but no dates; no gift ideas; no photos; no
-past to look back on; a search with no results; a month with no birthdays. Each
-needs its own words, not one generic shrug.
-
-**Offline** — reads come from a local cache, so the app opens and works with no
-connection. Note writes are queued, shown immediately as though they had
-happened, and sent later. A banner says how many are waiting and offers to retry
-now.
-
-**Write failed** — people, days and events are *not* queued. If one of those
-fails, the user is told plainly, and told whether it was the connection or a
-refusal. Their typing is never discarded.
-
-**Undo** — deleting a person, a day or a note hides it immediately and offers
-five seconds to change your mind before it actually happens.
-
-**Load failed** — the previous data stays on screen with an explanation and a
-retry, never a blank list that reads as "everything is gone".
-
-**Permission denied** — notifications and photo library. Both need a way back.
-
-**In progress** — importing contacts, uploading a photo, saving.
+- **Empty** — no birthdays yet. This is the first thing most users see, and it
+  is the app's only chance to explain itself.
+- **Offline** — the list is served from the cache. It must be visibly the
+  saved copy, not silently stale.
+- **Write failed** — saving a birthday does not queue. It surfaces an error, and
+  what the user typed stays on screen.
+- **Load failed** — an error with a retry. Never dressed up as an empty state.
+- **Undo** — five seconds after a delete.
+- **Permission denied** — notifications are switched off at the OS level. The
+  app's whole promise is broken; say so clearly.
+- **In progress** — saving, loading, signing in.
 
 ---
 
 ## 6. Technical constraints
 
-Built with **React Native and Expo (SDK 54)**, running on iOS and Android.
-
-- No CSS gradients, backdrop blur, or filter effects. Anything the design relies
-  on must be renderable by a plain React Native view.
-- Shadows behave differently on iOS and Android and are unreliable as the only
-  means of separating a surface from its background.
-- Fonts are loaded from Google Fonts at startup. Currently Literata (serif) and
-  Inter — both replaceable.
-- Icons are Material Icons. A different set means bundling one.
-- Animation is available and cheap (Reanimated) — layout transitions, fades,
-  springs are all fine.
-- The screen must work at 375pt wide, and text may be scaled up by the OS.
-- Light theme only today. Dark theme is wanted but not yet built, so a palette
-  that can eventually invert is worth more than one that cannot.
+- React Native via Expo SDK 54. iOS and Android are the real targets; web is a
+  static export that should not crash.
+- Shadows behave differently on the two platforms — use `cardShadow` /
+  `floatShadow` from the theme rather than raw shadow props.
+- Fonts come from Google Fonts (Fraunces for display, Figtree for UI) and are
+  replaceable.
+- Icons are Material Icons via `@expo/vector-icons`.
+- `react-native-reanimated` and `react-native-gesture-handler` are available and
+  used by the importance slider.
+- Design for 375pt wide. Respect OS text scaling.
+- Light and dark both ship.
 
 ---
 
-## 7. What is weak about the current design
-
-An honest diagnosis, so the redesign solves the real problem.
-
-**Everything is the same value.** Background `#fcf9f8`, cards `#ffffff`,
-containers `#f6f3f2` — within 3% of each other. Shadows sit at 0.06 opacity.
-Nothing separates from anything. The result reads as flat and undifferentiated.
-
-**The accent does not act like an accent.** A desaturated dusty brick
-(`#8b4c4d`) against a warm off-white. It never pops, so nothing signals
-importance.
-
-**No dark surface anywhere.** No anchor for the eye.
-
-**Serif-plus-sans is the wellness-app default.** Competent, but it makes the app
-look like every other mindful-reminder product.
-
-**Small radii and low contrast together** make cards look pressed flat into the
-page.
-
-**Rows are undifferentiated.** A list of five things happening today looks
-identical to a list of five things happening in a month. Nothing carries weight.
-
----
-
-## 8. Hard-won details worth keeping
+## 7. Hard-won details worth keeping
 
 Behaviours that were fixed after they went wrong. A rewrite should not
 reintroduce them.
 
-- A long unbroken word in a note must not push out of its card — the text
-  container needs to be allowed to shrink
-- A thumbnail's tappable wrapper needs real dimensions, or the image inside
-  collapses to nothing
-- Ticking a gift off must update instantly and reconcile with the server
-  afterwards; waiting for the round trip reads as the app hanging
-- Rows that move between lists should travel, not teleport
-- Date pickers should not offer a past month for a date pinned to this year, and
-  should say so when they move a choice forward
+- Rows that move between positions should travel, not teleport
+- A date picker must not be able to offer the 31st of February — capping the day
+  list to the chosen month is cheaper than validating afterwards
 - A secondary action must not be visually louder than the primary one — a filled
   "add" button once outshouted "Done"
-- "Turning 36" belongs only to birthdays, and only where the message is
-  rewritten each year
+- "Turning 36" belongs only where a year was given, and the message is rewritten
+  each year rather than baked in once
+- A long unbroken name must not push out of its card — let the text container
+  shrink
 - An empty state after a failed load must not read as an empty state
+- A repeating yearly notification cannot carry an age, because the operating
+  system will read the same text out every year. Only dated reminders may.
+- Reminders must not be scheduled before permission has actually been granted,
+  and the schedule must be retried once it is — the permission prompt and the
+  first data load run on different timelines, and whichever loses the race, the
+  user must not end up with nothing booked
+- A run that failed to book its reminders must not be remembered as a run that
+  succeeded, or the retry never happens
+- A lead time worked out in a leap year lands on a different day than the same
+  lead time in a common year. A repeating yearly slot cannot hold both, so it is
+  always worked out in a common year — the answer must not depend on when the
+  app was last opened
+- An animation belongs to a style property, never inside an expression:
+  `width: base + withSpring(x)` turns the animation into a string and the
+  element freezes at its last good value
 
 ---
 
-## 9. How it should feel
+## 8. How it should feel
 
 One sentence governs everything below:
 
@@ -282,37 +178,32 @@ opposite. The user hands over the worry and gets on with their life.
 ### Trust, not vigilance
 
 - No badges, no unread counts, no "3 overdue". Nothing that says you are behind.
-- Nothing is ever *missed*. A date that has passed is simply past, and is shown
-  as something to look back on, not as a failure.
+- Nothing is ever *missed*. A date that has passed is simply past.
 - A countdown is anticipation, not a deadline. Three days away is a nice thing
   approaching, not a clock running out.
 - **When something is saved, show that the app has taken the job on.** The
-  reassurance is the product. Today the screen just closes, which asks the user
-  to hope rather than to know.
-- Let the mechanism be quietly visible — that reminders are armed, when they
-  will arrive.
+  reassurance is the product.
+- Let the mechanism be quietly visible — that reminders are armed, and when they
+  will arrive. This is what the importance slider is really for: it is not a
+  setting, it is the user watching the promise being made.
 - **One exception, and it should be loud:** if notification permission is
   denied, the promise cannot be kept. That is the only alarm this app earns.
 
 ### Obvious, not explained
 
 - Very little text. Labels, not paragraphs.
-- Every action visible. Nothing important hidden behind a long-press — deleting
-  a person currently is, and nobody will find it.
+- Every action visible. Nothing important hidden behind a long-press.
 - One clear primary action per screen.
 - **If a screen needs a paragraph to explain itself, the screen is wrong.** The
-  fix is a better arrangement, not shorter prose. The current design leans on
-  explanatory blurbs under almost every section; they should mostly disappear,
-  not shrink.
+  fix is a better arrangement, not shorter prose.
 - A first-time user should be able to work out what to do without reading.
 
 ### Fluid, with small delights
 
-- Things move rather than appear and disappear. Lists reorder by travelling.
+- Things move rather than appear and disappear.
 - Navigation should feel continuous, not like slides being swapped.
-- Motion should *mean* something. Good places: a gift idea ticking off and
-  moving to the bought list, a countdown reaching today, a photo landing in the
-  grid, a new entry sliding into the timeline.
+- Motion should *mean* something. Good places: a countdown reaching today, a new
+  birthday sliding into the list, the importance slider settling onto a stop.
 - Bad places: form fields, settings rows, error messages. Movement there reads
   as sluggishness.
 - Playful, not cartoonish. One well-timed spring beats five bouncy ones. The
@@ -321,22 +212,17 @@ opposite. The user hands over the worry and gets on with their life.
 ### Light and dark, both first-class
 
 Both themes ship together. Neither is an afterthought or an inversion done
-badly. The palette must hold up either way, and faces and photographs must look
-right on both.
+badly. The palette must hold up either way.
 
 ---
 
-## 10. What the redesign is free to change
+## 9. What the design is free to change
 
-Everything visual and structural:
+Everything visual and structural: which information lives on which screen, how
+the date is entered, navigation patterns, the entire palette, type scale,
+spacing rhythm and shape language.
 
-- The number of tabs and what they are
-- Which information lives on which screen
-- Whether the person detail screen is one page or several
-- How dates are added — the current multi-field forms are not sacred
-- Navigation patterns: sheets, modals, full screens, stacks
-- The entire palette, type scale, spacing rhythm, and shape language
-- Whether the app is light, dark, or both
-
-What must not change is what the app *does* — every capability in section 3 needs
-somewhere to live, and every state in section 5 needs a design.
+What must not change is the size of the app. Every capability in section 3 needs
+somewhere to live and every state in section 5 needs a design — and nothing
+outside section 3 gets built. A feature that is merely useful is still a
+feature this app does not want.

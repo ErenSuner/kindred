@@ -17,7 +17,3 @@ export function daysLongLabel(daysAway: number): string {
   return i18n.t('in_days', { n: daysAway });
 }
 
-// Past form: "3 days ago".
-export function daysAgoLabel(daysAway: number): string {
-  return i18n.t('days_ago', { n: Math.abs(daysAway) });
-}

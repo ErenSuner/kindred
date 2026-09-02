@@ -16,14 +16,3 @@ export function upperCase(value: string): string {
   return value.toLocaleUpperCase(locale());
 }
 
-export function lowerCase(value: string): string {
-  return value.toLocaleLowerCase(locale());
-}
-
-// First letter up, the rest untouched — for a name typed in whatever case the
-// person felt like. Only the first word, so "eren suner" keeps its own shape
-// beyond the initial rather than being title-cased into something it isn't.
-export function capitalizeFirst(value: string): string {
-  if (!value) return value;
-  return upperCase(value.charAt(0)) + value.slice(1);
-}
